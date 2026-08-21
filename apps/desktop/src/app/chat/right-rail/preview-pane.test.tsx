@@ -142,6 +142,36 @@ describe('PreviewPane console state', () => {
     expect(rendered.queryByRole('textbox', { name: 'Address' })).toBeNull()
   })
 
+  it('derives agent access from the real webview lifecycle', async () => {
+    let rendered!: ReturnType<typeof render>
+    await act(async () => {
+      rendered = render(
+        <PreviewPane
+          tabId="preview-agent-access"
+          target={{ kind: 'url', label: 'Preview', source: 'http://localhost:5174', url: 'http://localhost:5174' }}
+        />
+      )
+    })
+
+    const webview = rendered.container.querySelector('webview') as HTMLElement
+    expect(rendered.getByRole('status').getAttribute('data-agent-access')).toBe('connecting')
+
+    act(() => webview.dispatchEvent(new Event('dom-ready')))
+    expect(rendered.getByRole('status').getAttribute('data-agent-access')).toBe('on')
+
+    act(() =>
+      webview.dispatchEvent(
+        Object.assign(new Event('did-fail-load'), {
+          errorCode: -102,
+          errorDescription: 'ERR_CONNECTION_REFUSED',
+          isMainFrame: true,
+          validatedURL: 'http://localhost:5174'
+        })
+      )
+    )
+    expect(rendered.getByRole('status').getAttribute('data-agent-access')).toBe('off')
+  })
+
   it('drives the webview from the bar and tracks its history', async () => {
     let rendered!: ReturnType<typeof render>
     await act(async () => {

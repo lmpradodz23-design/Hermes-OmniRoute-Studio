@@ -3130,7 +3130,11 @@ Deixe em branco para manter o ${mode} padr\u00E3o.`,
       fallbackTitle: 'Visualiza\u00E7\u00E3o',
       agentAccess: 'Acesso do agente ativado',
       agentAccessDescription:
-        'Hermes pode ler e controlar esta guia apenas no chat que voc\u00EA est\u00E1 visualizando.'
+        'Hermes pode ler e controlar esta guia apenas no chat que voc\u00EA est\u00E1 visualizando.',
+      agentAccessConnecting: 'Conectando acesso do agente',
+      agentAccessConnectingDescription: 'O Hermes aguarda a p\u00E1gina da pr\u00E9via ficar pronta.',
+      agentAccessOff: 'Acesso do agente desativado',
+      agentAccessOffDescription: 'O Hermes n\u00E3o pode ler nem controlar esta aba de pr\u00E9via.'
     }
   },
   zones: {

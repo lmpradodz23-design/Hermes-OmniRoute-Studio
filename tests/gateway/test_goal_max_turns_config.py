@@ -115,6 +115,29 @@ async def test_gateway_goal_draft_pauses_for_real_spec_review(tmp_path, monkeypa
 
 
 @pytest.mark.asyncio
+async def test_gateway_goal_draft_reports_pause_failure_and_clears_goal(tmp_path, monkeypatch):
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setattr(
+        goals,
+        "draft_contract",
+        lambda _objective: goals.GoalContract(outcome="Built", verification="Tests pass"),
+    )
+    monkeypatch.setattr(goals.GoalManager, "pause", lambda self, reason="": None)
+    goals._DB_CACHE.clear()
+
+    try:
+        response = await GatewayRunner._handle_goal_command(_make_runner(), _make_goal_draft_event())
+
+        assert "Goal pause failed" in response
+        assert "paused for review" not in response
+        assert goals.GoalManager("sid-gateway-goal-config").has_goal() is False
+    finally:
+        goals._DB_CACHE.clear()
+
+
+@pytest.mark.asyncio
 async def test_goal_command_slow_db_init_still_persists(tmp_path, monkeypatch):
     """A slow state.db init (cold cache, first /goal of the process) must
     not silently drop the goal write: the gateway warms the cache off-loop,

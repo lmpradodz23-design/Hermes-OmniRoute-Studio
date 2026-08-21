@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -608,8 +609,9 @@ test('tightenSecretFileMode only touches a regular file the current user owns', 
   assert.deepEqual(chmodded, ['/x/connection.json'])
 })
 
-test('tightenSecretFileMode leaves Windows alone rather than flipping the read-only bit', () => {
+test('tightenSecretFileMode applies an explicit owner and LocalSystem ACL on Windows', () => {
   const chmods: string[] = []
+  const calls: Array<{ command: string; args: string[] }> = []
 
   const fakeFs = {
     chmodSync: (filePath: string) => void chmods.push(filePath),
@@ -624,13 +626,63 @@ test('tightenSecretFileMode leaves Windows alone rather than flipping the read-o
     writeFileSync: () => void 0
   } as any
 
-  assert.equal(tightenSecretFileMode('C:\\Users\\me\\connection.json', { fs: fakeFs, platform: 'win32' }), true)
+  assert.equal(
+    tightenSecretFileMode('C:\\Users\\me\\connection.json', {
+      execFileSync: ((command: string, args: string[]) => {
+        calls.push({ command, args })
+
+        return command === 'whoami.exe' ? '"DESKTOP\\me","S-1-5-21-100-200-300-1001"\r\n' : ''
+      }) as any,
+      fs: fakeFs,
+      platform: 'win32'
+    }),
+    true
+  )
   assert.deepEqual(chmods, [], 'no chmod on win32')
+  assert.deepEqual(calls, [
+    { command: 'whoami.exe', args: ['/user', '/fo', 'csv', '/nh'] },
+    {
+      command: 'icacls.exe',
+      args: [
+        'C:\\Users\\me\\connection.json',
+        '/inheritance:r',
+        '/grant:r',
+        '*S-1-5-21-100-200-300-1001:(F)',
+        '*S-1-5-18:(F)'
+      ]
+    }
+  ])
 
   // Same fs, POSIX: the chmod does happen, proving the platform gate is what
   // suppressed it above.
   assert.equal(tightenSecretFileMode('/home/me/connection.json', { fs: fakeFs, platform: 'linux' }), true)
   assert.ok(chmods.includes('/home/me/connection.json'), 'the POSIX path was tightened')
+})
+
+test.skipIf(process.platform !== 'win32')('tightenSecretFileMode hardens a real Windows file with icacls', () => {
+  withTempDir(dir => {
+    const target = path.join(dir, 'connection.json')
+
+    fs.writeFileSync(target, '{"token":"encrypted"}', 'utf8')
+    assert.equal(tightenSecretFileMode(target), true)
+
+    const icaclsOutput = String(execFileSync('icacls.exe', [target], { encoding: 'utf8', windowsHide: true }))
+    assert.ok(icaclsOutput.trim(), 'icacls can read the hardened ACL')
+
+    const ownerSid = String(
+      execFileSync('whoami.exe', ['/user', '/fo', 'csv', '/nh'], { encoding: 'utf8', windowsHide: true })
+    ).match(/S-\d-(?:\d+-)+\d+/i)?.[0]
+
+    assert.ok(ownerSid)
+
+    const aclFile = path.join(dir, 'connection.acl')
+    execFileSync('icacls.exe', [target, '/save', aclFile], { encoding: 'utf8', windowsHide: true })
+    const sddl = fs.readFileSync(aclFile, 'utf16le')
+
+    assert.match(sddl, new RegExp(`;;;${ownerSid.replaceAll('-', '\\-')}\\)`))
+    assert.match(sddl, /;;;SY\)/, 'LocalSystem has explicit full control')
+    assert.doesNotMatch(sddl, /;;;(?:WD|AU|BU)\)/, 'no broad Everyone, Authenticated Users, or Users ACE')
+  })
 })
 
 test('a token is never persisted in plaintext when safeStorage is unavailable', () => {

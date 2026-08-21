@@ -800,11 +800,7 @@ test('runSsh delivers stdinData to the child and does not log it', async () => {
   assert.equal(stdinWritten, 'secret-token-value', 'stdinData must be written to child.stdin')
 })
 
-test('open() rejects a control-dir that is a symlink', async () => {
-  if (process.platform === 'win32') {
-    return
-  }
-
+test.skipIf(process.platform === 'win32')('open() rejects a control-dir that is a symlink', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ssh-test-'))
   const real = path.join(tmp, 'real')
   const link = path.join(tmp, 'link')
@@ -816,11 +812,7 @@ test('open() rejects a control-dir that is a symlink', async () => {
   fs.rmSync(tmp, { recursive: true, force: true })
 })
 
-test('open() enforces 0700 on an existing control dir with lax permissions', async () => {
-  if (process.platform === 'win32') {
-    return
-  }
-
+test.skipIf(process.platform === 'win32')('open() enforces 0700 on an existing control dir with lax permissions', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ssh-test-'))
   const dir = path.join(tmp, 'ctrl')
   fs.mkdirSync(dir, { mode: 0o755 })

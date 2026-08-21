@@ -185,13 +185,7 @@ test('readDirForIpc marks a symlink to a directory as a directory', async t => {
   }
 })
 
-test('readDirForIpc marks a Windows junction to a directory as a directory', async t => {
-  if (process.platform !== 'win32') {
-    t.skip('junctions are a Windows-specific symlink type')
-
-    return
-  }
-
+test.skipIf(process.platform !== 'win32')('readDirForIpc marks a Windows junction to a directory as a directory', async t => {
   const root = mkTmpDir()
 
   try {

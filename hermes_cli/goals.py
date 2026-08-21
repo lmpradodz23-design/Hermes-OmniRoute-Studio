@@ -45,6 +45,22 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
+class GoalPauseError(RuntimeError):
+    """The requested pause was not durably reflected by GoalManager."""
+
+
+def pause_goal_or_raise(manager: "GoalManager", *, reason: str) -> "GoalState":
+    """Pause a goal without allowing ``None`` or a stale state to look successful."""
+    try:
+        state = manager.pause(reason=reason)
+    except Exception as exc:
+        raise GoalPauseError("goal state could not be persisted as paused") from exc
+
+    if state is None or state.status != "paused":
+        raise GoalPauseError("goal manager did not return a paused state")
+    return state
+
+
 # ──────────────────────────────────────────────────────────────────────
 # Constants & defaults
 # ──────────────────────────────────────────────────────────────────────

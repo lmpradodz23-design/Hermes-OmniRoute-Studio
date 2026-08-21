@@ -71,6 +71,18 @@ def _make_cli(session_id: str):
 
 
 class TestCliResumeRestartsWork:
+    def test_pause_failure_is_visible_and_never_claims_success(self, hermes_home, monkeypatch, capsys):
+        sid = f"sid-cli-pause-fail-{uuid.uuid4().hex}"
+        cli = _make_cli(sid)
+        goals.GoalManager(sid).set("do not lie about pausing")
+        monkeypatch.setattr(goals.GoalManager, "pause", lambda self, reason="": None)
+
+        cli._handle_goal_command("goal pause")
+
+        output = capsys.readouterr().out
+        assert "Goal pause failed" in output
+        assert "Goal paused:" not in output
+
     def test_resume_after_budget_exhaustion_queues_continuation(self, hermes_home):
         sid = f"sid-cli-resume-{uuid.uuid4().hex}"
         cli = _make_cli(sid)

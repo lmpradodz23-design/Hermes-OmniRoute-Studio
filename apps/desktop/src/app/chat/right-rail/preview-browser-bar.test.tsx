@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { normalizePreviewAddress, PreviewBrowserBar } from './preview-browser-bar'
 
 const baseProps = {
+  agentAccess: 'off' as const,
   canGoBack: false,
   canGoForward: false,
   consoleOpen: false,
@@ -79,6 +80,20 @@ describe('normalizePreviewAddress', () => {
 })
 
 describe('PreviewBrowserBar', () => {
+  it.each([
+    ['off', 'Agent access off'],
+    ['connecting', 'Agent access connecting'],
+    ['on', 'Agent access on']
+  ] as const)('reports the real agent-access state: %s', (agentAccess, label) => {
+    const rendered = render(<PreviewBrowserBar {...baseProps} agentAccess={agentAccess} />)
+    const status = rendered.getByRole('status')
+
+    expect(status.textContent).toContain(label)
+    expect(status.getAttribute('data-agent-access')).toBe(agentAccess)
+    expect(status.getAttribute('aria-live')).toBe('polite')
+    expect(status.className).not.toContain('hidden')
+  })
+
   it('renders the navigation controls and the page toggles', () => {
     const rendered = render(<PreviewBrowserBar {...baseProps} />)
 

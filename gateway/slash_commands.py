@@ -2713,9 +2713,13 @@ class GatewaySlashCommandsMixin:
             return f"{mgr.status_line()}\n{mgr.render_contract()}"
 
         if lower == "pause":
-            state = mgr.pause(reason="user-paused")
-            if state is None:
+            if not mgr.has_goal():
                 return t("gateway.goal.no_goal_set")
+            from hermes_cli.goals import GoalPauseError, pause_goal_or_raise
+            try:
+                state = pause_goal_or_raise(mgr, reason="user-paused")
+            except GoalPauseError as exc:
+                return f"Goal pause failed: {exc}. The goal was not reported as paused."
             try:
                 adapter = self.adapters.get(event.source.platform) if event.source else None
                 _quick_key = self._session_key_for_source(event.source) if event.source else None
@@ -2858,7 +2862,18 @@ class GatewaySlashCommandsMixin:
 
         base = t("gateway.goal.set", budget=state.max_turns, goal=state.goal)
         if is_draft and state.has_contract():
-            state = mgr.pause(reason="awaiting-spec-review") or state
+            from hermes_cli.goals import GoalPauseError, pause_goal_or_raise
+            try:
+                state = pause_goal_or_raise(mgr, reason="awaiting-spec-review")
+            except GoalPauseError as exc:
+                try:
+                    mgr.clear()
+                except Exception:
+                    logger.exception("goal draft pause failed and clearing the unsafe active goal also failed")
+                return (
+                    f"{base}\nGoal pause failed: {exc}. "
+                    "The drafted goal was cleared so it cannot run without review."
+                )
             return (
                 f"{base}\nSpec drafted and paused for review:\n"
                 f"{state.contract.render_block()}\n"

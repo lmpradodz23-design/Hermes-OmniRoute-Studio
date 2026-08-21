@@ -3206,7 +3206,11 @@ export const zh: Translations = {
       openTarget: url => `打开 ${url}`,
       fallbackTitle: '预览',
       agentAccess: '代理访问已开启',
-      agentAccessDescription: 'Hermes 只能从你正在查看的对话中读取和控制此标签页。'
+      agentAccessDescription: 'Hermes 只能从你正在查看的对话中读取和控制此标签页。',
+      agentAccessConnecting: '正在连接代理访问',
+      agentAccessConnectingDescription: 'Hermes 正在等待预览页面准备就绪。',
+      agentAccessOff: '代理访问已关闭',
+      agentAccessOffDescription: 'Hermes 无法读取或控制此预览标签页。'
     }
   },
 

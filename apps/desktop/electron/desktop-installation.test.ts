@@ -38,10 +38,13 @@ test('loadOrCreateInstallationId persists and reuses one installation ID', () =>
       loadOrCreateInstallationId(filePath, () => ID_B),
       ID_A
     )
+  }))
 
-    if (process.platform !== 'win32') {
-      assert.equal(fs.statSync(filePath).mode & 0o777, 0o600)
-    }
+test.skipIf(process.platform === 'win32')('new installation identity is owner-only on POSIX', () =>
+  withTempDir(directory => {
+    const filePath = path.join(directory, 'desktop-installation.json')
+    loadOrCreateInstallationId(filePath, () => ID_A)
+    assert.equal(fs.statSync(filePath).mode & 0o777, 0o600)
   }))
 
 test('loadOrCreateInstallationId tightens an existing identity file', () =>
@@ -52,10 +55,14 @@ test('loadOrCreateInstallationId tightens an existing identity file', () =>
       loadOrCreateInstallationId(filePath, () => ID_B),
       ID_A
     )
+  }))
 
-    if (process.platform !== 'win32') {
-      assert.equal(fs.statSync(filePath).mode & 0o777, 0o600)
-    }
+test.skipIf(process.platform === 'win32')('existing installation identity is tightened on POSIX', () =>
+  withTempDir(directory => {
+    const filePath = path.join(directory, 'desktop-installation.json')
+    fs.writeFileSync(filePath, JSON.stringify({ installationId: ID_A }), { mode: 0o644 })
+    loadOrCreateInstallationId(filePath, () => ID_B)
+    assert.equal(fs.statSync(filePath).mode & 0o777, 0o600)
   }))
 
 test('loadOrCreateInstallationId replaces a malformed existing record', () =>
@@ -69,12 +76,8 @@ test('loadOrCreateInstallationId replaces a malformed existing record', () =>
     assert.equal(JSON.parse(fs.readFileSync(filePath, 'utf8')).installationId, ID_A)
   }))
 
-test('loadOrCreateInstallationId replaces an existing symlink', () =>
+test.skipIf(process.platform === 'win32')('loadOrCreateInstallationId replaces an existing symlink', () =>
   withTempDir(directory => {
-    if (process.platform === 'win32') {
-      return
-    }
-
     const target = path.join(directory, 'target.json')
     const filePath = path.join(directory, 'desktop-installation.json')
     fs.writeFileSync(target, JSON.stringify({ installationId: ID_B }), { mode: 0o600 })

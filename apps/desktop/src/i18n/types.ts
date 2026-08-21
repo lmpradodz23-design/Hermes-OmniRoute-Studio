@@ -2618,6 +2618,10 @@ export interface Translations {
       fallbackTitle: string
       agentAccess: string
       agentAccessDescription: string
+      agentAccessConnecting: string
+      agentAccessConnectingDescription: string
+      agentAccessOff: string
+      agentAccessOffDescription: string
     }
   }
 

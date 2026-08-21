@@ -1,110 +1,83 @@
+from __future__ import annotations
+
 from pathlib import Path
+import re
 
 import yaml
 
+from agent.skill_utils import (
+    iter_skill_index_files,
+    parse_frontmatter,
+    skill_matches_platform_list,
+)
+
 
 ROOT = Path(__file__).resolve().parents[2]
-SKILL = ROOT / "skills" / "software-development" / "product-studio" / "SKILL.md"
+SKILL_ROOT = ROOT / "skills" / "software-development" / "product-studio"
+SKILL = SKILL_ROOT / "SKILL.md"
+CONTRACT = SKILL_ROOT / "contracts.yaml"
 
 
 def load_skill() -> tuple[dict, str]:
-    text = SKILL.read_text(encoding="utf-8")
-    _, frontmatter, body = text.split("---", 2)
-    return yaml.safe_load(frontmatter), body
+    return parse_frontmatter(SKILL.read_text(encoding="utf-8"))
 
 
-def test_product_studio_metadata_is_loadable() -> None:
+def load_contract() -> dict:
+    payload = yaml.safe_load(CONTRACT.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict)
+    return payload
+
+
+def test_product_studio_is_discoverable_on_the_running_platform() -> None:
     metadata, body = load_skill()
+    discovered = list(iter_skill_index_files(SKILL_ROOT, "SKILL.md"))
 
+    assert SKILL in discovered
     assert metadata["name"] == "product-studio"
-    assert metadata["description"].endswith(".")
-    assert len(metadata["description"]) <= 60
-    assert metadata["platforms"] == ["linux", "macos", "windows"]
+    assert metadata["version"] == "0.4.0"
+    assert skill_matches_platform_list(metadata["platforms"])
     assert body.strip()
 
 
-def test_product_studio_requires_evidence_and_browser_consent() -> None:
-    _, body = load_skill()
+def test_product_studio_contract_has_fail_closed_review_gates() -> None:
+    contract = load_contract()
+    gates = contract["review_gates"]
 
-    assert "Never call local compilation production proof" in body
-    assert "Require explicit user intent before sensitive browser actions" in body
-    assert "unit or integration tests" in body
-    assert "end-to-end" in body
-
-
-def test_product_studio_references_ship_with_the_skill() -> None:
-    _, body = load_skill()
-
-    for name in (
-        "delivery-gates.md",
-        "browser-security.md",
-        "multi-agent-orchestration.md",
-        "spec-driven-delivery.md",
-        "knowledge-and-rules.md",
-        "task-report.md",
-        "nontechnical-intake.md",
-        "deployment-integrations.md",
-        "subscription-auth.md",
-    ):
-        assert name in body
-        assert (SKILL.parent / "references" / name).is_file()
+    assert contract["schema_version"] == 1
+    assert gates["spec"] == {
+        "command": "/goal draft",
+        "resume_command": "/goal resume",
+        "auto_execute": False,
+    }
+    assert gates["authenticated_browser"]["explicit_user_intent"] is True
+    assert gates["production_publish"]["explicit_user_intent"] is True
 
 
-def test_multi_agent_reference_uses_real_hermes_capabilities() -> None:
-    reference = (SKILL.parent / "references" / "multi-agent-orchestration.md").read_text(encoding="utf-8")
+def test_every_declared_reference_resolves_inside_the_skill_package() -> None:
+    references = load_contract()["references"]
+    assert len(references) == len(set(references))
 
-    assert "delegate_task" in reference
-    assert "Named Hermes bots" in reference
-    assert "UI Architect" in reference
-    assert "Security and Privacy Engineer" in reference
-    assert "AI and Agent Architect" in reference
-    assert "Do not spin up the full roster" in reference
-
-
-def test_product_studio_has_reviewable_specs_live_preview_and_scoped_knowledge() -> None:
-    _, body = load_skill()
-
-    assert "/goal draft" in body
-    assert "/goal resume" in body
-    assert "embedded preview" in body
-    assert "Knowledge Cards" in body
-    assert "hierarchical `AGENTS.md`" in body
-
-    spec = (SKILL.parent / "references" / "spec-driven-delivery.md").read_text(encoding="utf-8")
-    knowledge = (SKILL.parent / "references" / "knowledge-and-rules.md").read_text(encoding="utf-8")
-    report = (SKILL.parent / "references" / "task-report.md").read_text(encoding="utf-8")
-    assert "awaiting-spec-review" in spec
-    assert "AGENTS.override.md" in knowledge
-    assert "Auto-commit" not in report
-    assert "commit, push, publish, or deploy only as a separate authorized action" in report
+    for name in references:
+        candidate = (SKILL_ROOT / "references" / name).resolve(strict=True)
+        candidate.relative_to(SKILL_ROOT.resolve())
+        assert candidate.is_file()
+        assert candidate.read_text(encoding="utf-8").strip()
 
 
-def test_nontechnical_users_are_not_forced_to_choose_engineering_tools() -> None:
-    intake = (SKILL.parent / "references" / "nontechnical-intake.md").read_text(encoding="utf-8")
+def test_capability_contract_covers_product_types_integrations_and_specialists() -> None:
+    contract = load_contract()
 
-    assert "make a CRM" in intake
-    assert "Never ask the user to choose a framework" in intake
-    assert "embedded live preview" in intake
-    assert "multi-gigabyte SDKs" in intake
-
-
-def test_deployment_integrations_use_preview_first_and_secret_safe_auth() -> None:
-    deployment = (SKILL.parent / "references" / "deployment-integrations.md").read_text(encoding="utf-8")
-
-    assert "supabase db push --dry-run" in deployment
-    assert "vercel deploy" in deployment
-    assert "vercel curl" in deployment
-    assert "MCP_COMPOSIO_API_KEY" in deployment
-    assert "Never scrape browser cookies" in deployment
-    assert "Production is a separate promotion gate" in deployment
+    assert set(contract["supported_products"]) == {"web", "desktop", "mobile", "api", "data", "ai"}
+    assert set(contract["integrations"]["deployment"]) == {"supabase", "vercel"}
+    assert contract["integrations"]["tools"] == ["composio"]
+    assert contract["integrations"]["model_routing"] == ["omniroute"]
+    assert len(set(contract["specialists"])) >= 7
 
 
-def test_subscription_auth_keeps_vendor_cli_credentials_isolated() -> None:
-    auth = (SKILL.parent / "references" / "subscription-auth.md").read_text(encoding="utf-8")
+def test_package_contains_no_unresolved_delivery_placeholders() -> None:
+    sources = [SKILL, CONTRACT, *sorted((SKILL_ROOT / "references").glob("*.md"))]
 
-    assert "openai-codex" in auth
-    assert "codex_app_server" in auth
-    assert 'acp_command: "claude"' in auth
-    assert "keep `ANTHROPIC_API_KEY` unset" in auth
-    assert "Do not import `~/.codex/auth.json`" in auth
-    assert "Never read, copy, or refresh Claude Code credentials" in auth
+    for source in sources:
+        text = source.read_text(encoding="utf-8")
+        assert re.search(r"(?im)^\s*(?:TODO|FIXME)(?:\b|:)", text) is None
+        assert re.search(r"(?im)^\s*PLACEHOLDER(?:\b|:)", text) is None

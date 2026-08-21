@@ -3048,7 +3048,11 @@ export const en: Translations = {
       openTarget: url => `Open ${url}`,
       fallbackTitle: 'Preview',
       agentAccess: 'Agent access on',
-      agentAccessDescription: 'Hermes can read and control this tab only from the chat you are viewing.'
+      agentAccessDescription: 'Hermes can read and control this tab only from the chat you are viewing.',
+      agentAccessConnecting: 'Agent access connecting',
+      agentAccessConnectingDescription: 'Hermes is waiting for the preview page to become ready.',
+      agentAccessOff: 'Agent access off',
+      agentAccessOffDescription: 'Hermes cannot read or control this preview tab.'
     }
   },
 

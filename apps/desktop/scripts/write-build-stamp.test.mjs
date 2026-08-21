@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'vitest'
 
 import {
+  assertReleaseStamp,
   FALLBACK_BRANCH,
   FALLBACK_COMMIT,
   fromCI,
@@ -10,6 +11,21 @@ import {
   isFallbackCommit,
   resolveStamp
 } from './write-build-stamp.mjs'
+
+test('release builds refuse dirty or fallback source provenance', () => {
+  const env = { HERMES_RELEASE_BUILD: '1' }
+
+  assert.throws(
+    () => assertReleaseStamp({ commit: 'a'.repeat(40), dirty: true }, env),
+    /tracked source differs from HEAD/
+  )
+  assert.throws(
+    () => assertReleaseStamp({ commit: FALLBACK_COMMIT, dirty: false }, env),
+    /real source commit is required/
+  )
+  assert.doesNotThrow(() => assertReleaseStamp({ commit: 'a'.repeat(40), dirty: false }, env))
+  assert.doesNotThrow(() => assertReleaseStamp({ commit: FALLBACK_COMMIT, dirty: true }, {}))
+})
 
 test('fromCI reads GITHUB_SHA / GITHUB_REF_NAME', () => {
   assert.deepEqual(

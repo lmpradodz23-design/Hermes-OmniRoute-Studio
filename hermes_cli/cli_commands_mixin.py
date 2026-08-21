@@ -2816,11 +2816,16 @@ class CLICommandsMixin:
             return
 
         if lower == "pause":
-            state = mgr.pause(reason="user-paused")
-            if state is None:
+            if not mgr.has_goal():
                 _cprint(f"  {_DIM}No goal set.{_RST}")
-            else:
-                _cprint(f"  ⏸ Goal paused: {state.goal}")
+                return
+            from hermes_cli.goals import GoalPauseError, pause_goal_or_raise
+            try:
+                state = pause_goal_or_raise(mgr, reason="user-paused")
+            except GoalPauseError as exc:
+                _cprint(f"  Goal pause failed: {exc}. The goal was not reported as paused.")
+                return
+            _cprint(f"  ⏸ Goal paused: {state.goal}")
             return
 
         if lower == "resume":
@@ -2997,7 +3002,18 @@ class CLICommandsMixin:
             # edit. Pause it until the user explicitly resumes after reading
             # the outcome, verification, constraints, boundaries, and stop
             # condition. Plain `/goal <text>` keeps its immediate behavior.
-            state = mgr.pause(reason="awaiting-spec-review") or state
+            from hermes_cli.goals import GoalPauseError, pause_goal_or_raise
+            try:
+                state = pause_goal_or_raise(mgr, reason="awaiting-spec-review")
+            except GoalPauseError as exc:
+                try:
+                    mgr.clear()
+                except Exception:
+                    pass
+                _cprint(
+                    f"  Goal pause failed: {exc}. The drafted goal was cleared so it cannot run without review."
+                )
+                return
             _cprint(f"  {_DIM}Drafted completion contract:{_RST}")
             for line in state.contract.render_block().splitlines():
                 _cprint(f"    {line}")

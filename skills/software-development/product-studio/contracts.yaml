@@ -1,0 +1,45 @@
+schema_version: 1
+supported_products:
+  - web
+  - desktop
+  - mobile
+  - api
+  - data
+  - ai
+review_gates:
+  spec:
+    command: /goal draft
+    resume_command: /goal resume
+    auto_execute: false
+  authenticated_browser:
+    explicit_user_intent: true
+  production_publish:
+    explicit_user_intent: true
+integrations:
+  deployment:
+    - supabase
+    - vercel
+  tools:
+    - composio
+  model_routing:
+    - omniroute
+specialists:
+  - ui-architect
+  - data-engineer
+  - code-auditor
+  - testing-agent
+  - seo-optimizer
+  - deploy-ops
+  - api-integrator
+  - security-privacy-engineer
+  - ai-agent-architect
+references:
+  - delivery-gates.md
+  - browser-security.md
+  - multi-agent-orchestration.md
+  - spec-driven-delivery.md
+  - knowledge-and-rules.md
+  - task-report.md
+  - nontechnical-intake.md
+  - deployment-integrations.md
+  - subscription-auth.md

@@ -4,7 +4,7 @@ Hermes OmniRoute Studio is a Windows desktop edition designed for nontechnical u
 
 ## What is included
 
-- Native OmniRoute preset using the local OpenAI-compatible endpoint at `http://127.0.0.1:20128/v1`.
+- Native OmniRoute preset using the local OpenAI-compatible endpoint defined once in `integrations/omniroute-defaults.json` (editable for advanced setups).
 - All 107 tools advertised by the OmniRoute MCP server. Tools are not hidden to simulate safety; deterministic hooks and explicit approval boundaries protect risky operations.
 - `dz23-moa` virtual multi-model preset, with three reference slots and one aggregator slot.
 - Multi-agent delegation with up to five concurrent children and depth two.

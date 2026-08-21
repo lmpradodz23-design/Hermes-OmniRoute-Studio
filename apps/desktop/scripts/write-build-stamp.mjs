@@ -114,6 +114,16 @@ export function isFallbackCommit(commit) {
   return typeof commit === "string" && /^0{7,40}$/.test(commit)
 }
 
+export function assertReleaseStamp(stamp, env = process.env) {
+  if (env.HERMES_RELEASE_BUILD !== "1") return
+  if (stamp?.dirty) {
+    throw new Error("release build refused: tracked source differs from HEAD; commit the reviewed changes first")
+  }
+  if (!stamp?.commit || isFallbackCommit(stamp.commit)) {
+    throw new Error("release build refused: a real source commit is required")
+  }
+}
+
 function main() {
   const stamp = resolveStamp()
   if (!stamp || !stamp.commit) {
@@ -127,6 +137,13 @@ function main() {
         "Packaged builds require a git ref to pin first-launch install.ps1\n" +
         "against. Run from a git checkout or set $GITHUB_SHA explicitly."
     )
+    process.exit(1)
+  }
+
+  try {
+    assertReleaseStamp(stamp)
+  } catch (error) {
+    console.error(`[write-build-stamp] ERROR: ${error instanceof Error ? error.message : String(error)}`)
     process.exit(1)
   }
 

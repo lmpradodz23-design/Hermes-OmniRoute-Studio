@@ -1,5 +1,7 @@
+import omniRouteDefaults from '../../../../../integrations/omniroute-defaults.json'
+
 export const OMNIROUTE_ENDPOINT = {
-  baseUrl: 'http://127.0.0.1:20128/v1',
+  baseUrl: omniRouteDefaults.base_url,
   id: 'omniroute',
   model: 'auto/coding',
   name: 'OmniRoute'
@@ -11,7 +13,7 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
 }
 
-export const OMNIROUTE_DASHBOARD_URL = 'http://127.0.0.1:20128/dashboard'
+export const OMNIROUTE_DASHBOARD_URL = omniRouteDefaults.dashboard_url
 
 function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []

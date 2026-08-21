@@ -67,6 +67,12 @@ jobs:
       - name: Verify TypeScript and desktop contracts
         run: npm run --workspace apps/desktop typecheck
 
+      - name: Reject platform-test no-ops
+        run: npm run --workspace apps/desktop test:platform-guards
+
+      - name: Verify platform security behavior
+        run: npm exec --workspace apps/desktop vitest run -- --project electron electron/hardening.test.ts electron/desktop-installation.test.ts electron/ssh-connection.test.ts --pool=threads --maxWorkers=1 --no-file-parallelism
+
       - name: Package application
         run: npm run --workspace apps/desktop ${{ matrix.script }}
 
@@ -84,3 +90,59 @@ jobs:
             apps/desktop/release/*.AppImage
             apps/desktop/release/*.deb
             apps/desktop/release/*.rpm
+
+  ssh-live:
+    name: Live OpenSSH no-mux contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        uses: ./.github/actions/retry
+        with:
+          command: npm ci
+
+      - name: Start isolated OpenSSH container
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh-keygen -q -t ed25519 -N '' -f "$RUNNER_TEMP/hermes-ci-key"
+          docker run --detach --name hermes-openssh --publish 127.0.0.1:2222:22 \
+            --volume "$RUNNER_TEMP/hermes-ci-key.pub:/tmp/hermes-ci-key.pub:ro" \
+            ubuntu:24.04 bash -lc '
+              apt-get update -qq && apt-get install -y -qq openssh-server &&
+              useradd --create-home --shell /bin/bash hermes &&
+              install -d -m 700 -o hermes -g hermes /home/hermes/.ssh &&
+              install -m 600 -o hermes -g hermes /tmp/hermes-ci-key.pub /home/hermes/.ssh/authorized_keys &&
+              ssh-keygen -A && install -d /run/sshd &&
+              exec /usr/sbin/sshd -D -e -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o PermitRootLogin=no -o AllowUsers=hermes'
+          for attempt in $(seq 1 60); do
+            if ssh -i "$RUNNER_TEMP/hermes-ci-key" -p 2222 \
+              -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=2 \
+              hermes@127.0.0.1 'exit 0' 2>/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs hermes-openssh
+          exit 1
+
+      - name: Exercise real no-mux SSH lifecycle
+        env:
+          HERMES_LIVE_SSH_HOST: 127.0.0.1
+          HERMES_LIVE_SSH_KEY: ${{ runner.temp }}/hermes-ci-key
+          HERMES_LIVE_SSH_PORT: '2222'
+          HERMES_LIVE_SSH_USER: hermes
+        run: npm exec --workspace apps/desktop vitest run -- --project electron electron/ssh-connection-live.test.ts --pool=threads --maxWorkers=1 --no-file-parallelism
+
+      - name: Collect OpenSSH logs on failure
+        if: failure()
+        run: docker logs hermes-openssh || true

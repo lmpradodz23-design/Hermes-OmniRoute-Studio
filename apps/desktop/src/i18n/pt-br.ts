@@ -515,7 +515,11 @@ export const ptBr = defineLocale(
         addressPlaceholder: 'Digite um endereço',
         blankPageBody: 'Digite um endereço acima ou peça ao Hermes para abrir uma página.',
         agentAccess: 'Acesso do agente ativo',
-        agentAccessDescription: 'O Hermes pode ler e controlar esta aba somente pela conversa que você está vendo.'
+        agentAccessDescription: 'O Hermes pode ler e controlar esta aba somente pela conversa que você está vendo.',
+        agentAccessConnecting: 'Conectando acesso do agente',
+        agentAccessConnectingDescription: 'O Hermes aguarda a página da prévia ficar pronta.',
+        agentAccessOff: 'Acesso do agente desativado',
+        agentAccessOffDescription: 'O Hermes não pode ler nem controlar esta aba de prévia.'
       }
     },
     skills: {

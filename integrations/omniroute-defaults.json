@@ -1,0 +1,4 @@
+{
+  "base_url": "http://127.0.0.1:20128/v1",
+  "dashboard_url": "http://127.0.0.1:20128/dashboard"
+}

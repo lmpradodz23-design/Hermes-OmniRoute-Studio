@@ -213,6 +213,7 @@ export function PreviewPane({ embedded = false, onRestartServer, reloadRequest =
   const consoleHeight = useStore(consoleState.$height)
   const consoleOpen = useStore(consoleState.$open)
   const [currentUrl, setCurrentUrl] = useState(target.url)
+  const [agentAccess, setAgentAccess] = useState<'connecting' | 'off' | 'on'>('off')
   const [devtoolsOpen, setDevtoolsOpen] = useState(false)
   const [history, setHistory] = useState({ back: false, forward: false })
   const [loading, setLoading] = useState(true)
@@ -698,6 +699,7 @@ export function PreviewPane({ embedded = false, onRestartServer, reloadRequest =
 
     host.replaceChildren()
     webviewRef.current = null
+    setAgentAccess('off')
     setCurrentUrl(target.url)
     setDevtoolsOpen(false)
     setHistory({ back: false, forward: false })
@@ -712,6 +714,11 @@ export function PreviewPane({ embedded = false, onRestartServer, reloadRequest =
     }
 
     const webview = document.createElement('webview') as PreviewWebview
+
+    if (tabId) {
+      setAgentAccess('connecting')
+    }
+
     webview.className = 'flex h-full w-full flex-1 bg-transparent'
     webview.setAttribute('partition', 'persist:hermes-preview')
     webview.setAttribute('src', target.url)
@@ -784,7 +791,10 @@ export function PreviewPane({ embedded = false, onRestartServer, reloadRequest =
         url: detail.validatedURL || webview.getURL?.() || target.url
       })
       setLoading(false)
+      setAgentAccess('off')
     }
+
+    const onDomReady = () => setAgentAccess(tabId ? 'on' : 'off')
 
     const onStart = () => setLoading(true)
 
@@ -881,6 +891,7 @@ export function PreviewPane({ embedded = false, onRestartServer, reloadRequest =
     webview.addEventListener('devtools-closed', onDevToolsClosed)
     webview.addEventListener('devtools-opened', onDevToolsOpened)
     webview.addEventListener('did-fail-load', onFail)
+    webview.addEventListener('dom-ready', onDomReady)
     webview.addEventListener('did-navigate', onNavigate)
     webview.addEventListener('did-navigate-in-page', onNavigate)
     webview.addEventListener('did-start-loading', onStart)
@@ -894,13 +905,14 @@ export function PreviewPane({ embedded = false, onRestartServer, reloadRequest =
       webview.removeEventListener('devtools-closed', onDevToolsClosed)
       webview.removeEventListener('devtools-opened', onDevToolsOpened)
       webview.removeEventListener('did-fail-load', onFail)
+      webview.removeEventListener('dom-ready', onDomReady)
       webview.removeEventListener('did-navigate', onNavigate)
       webview.removeEventListener('did-navigate-in-page', onNavigate)
       webview.removeEventListener('did-start-loading', onStart)
       webview.removeEventListener('did-stop-loading', onStop)
       webview.remove()
     }
-  }, [appendConsoleEntry, consoleState, copy, isRemoteHtml, isWebPreview, target.url])
+  }, [appendConsoleEntry, consoleState, copy, isRemoteHtml, isWebPreview, tabId, target.url])
 
   return (
     <aside
@@ -950,6 +962,7 @@ export function PreviewPane({ embedded = false, onRestartServer, reloadRequest =
 
         {isWebPreview && !isRemoteHtml && (
           <PreviewBrowserBar
+            agentAccess={agentAccess}
             canGoBack={history.back}
             canGoForward={history.forward}
             consoleOpen={consoleOpen}

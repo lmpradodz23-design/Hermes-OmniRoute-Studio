@@ -38,14 +38,12 @@ test('gitFor accepts an internally resolved git binary path containing spaces', 
   assert.doesNotThrow(() => gitFor(process.cwd(), 'C:\\Program Files\\Git\\cmd\\git.exe'))
 })
 
-test('gitFor runs git through a spaced binary path', async () => {
-  if (process.platform !== 'win32') {
-    return
-  }
-
+test.skipIf(process.platform !== 'win32')('gitFor runs git through a spaced binary path', async t => {
   const gitBin = path.join(process.env.ProgramFiles || String.raw`C:\Program Files`, 'Git', 'cmd', 'git.exe')
 
   if (!fs.existsSync(gitBin)) {
+    t.skip(`Git for Windows is not installed at ${gitBin}`)
+
     return
   }
 

@@ -573,12 +573,22 @@ test('darwin staging ships the Swift helper executable and the rewritten windows
 
     stageGetWindowsInto(srcRoot, destRoot, { platform: 'darwin' })
 
-    if (process.platform !== 'win32') {
-      assert.equal(fs.statSync(join(destRoot, 'main')).mode & 0o777, 0o755)
-    }
     const staged = fs.readFileSync(join(destRoot, 'lib', 'windows.js'), 'utf8')
     assert.match(staged, /Rewritten by stage-native-deps\.mjs/)
     assert.ok(!staged.includes('node-pre-gyp'), 'pre-gyp loader must not survive staging')
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true })
+  }
+})
+
+test.skipIf(process.platform === 'win32')('darwin staging marks the Swift helper executable on POSIX', () => {
+  const tmp = fs.mkdtempSync(join(os.tmpdir(), 'hermes-stage-'))
+  try {
+    const srcRoot = join(tmp, 'get-windows')
+    const destRoot = join(tmp, 'dest')
+    makeFakeGetWindows(srcRoot)
+    stageGetWindowsInto(srcRoot, destRoot, { platform: 'darwin' })
+    assert.equal(fs.statSync(join(destRoot, 'main')).mode & 0o777, 0o755)
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true })
   }

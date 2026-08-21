@@ -104,6 +104,21 @@ class TestJudgeGoal:
 
 class TestGoalManager:
 
+    def test_pause_helper_rejects_none_or_non_paused_state(self):
+        from hermes_cli.goals import GoalPauseError, GoalState, pause_goal_or_raise
+
+        class MissingPause:
+            pause = lambda self, reason: None
+
+        class StalePause:
+            pause = lambda self, reason: GoalState(goal="x", status="active")
+
+        with pytest.raises(GoalPauseError, match="did not return a paused state"):
+            pause_goal_or_raise(MissingPause(), reason="test")
+        with pytest.raises(GoalPauseError, match="did not return a paused state"):
+            pause_goal_or_raise(StalePause(), reason="test")
+
+
     def test_set_then_status(self, hermes_home):
         from hermes_cli.goals import GoalManager
 
@@ -797,4 +812,3 @@ class TestContractAndBackgroundCompose:
         # The judge can return a wait verdict on a contract goal.
         assert verdict == "wait"
         assert wait_directive and wait_directive.get("pid") == 4242
-

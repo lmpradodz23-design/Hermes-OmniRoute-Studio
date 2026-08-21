@@ -23,6 +23,7 @@ import { PaneStripGlyph } from '@/components/ui/pane-tab'
 import { useI18n } from '@/i18n'
 
 interface PreviewBrowserBarProps {
+  agentAccess: 'connecting' | 'off' | 'on'
   canGoBack: boolean
   canGoForward: boolean
   consoleOpen: boolean
@@ -86,6 +87,7 @@ export function normalizePreviewAddress(value: string): null | string {
 }
 
 export function PreviewBrowserBar({
+  agentAccess,
   canGoBack,
   canGoForward,
   consoleOpen,
@@ -108,6 +110,14 @@ export function PreviewBrowserBar({
   // Only while the user is typing: a page that navigates itself is never the
   // user's mistake to flag.
   const invalid = draft !== null && draft.trim().length > 0 && !normalizePreviewAddress(draft)
+
+  const agentAccessCopy = {
+    connecting: [copy.agentAccessConnecting, copy.agentAccessConnectingDescription],
+    off: [copy.agentAccessOff, copy.agentAccessOffDescription],
+    on: [copy.agentAccess, copy.agentAccessDescription]
+  } as const
+
+  const [agentAccessLabel, agentAccessDescription] = agentAccessCopy[agentAccess]
 
   const commit = (value: string) => {
     const address = normalizePreviewAddress(value)
@@ -186,12 +196,14 @@ export function PreviewBrowserBar({
         onSelect={onOpenExternal}
       />
       <div
-        aria-label={copy.agentAccessDescription}
-        className="hidden items-center gap-1 rounded-sm border border-border/60 px-1.5 py-1 text-[0.68rem] text-muted-foreground lg:flex"
+        aria-label={agentAccessDescription}
+        aria-live="polite"
+        className="flex items-center gap-1 rounded-sm border border-border/60 px-1.5 py-1 text-[0.68rem] text-muted-foreground"
+        data-agent-access={agentAccess}
         role="status"
       >
         <Codicon name="shield" size="0.75rem" />
-        {copy.agentAccess}
+        <span className="sr-only sm:not-sr-only">{agentAccessLabel}</span>
       </div>
       <PaneStripGlyph
         active={consoleOpen}

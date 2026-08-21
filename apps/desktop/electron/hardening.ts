@@ -1,3 +1,4 @@
+import { execFileSync as nodeExecFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -52,6 +53,7 @@ interface SecretFileFs {
 
 interface SecretFileOptions {
   encoding?: BufferEncoding
+  execFileSync?: typeof nodeExecFileSync
   fs?: SecretFileFs
   getuid?: () => number
   platform?: string
@@ -72,10 +74,9 @@ interface SecretFileOptions {
  * file we own, never a symlink and never another user's file. Without them a
  * symlink planted at the path would send the chmod to whatever it resolves to.
  *
- * POSIX only. Windows has no meaningful chmod (Node maps it to the read-only
- * bit), and userData there is already ACL'd to the user profile, so we report
- * success without touching the file rather than flipping it read-only and
- * breaking the next write.
+ * POSIX uses mode bits. Windows uses an explicit non-inherited ACL granting
+ * full control only to the current user SID and LocalSystem. We never invoke a
+ * shell: paths and SIDs remain separate argv values.
  *
  * Never throws: a chmod can legitimately fail (read-only mount, file owned by
  * another user), and failing to tighten a file is not a reason to lose the
@@ -85,15 +86,37 @@ function tightenSecretFileMode(filePath, options: SecretFileOptions = {}) {
   const fsImpl = options.fs || fs
   const platform = options.platform || process.platform
 
-  if (platform === 'win32') {
-    return true
-  }
-
   try {
     const stat = fsImpl.lstatSync(filePath)
 
     if (!stat.isFile() || stat.isSymbolicLink()) {
       return false
+    }
+
+    if (platform === 'win32') {
+      const execFileSync = options.execFileSync || nodeExecFileSync
+
+      const identity = String(
+        execFileSync('whoami.exe', ['/user', '/fo', 'csv', '/nh'], {
+          encoding: 'utf8',
+          windowsHide: true
+        })
+      )
+
+      const sid = identity.match(/S-\d-(?:\d+-)+\d+/i)?.[0]
+
+      if (!sid) {
+
+        return false
+      }
+
+      execFileSync(
+        'icacls.exe',
+        [filePath, '/inheritance:r', '/grant:r', `*${sid}:(F)`, '*S-1-5-18:(F)'],
+        { encoding: 'utf8', windowsHide: true }
+      )
+
+      return true
     }
 
     const getuid = options.getuid || process.getuid
@@ -115,15 +138,9 @@ function tightenSecretFileMode(filePath, options: SecretFileOptions = {}) {
 }
 
 /**
- * Atomically write a credential file, owner-only wherever the OS expresses
- * permissions as mode bits.
- *
- * On POSIX the file is owner-only from the moment it exists. On Windows this
- * only gets the atomic rename: `tightenSecretFileMode` no-ops there (Node maps
- * chmod to the read-only bit), so the file inherits the userData directory's
- * ACL rather than an explicit owner-only one. Tightening Windows ACLs is being
- * handled once, for the Python `_secure_file`, in PR #77527 — the desktop
- * should follow that rather than start a second ACL story here.
+ * Atomically write a credential file owner-only. POSIX applies 0600 at create
+ * time and before rename; Windows removes inherited ACEs and grants the
+ * current user plus LocalSystem before the temp file becomes the destination.
  *
  * The temp-then-rename dance is what makes the mode subtle: `renameSync` keeps
  * the TEMP file's permissions, so writing the temp at the default umask (0644)

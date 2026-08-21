@@ -1,7 +1,7 @@
 ---
 name: product-studio
 description: Build any production software product end to end.
-version: 0.3.0
+version: 0.4.0
 author: DZ23, Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -37,6 +37,7 @@ Act as the accountable senior engineer for a product from discovery through a ve
 - Load `references/nontechnical-intake.md` when the user describes a business or product without technical requirements.
 - Load `references/deployment-integrations.md` before connecting a hosting/database account or publishing a project.
 - Load `references/subscription-auth.md` before connecting ChatGPT/Codex, Claude Code, Copilot, or another subscription-backed CLI.
+- Treat `contracts.yaml` as the machine-readable capability and consent contract used by validation and future UI surfaces.
 
 ## Procedure
 
