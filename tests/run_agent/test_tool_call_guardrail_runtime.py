@@ -344,6 +344,25 @@ def test_plugin_pre_tool_block_wins_without_counting_as_toolguard_block():
     assert agent._tool_guardrails.before_call("web_search", args).action == "allow"
 
 
+def test_pre_tool_hook_dispatch_failure_blocks_sequential_execution():
+    agent = _make_agent("web_search")
+    tc = _mock_tool_call("web_search", json.dumps({"query": "safe"}), "c-hook-failure")
+    msg = SimpleNamespace(content="", tool_calls=[tc])
+    messages = []
+
+    with (
+        patch(
+            "hermes_cli.plugins._dispatch_pre_tool_call_hooks",
+            side_effect=RuntimeError("security parser unavailable"),
+        ),
+        patch("run_agent.handle_function_call", return_value="SHOULD_NOT_RUN") as dispatch,
+    ):
+        agent._execute_tool_calls_sequential(msg, messages, "task-1")
+
+    dispatch.assert_not_called()
+    assert "security policy could not be evaluated" in messages[0]["content"]
+
+
 def test_default_run_conversation_warns_without_guardrail_halt():
     agent = _make_agent("web_search", max_iterations=10)
     same_args = {"query": "same"}

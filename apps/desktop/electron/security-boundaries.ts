@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 
 import { sensitiveFileBlockReason } from './hardening'
@@ -14,16 +15,34 @@ export const DEFAULT_OMNIROUTE_MCP_SCOPES = [
 
 const EXECUTABLE_FILE_EXTENSIONS = new Set([
   '.bat',
+  '.appref-ms',
+  '.chm',
   '.cmd',
   '.com',
+  '.cpl',
   '.exe',
+  '.hta',
+  '.inf',
   '.jar',
+  '.jse',
   '.js',
   '.lnk',
+  '.msc',
   '.msi',
+  '.msp',
+  '.pif',
   '.ps1',
+  '.ps2',
+  '.psc1',
+  '.reg',
   '.scr',
-  '.vbs'
+  '.scf',
+  '.sct',
+  '.url',
+  '.vbe',
+  '.vbs',
+  '.wsf',
+  '.wsh'
 ])
 
 function comparisonKey(value: string): string {
@@ -49,9 +68,41 @@ function canonicalExistingAncestor(value: string): string {
   return path.resolve(canonical, ...tail)
 }
 
-export function resolveAllowedFsIpcPath(value: string, allowedRoots: readonly string[]): string {
+export function isUnsafeBroadFsRoot(value: string, homeDirectory = os.homedir()): boolean {
+  const raw = String(value || '').trim()
+
+  if (!raw) {return true}
+
+  // path.parse('C:\\') is platform-dependent. Keep the explicit Windows
+  // drive-root check so Linux/macOS CI also proves the Windows boundary.
+  if (/^[a-z]:[\\/]?$/i.test(raw)) {return true}
+
+  const resolved = path.resolve(raw)
+  const parsedRoot = path.parse(resolved).root
+
+  return comparisonKey(resolved) === comparisonKey(parsedRoot)
+    || comparisonKey(resolved) === comparisonKey(path.resolve(homeDirectory))
+}
+
+export function resolveAllowedFsIpcPath(
+  value: string,
+  allowedRoots: readonly string[],
+  allowedFiles: readonly string[] = []
+): string {
   const resolved = canonicalExistingAncestor(value)
   const targetKey = comparisonKey(resolved)
+
+  const exactFileAllowed = allowedFiles.some(file => {
+    if (!file) {return false}
+
+    try {
+      return comparisonKey(canonicalExistingAncestor(file)) === targetKey
+    } catch {
+      return false
+    }
+  })
+
+  if (exactFileAllowed) {return resolved}
 
   const allowed = allowedRoots.some(root => {
     if (!root) {return false}

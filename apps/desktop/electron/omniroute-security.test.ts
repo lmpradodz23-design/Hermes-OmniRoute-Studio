@@ -14,6 +14,7 @@ import { resolveTrustedOmniRouteRoot } from '../../../integrations/omniroute-mcp
 import {
   DEFAULT_OMNIROUTE_MCP_SCOPES,
   externalFileBlockReason,
+  isUnsafeBroadFsRoot,
   resolveAllowedFsIpcPath
 } from './security-boundaries'
 
@@ -71,6 +72,12 @@ test('default OmniRoute MCP scopes are minimal and never auto-grant plugin write
 
 test('external file policy rejects executables and sensitive files', () => {
   assert.match(String(externalFileBlockReason('C:\\Windows\\System32\\calc.exe')), /executable/i)
+  for (const extension of [
+    '.hta', '.wsf', '.wsh', '.jse', '.vbe', '.reg', '.url', '.scf', '.pif',
+    '.cpl', '.msc', '.msp', '.appref-ms', '.ps2', '.psc1', '.chm', '.sct', '.inf'
+  ]) {
+    assert.match(String(externalFileBlockReason(`C:\\Temp\\payload${extension}`)), /executable/i, extension)
+  }
   assert.match(String(externalFileBlockReason(path.join(os.homedir(), '.ssh', 'id_rsa'))), /sensitive/i)
   assert.equal(externalFileBlockReason(path.join(os.tmpdir(), 'report.pdf')), null)
 })
@@ -83,6 +90,22 @@ test('filesystem IPC writes are confined to explicitly allowed roots', () => {
     () => resolveAllowedFsIpcPath(path.join(os.tmpdir(), 'outside', 'payload.cmd'), [root]),
     /outside the allowed roots/i
   )
+})
+
+test('native file grants are exact and never grant the selected parent directory', () => {
+  const root = path.join(os.tmpdir(), 'hermes-native-selection')
+  const selected = path.join(root, 'selected.txt')
+  const sibling = path.join(root, 'sibling.txt')
+
+  assert.equal(resolveAllowedFsIpcPath(selected, [], [selected]), path.resolve(selected))
+  assert.throws(() => resolveAllowedFsIpcPath(sibling, [], [selected]), /outside the allowed roots/i)
+})
+
+test('drive roots and the user home are rejected as broad grants', () => {
+  assert.equal(isUnsafeBroadFsRoot('C:\\'), true)
+  assert.equal(isUnsafeBroadFsRoot('/', '/home/example'), true)
+  assert.equal(isUnsafeBroadFsRoot('/home/example', '/home/example'), true)
+  assert.equal(isUnsafeBroadFsRoot('/home/example/project', '/home/example'), false)
 })
 
 test('OmniRoute bridge rejects an environment-controlled package root outside its allowlist', async () => {

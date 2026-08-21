@@ -162,9 +162,17 @@ def _outside_workspace(path: Path) -> tuple[bool, Path]:
 
 
 def _command_detection_variants(command: str) -> Iterable[str]:
-    from tools.approval import _command_detection_variants as core_variants
+    try:
+        from tools.approval import _command_detection_variants as core_variants
 
-    return core_variants(command)
+        return core_variants(command)
+    except Exception:
+        # Conservative standalone fallback: never skip inspection merely
+        # because the shared parser cannot be imported. The security-critical
+        # plugin manager still fails closed if this plugin itself raises; this
+        # raw variant preserves deterministic matching for ordinary commands
+        # when the core parser is temporarily unavailable.
+        return (str(command or ""),)
 
 
 def _destructive_match(command: str) -> Optional[str]:

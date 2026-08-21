@@ -40,6 +40,10 @@ def _manual_approval(monkeypatch):
         "pip install requests",
         "python -m pip install requests",
         "uv add fastapi",
+        "uv pip install requests",
+        "poetry add pydantic@latest",
+        "pdm add httpx==0.28.1",
+        "conda install numpy=2.0",
         "cargo add serde",
         "cargo install ripgrep",
         "gem install rails",
@@ -85,6 +89,20 @@ def test_lockfile_restore_does_not_require_dependency_approval(command):
 
     assert result["approved"] is True
     callback.assert_not_called()
+
+
+def test_dependency_approval_names_the_requested_package_and_version():
+    callback = MagicMock(return_value="deny")
+    with patch("tools.tirith_security.check_command_security", _tirith_allow):
+        result = approval.check_all_command_guards(
+            "npm install left-pad@1.3.0",
+            "local",
+            approval_callback=callback,
+        )
+
+    assert result["approved"] is False
+    callback.assert_called_once()
+    assert "left-pad@1.3.0" in callback.call_args.args[1]
 
 
 def test_known_malware_package_is_blocked_before_human_override():

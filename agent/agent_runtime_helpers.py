@@ -3091,8 +3091,17 @@ def invoke_tool(agent, function_name: str, function_args: dict, effective_task_i
             )
             if modified_args is not None:
                 function_args = modified_args
-        except Exception:
-            block_message = None
+        except Exception as exc:
+            logger.error(
+                "Pre-tool security hook dispatch failed closed for %s: %s",
+                function_name,
+                exc,
+                exc_info=True,
+            )
+            block_message = (
+                "BLOCKED: the pre-tool security policy could not be evaluated. "
+                "No tool was executed."
+            )
     if block_message is not None:
         result = json.dumps({"error": block_message}, ensure_ascii=False)
         try:

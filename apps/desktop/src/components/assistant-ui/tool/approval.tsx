@@ -187,6 +187,11 @@ const ApprovalBar: FC<{ request: ApprovalRequest; surface: 'floating' | 'inline'
       className={cn(surface === 'inline' ? 'mt-1 ps-5' : 'mt-2')}
       data-slot={surface === 'inline' ? 'tool-approval-inline' : 'tool-approval-actions'}
     >
+      {surface === 'inline' && request.description && (
+        <p className="mb-1.5 max-w-2xl text-xs leading-snug text-(--ui-text-tertiary)" data-slot="tool-approval-description">
+          {request.description}
+        </p>
+      )}
       <div className="flex items-center gap-2.5">
         <div className="inline-flex h-6 items-stretch overflow-hidden rounded-md border border-primary/25 bg-primary/10 text-primary">
           <Button

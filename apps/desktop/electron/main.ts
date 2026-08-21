@@ -289,6 +289,7 @@ import { attachRendererConsoleCapture, formatRendererBoundaryReport } from './re
 import {
   DEFAULT_OMNIROUTE_MCP_SCOPES,
   externalFileBlockReason,
+  isUnsafeBroadFsRoot,
   resolveAllowedFsIpcPath
 } from './security-boundaries'
 import {
@@ -769,6 +770,7 @@ function omniRouteBackendSecretEnv(): Record<string, string> {
 }
 
 const nativeApprovedFsRoots = new Set<string>()
+const nativeApprovedFsFiles = new Set<string>()
 
 function desktopAllowedFsRoots(): string[] {
   return [HERMES_HOME, app.getPath('downloads'), readDefaultProjectDir(), ...nativeApprovedFsRoots].filter(
@@ -776,8 +778,23 @@ function desktopAllowedFsRoots(): string[] {
   )
 }
 
+function desktopAllowedFsFiles(): string[] {
+  return [...nativeApprovedFsFiles]
+}
+
 function approveNativeSelectedPath(selectedPath: string, directory: boolean): void {
-  nativeApprovedFsRoots.add(path.resolve(directory ? selectedPath : path.dirname(selectedPath)))
+  const resolved = path.resolve(selectedPath)
+
+  if (directory) {
+    if (isUnsafeBroadFsRoot(resolved, app.getPath('home'))) {
+      throw new Error('Filesystem access blocked: drive roots and the home directory cannot be granted as broad roots')
+    }
+    nativeApprovedFsRoots.add(resolved)
+
+    return
+  }
+
+  nativeApprovedFsFiles.add(resolved)
 }
 
 function pathWithHermesManagedNode(...entries) {
@@ -1617,7 +1634,7 @@ function openExternalUrl(rawUrl) {
 
     try {
       localPath = resolveRequestedPathForIpc(parsed.toString(), { purpose: 'Open external file' })
-      localPath = resolveAllowedFsIpcPath(localPath, desktopAllowedFsRoots())
+      localPath = resolveAllowedFsIpcPath(localPath, desktopAllowedFsRoots(), desktopAllowedFsFiles())
 
       if (externalFileBlockReason(localPath)) {
         return false
@@ -1695,7 +1712,7 @@ async function openPreviewInBrowser(rawUrl) {
 
     try {
       localPath = resolveRequestedPathForIpc(parsed.toString(), { purpose: 'Open preview in browser' })
-      localPath = resolveAllowedFsIpcPath(localPath, desktopAllowedFsRoots())
+      localPath = resolveAllowedFsIpcPath(localPath, desktopAllowedFsRoots(), desktopAllowedFsFiles())
 
       if (externalFileBlockReason(localPath)) {
         return false
@@ -14732,7 +14749,7 @@ registerFsIpc({
   resolveRequestedPathForIpc,
   directoryExists,
   resolveGitBinary,
-  resolveAllowedPath: value => resolveAllowedFsIpcPath(value, desktopAllowedFsRoots())
+  resolveAllowedPath: value => resolveAllowedFsIpcPath(value, desktopAllowedFsRoots(), desktopAllowedFsFiles())
 })
 
 // Git-driven features (worktrees, review pane, repo scan) — see git-ipc.ts.

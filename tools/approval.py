@@ -782,25 +782,42 @@ DANGEROUS_PATTERNS = [
     (
         r'\b(?:npm|pnpm)\s+(?:add|i|install)\b'
         r'(?:\s+--?[a-z][\w-]*(?:=\S+)?)*\s+'
-        r'(?!-)(?:["\']?[@a-z0-9][^\s;&|]*|(?:git|https?)://\S+)',
+        r'(?P<package>(?!-)(?:["\']?[@a-z0-9][^\s;&|]*|(?:git|https?)://\S+))',
         "new JavaScript dependency installation requires explicit approval",
     ),
     (
         r'\b(?:yarn|bun)\s+add\b'
         r'(?:\s+--?[a-z][\w-]*(?:=\S+)?)*\s+'
-        r'(?!-)(?:["\']?[@a-z0-9][^\s;&|]*|(?:git|https?)://\S+)',
+        r'(?P<package>(?!-)(?:["\']?[@a-z0-9][^\s;&|]*|(?:git|https?)://\S+))',
         "new JavaScript dependency installation requires explicit approval",
     ),
     (
         r'\b(?:(?:python(?:\d+(?:\.\d+)?)?|py)\s+-m\s+)?pip(?:\d+)?\s+install\b'
         r'(?![^\n;&|]*(?:-r|--requirement)(?:\s|=))'
         r'(?:\s+--?[a-z][\w-]*(?:=\S+)?)*\s+'
-        r'(?!-|\.)(?:["\']?[a-z0-9][^\s;&|]*|(?:git|https?)://\S+)',
+        r'(?P<package>(?!-|\.)(?:["\']?[a-z0-9][^\s;&|]*|(?:git|https?)://\S+))',
         "new Python dependency installation requires explicit approval",
     ),
     (
         r'\buv\s+add\b(?:\s+--?[a-z][\w-]*(?:=\S+)?)*\s+'
-        r'(?!-)(?:["\']?[a-z0-9][^\s;&|]*|(?:git|https?)://\S+)',
+        r'(?P<package>(?!-)(?:["\']?[a-z0-9][^\s;&|]*|(?:git|https?)://\S+))',
+        "new Python dependency installation requires explicit approval",
+    ),
+    (
+        r'\buv\s+pip\s+install\b'
+        r'(?![^\n;&|]*(?:-r|--requirement)(?:\s|=))'
+        r'(?:\s+--?[a-z][\w-]*(?:=\S+)?)*\s+'
+        r'(?P<package>(?!-|\.)(?:["\']?[a-z0-9][^\s;&|]*|(?:git|https?)://\S+))',
+        "new Python dependency installation requires explicit approval",
+    ),
+    (
+        r'\b(?:poetry|pdm)\s+add\b(?:\s+--?[a-z][\w-]*(?:=\S+)?)*\s+'
+        r'(?P<package>(?!-)(?:["\']?[a-z0-9][^\s;&|]*|(?:git|https?)://\S+))',
+        "new Python dependency installation requires explicit approval",
+    ),
+    (
+        r'\bconda\s+install\b(?:\s+--?[a-z][\w-]*(?:=\S+)?)*\s+'
+        r'(?P<package>(?!-)(?:["\']?[a-z0-9][^\s;&|]*))',
         "new Python dependency installation requires explicit approval",
     ),
     (
@@ -2378,8 +2395,13 @@ def detect_dangerous_command(command: str) -> tuple:
     for command_variant in _command_detection_variants(command):
         command_lower = command_variant.lower()
         for pattern_re, description in DANGEROUS_PATTERNS_COMPILED:
-            if pattern_re.search(command_lower):
+            match = pattern_re.search(command_lower)
+            if match:
                 pattern_key = description
+                package = match.groupdict().get("package")
+                if package:
+                    package = package.strip("\"'")
+                    return (True, pattern_key, f"{description}: {package}")
                 return (True, pattern_key, description)
     normalized = _normalize_command_for_detection(command)
     for description, _ in _execution_flag_findings(normalized):

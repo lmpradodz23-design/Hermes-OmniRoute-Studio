@@ -22,6 +22,14 @@ test('CSP header is present and prevents executable content injection', () => {
   assert.match(policy, /object-src 'none'/)
   assert.match(policy, /base-uri 'none'/)
   assert.match(policy, /frame-ancestors 'none'/)
+
+  for (const directiveName of ['img-src', 'media-src', 'frame-src']) {
+    const directive = policy.split('; ').find(entry => entry.startsWith(`${directiveName} `)) ?? ''
+
+    assert.doesNotMatch(directive, /(?:^|\s)http:(?:\s|$)/, `${directiveName} must not allow arbitrary cleartext HTTP`)
+    assert.match(directive, /http:\/\/127\.0\.0\.1:\*/)
+    assert.match(directive, /http:\/\/localhost:\*/)
+  }
 })
 
 test('webview attributes are neutralized before attachment', () => {

@@ -33,10 +33,10 @@ function part(toolName: string): ToolPart {
 function setRequest(
   command = 'rm -rf /tmp/x',
   allowPermanent?: boolean,
-  extra: { choices?: string[]; smartDenied?: boolean } = {}
+  extra: { choices?: string[]; description?: string; smartDenied?: boolean } = {}
 ) {
   $activeSessionId.set('sess-1')
-  setApprovalRequest({ allowPermanent, command, description: 'dangerous command', sessionId: 'sess-1', ...extra })
+  setApprovalRequest({ allowPermanent, command, description: extra.description ?? 'dangerous command', sessionId: 'sess-1', ...extra })
 }
 
 function mockGateway() {
@@ -73,6 +73,15 @@ describe('PendingToolApproval', () => {
 
     expect(screen.getByRole('button', { name: /Run/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /Reject/ })).toBeTruthy()
+  })
+
+  it('shows the package and version extracted by the dependency approval policy', () => {
+    setRequest('npm install left-pad@1.3.0', true, {
+      description: 'new JavaScript dependency installation requires explicit approval: left-pad@1.3.0'
+    })
+    render(<PendingToolApproval part={part('terminal')} />)
+
+    expect(screen.getByText(/left-pad@1\.3\.0/)).toBeTruthy()
   })
 
   it('sends approval.respond {choice: "once"} and clears the request on Run', async () => {

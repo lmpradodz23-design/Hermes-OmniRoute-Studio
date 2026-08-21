@@ -1398,7 +1398,16 @@ def handle_function_call(
                 if modified_args is not None:
                     function_args = modified_args
             except Exception as _hook_err:
-                logger.debug("pre_tool_call hook error: %s", _hook_err)
+                logger.error(
+                    "Pre-tool security hook dispatch failed closed for %s: %s",
+                    function_name,
+                    _hook_err,
+                    exc_info=True,
+                )
+                block_message = (
+                    "BLOCKED: the pre-tool security policy could not be evaluated. "
+                    "No tool was executed."
+                )
 
             if block_message is not None:
                 result = tool_error(block_message)

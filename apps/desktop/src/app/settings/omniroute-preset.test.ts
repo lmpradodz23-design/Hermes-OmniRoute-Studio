@@ -33,6 +33,11 @@ describe('buildOmniRouteStudioConfig', () => {
       mode: 'smart',
       single_query_mode: 'deny'
     })
+    const smartPolicy = (config.approvals as { smart_policy: string }).smart_policy
+
+    expect(smartPolicy).toContain('lockfile-based dependency restores')
+    expect(smartPolicy).toContain('explicit approval when a command names a new package')
+    expect(smartPolicy).not.toContain('builds, dependency installation')
     expect(config.mcp_servers).toEqual({
       omniroute: mcpConfig
     })

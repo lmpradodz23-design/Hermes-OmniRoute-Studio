@@ -161,6 +161,9 @@ def check_install_command_for_malware(command: str) -> Optional[str]:
     if len(tokens) >= 4 and lowered[0] in {"python", "python3", "py"} and lowered[1:3] == ["-m", "pip"]:
         manager = "pip"
         start = 3
+    elif len(tokens) >= 4 and lowered[0] == "uv" and lowered[1:3] == ["pip", "install"]:
+        manager = "pip"
+        start = 2
     else:
         manager = os.path.basename(lowered[0]).removesuffix(".cmd").removesuffix(".exe")
         start = 1
@@ -180,6 +183,8 @@ def check_install_command_for_malware(command: str) -> Optional[str]:
             return None
         ecosystem = "PyPI"
     elif manager == "uv" and action == "add":
+        ecosystem = "PyPI"
+    elif manager in {"poetry", "pdm"} and action == "add":
         ecosystem = "PyPI"
     elif manager in _INSTALL_ECOSYSTEMS and (
         (manager == "cargo" and action in {"add", "install"})

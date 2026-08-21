@@ -641,8 +641,17 @@ def _run_agent_tool_execution_middleware(
                         final_args = modified_args
                         state["args"] = modified_args
                     return block_msg
-                except Exception:
-                    return None
+                except Exception as exc:
+                    logger.error(
+                        "Pre-tool security hook dispatch failed closed for %s: %s",
+                        function_name,
+                        exc,
+                        exc_info=True,
+                    )
+                    return (
+                        "BLOCKED: the pre-tool security policy could not be "
+                        "evaluated. No tool was executed."
+                    )
 
             block_message = (
                 _resolve_pre_tool_block()

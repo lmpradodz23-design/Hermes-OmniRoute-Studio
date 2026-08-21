@@ -1,7 +1,7 @@
 """Tests for model_tools.py — function call dispatch, agent-loop interception, legacy toolsets."""
 
 import json
-from unittest.mock import ANY, call, patch
+from unittest.mock import ANY, MagicMock, call, patch
 
 
 from model_tools import (
@@ -273,6 +273,19 @@ class TestPreToolCallBlocking:
         assert post_call[1]["error_type"] == "plugin_block"
         assert post_call[1]["error_message"] == "Blocked by policy"
         assert post_call[1]["duration_ms"] == 0
+
+    def test_hook_dispatch_failure_is_fail_closed(self, monkeypatch):
+        monkeypatch.setattr(
+            "hermes_cli.plugins._dispatch_pre_tool_call_hooks",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("parser unavailable")),
+        )
+        dispatch = MagicMock(side_effect=AssertionError("dispatch must not run"))
+        monkeypatch.setattr("model_tools.registry.dispatch", dispatch)
+
+        result = json.loads(handle_function_call("terminal", {"command": "echo safe"}, task_id="t1"))
+
+        dispatch.assert_not_called()
+        assert "security policy could not be evaluated" in result["error"]
 
     def test_blocked_tool_skips_read_loop_notification(self, monkeypatch):
         notifications = []

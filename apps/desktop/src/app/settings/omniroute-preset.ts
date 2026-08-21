@@ -79,7 +79,7 @@ export function buildOmniRouteStudioConfig(
       cron_mode: 'deny',
       single_query_mode: 'deny',
       smart_policy:
-        'Auto-approve read-only inspection, tests, builds, dependency installation, and reversible writes inside the active workspace or an explicitly connected SSH workspace. Escalate secrets, credential changes, production deployment, external publication, writes outside the active workspace, and irreversible operations.'
+        'Auto-approve read-only inspection, tests, builds, lockfile-based dependency restores, and reversible writes inside the active workspace or an explicitly connected SSH workspace. Always require explicit approval when a command names a new package or package version. Escalate secrets, credential changes, production deployment, external publication, writes outside the active workspace, and irreversible operations.'
     },
     memory: {
       ...memory,

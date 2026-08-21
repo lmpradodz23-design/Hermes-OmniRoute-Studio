@@ -1,3 +1,4 @@
+import builtins
 import importlib.util
 import os
 import shutil
@@ -128,6 +129,23 @@ def test_destructive_commands_are_blocked_by_hook() -> None:
         result = plugin.on_pre_tool_call("terminal", {"command": command})
         assert result["action"] == "block"
         assert "DZ23 Guardrail" in result["message"]
+
+
+def test_guardrail_uses_raw_conservative_variant_when_core_parser_import_fails(monkeypatch) -> None:
+    plugin = load_plugin()
+    original_import = builtins.__import__
+
+    def guarded_import(name, *args, **kwargs):
+        if name == "tools.approval":
+            raise ImportError("approval parser unavailable")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+
+    result = plugin.on_pre_tool_call("terminal", {"command": "rm -rf /tmp/teste"})
+
+    assert result["action"] == "block"
+    assert "recursive forced rm" in result["message"]
 
 
 @pytest.mark.parametrize(
