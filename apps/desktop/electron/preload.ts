@@ -8,9 +8,11 @@ import { contextBridge, ipcRenderer, webFrame, webUtils } from 'electron'
 // "Desktop IPC bridge is unavailable"). No reply means no glass, which degrades
 // to an ordinary opaque window rather than a page thinned over nothing.
 const translucencySupport = ipcRenderer.sendSync('hermes:translucency:support')
+const systemLocale = ipcRenderer.sendSync('hermes:system-locale')
 
 contextBridge.exposeInMainWorld('hermesDesktop', {
   glassSupported: translucencySupport?.glass === true,
+  systemLocale: typeof systemLocale === 'string' ? systemLocale : 'en-US',
   translucencySupported: translucencySupport?.translucency === true,
   getConnection: profile => ipcRenderer.invoke('hermes:connection', profile),
   // Registry-scoped backend resolution: { connectionId, profile } → descriptor.
@@ -239,6 +241,9 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   },
   omniRouteMcp: {
     getConfig: () => ipcRenderer.invoke('hermes:omniroute:mcp:config')
+  },
+  omniRouteManaged: {
+    getStatus: () => ipcRenderer.invoke('hermes:omniroute:managed:status')
   },
   openPreviewInBrowser: url => ipcRenderer.invoke('hermes:openPreviewInBrowser', url),
   reachPreviewUrl: url => ipcRenderer.invoke('hermes:preview:reach', url),

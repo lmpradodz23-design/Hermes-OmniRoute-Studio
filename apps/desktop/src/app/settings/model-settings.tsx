@@ -186,6 +186,19 @@ interface ModelSettingsProps {
   scopeProfile?: null | string
 }
 
+const BACKEND_STARTUP_RETRY_DELAYS_MS: readonly number[] =
+  import.meta.env.MODE === 'test' ? [0, 0, 0] : [2_000, 5_000, 10_000]
+
+function isBackendStartupTimeout(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+
+  return /timed out connecting to hermes backend/i.test(message)
+}
+
+function waitForRetry(delayMs: number): Promise<void> {
+  return new Promise(resolve => window.setTimeout(resolve, delayMs))
+}
+
 export function ModelSettings({ onMainModelChanged, scopeProfile = null }: ModelSettingsProps) {
   const { t } = useI18n()
   const m = t.settings.model
@@ -234,42 +247,58 @@ export function ModelSettings({ onMainModelChanged, scopeProfile = null }: Model
       setError('')
 
       try {
-        const [modelInfo, modelOptions, auxiliaryModels, moaModels] = await Promise.all([
-          getGlobalModelInfo(scopeProfile),
-          getGlobalModelOptions(undefined, scopeProfile),
-          getAuxiliaryModels(scopeProfile),
-          getMoaModels(scopeProfile).catch(() => null)
-        ])
+        for (let attempt = 0; ; attempt += 1) {
+          try {
+            const [modelInfo, modelOptions, auxiliaryModels, moaModels] = await Promise.all([
+              getGlobalModelInfo(scopeProfile),
+              getGlobalModelOptions(undefined, scopeProfile),
+              getAuxiliaryModels(scopeProfile),
+              getMoaModels(scopeProfile).catch(() => null)
+            ])
 
-        if (profileEpoch.current !== epoch) {
-          return
+            if (profileEpoch.current !== epoch) {
+              return
+            }
+
+            setMainModel({ model: modelInfo.model, provider: modelInfo.provider })
+            setProviders(modelOptions.providers || [])
+
+            if (replaceSelection) {
+              setSelectedProvider(modelInfo.provider)
+              setSelectedModel(modelInfo.model)
+            } else {
+              setSelectedProvider(prev => prev || modelInfo.provider)
+              setSelectedModel(prev => prev || modelInfo.model)
+            }
+
+            setAuxiliary(auxiliaryModels)
+            setMoa(moaModels)
+
+            if (moaModels) {
+              setSelectedMoaPreset(prev => (prev && moaModels.presets[prev] ? prev : moaModels.default_preset))
+            }
+
+            // The config record loads via its own shared query; a model switch can
+            // change it server-side (aux slots), so nudge that cache to refetch.
+            void invalidateHermesConfig(scopeProfile)
+
+            return
+          } catch (err) {
+            const retryDelay = BACKEND_STARTUP_RETRY_DELAYS_MS[attempt]
+
+            if (!isBackendStartupTimeout(err) || retryDelay === undefined) {
+              throw err
+            }
+
+            await waitForRetry(retryDelay)
+
+            if (profileEpoch.current !== epoch) {
+              return
+            }
+          }
         }
-
-        setMainModel({ model: modelInfo.model, provider: modelInfo.provider })
-        setProviders(modelOptions.providers || [])
-
-        if (replaceSelection) {
-          setSelectedProvider(modelInfo.provider)
-          setSelectedModel(modelInfo.model)
-        } else {
-          setSelectedProvider(prev => prev || modelInfo.provider)
-          setSelectedModel(prev => prev || modelInfo.model)
-        }
-
-        setAuxiliary(auxiliaryModels)
-        setMoa(moaModels)
-
-        if (moaModels) {
-          setSelectedMoaPreset(prev => (prev && moaModels.presets[prev] ? prev : moaModels.default_preset))
-        }
-
-        // The config record loads via its own shared query; a model switch can
-        // change it server-side (aux slots), so nudge that cache to refetch.
-        void invalidateHermesConfig(scopeProfile)
       } catch (err) {
-        if (profileEpoch.current === epoch) {
-          setError(err instanceof Error ? err.message : String(err))
-        }
+        setError(err instanceof Error ? err.message : String(err))
       } finally {
         if (profileEpoch.current === epoch) {
           setLoading(false)

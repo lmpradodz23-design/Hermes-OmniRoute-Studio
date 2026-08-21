@@ -7790,6 +7790,7 @@ def _catalog_provider_env_metadata() -> dict:
                     "provider": d.slug,
                     "provider_label": d.label,
                     "description": f"{d.label} base URL override",
+                    "default_value": d.default_base_url or None,
                     "url": None,
                     "is_password": False,
                     "advanced": True,
@@ -7852,15 +7853,20 @@ def _get_env_vars_sync(profile: Optional[str] = None):
     def _row(var_name: str, info: dict, *, custom: bool = False) -> dict:
         value = env_on_disk.get(var_name)
         cat_meta = catalog_meta.get(var_name) or {}
+        is_password = info.get("password", cat_meta.get("is_password", False))
         # Hand OPTIONAL_ENV_VARS prose wins where present; the catalog fills any
         # gaps (description/url) and always supplies provider grouping hints.
         return {
             "is_set": bool(value),
-            "redacted_value": redact_key(value) if value else None,
+            # Non-secret fields such as provider base URLs must remain editable
+            # without forcing the user to retype them from memory. Passwords
+            # stay redacted exactly as before.
+            "redacted_value": (redact_key(value) if is_password else value) if value else None,
             "description": info.get("description") or cat_meta.get("description", ""),
             "url": info.get("url") if info.get("url") is not None else cat_meta.get("url"),
             "category": info.get("category") or cat_meta.get("category", ""),
-            "is_password": info.get("password", cat_meta.get("is_password", False)),
+            "is_password": is_password,
+            "default_value": info.get("default_value") or cat_meta.get("default_value"),
             "tools": info.get("tools", []),
             "advanced": info.get("advanced", cat_meta.get("advanced", False)),
             # True when this var is a messaging-platform credential owned by a
@@ -10453,27 +10459,75 @@ def _anthropic_oauth_status() -> Dict[str, Any]:
 
 
 def _claude_code_only_status() -> Dict[str, Any]:
-    """Surface Claude Code CLI credentials as their own provider entry.
+    """Probe the official Claude Code CLI without reading or copying tokens.
 
-    Independent of the Anthropic entry above so users can see whether their
-    Claude Code subscription tokens are actively flowing into Hermes even
-    when they also have a separate Hermes-managed PKCE login.
+    Subscription usage belongs inside Anthropic's own client boundary. Newer
+    Claude Code builds expose a non-destructive ``auth status`` command; use it
+    when available and otherwise report only CLI availability. We deliberately
+    never inspect ``~/.claude/.credentials.json`` or the macOS Keychain here.
     """
-    try:
-        from agent.anthropic_adapter import read_claude_code_credentials
-        creds = read_claude_code_credentials()
-    except Exception:
-        creds = None
-    if creds and creds.get("accessToken"):
+    claude_path = shutil.which("claude")
+    if not claude_path:
         return {
-            "logged_in": True,
+            "logged_in": False,
             "source": "claude_code_cli",
-            "source_label": "~/.claude/.credentials.json",
-            "token_preview": _truncate_token(creds.get("accessToken")),
-            "expires_at": creds.get("expiresAt"),
-            "has_refresh_token": bool(creds.get("refreshToken")),
+            "source_label": "Claude Code CLI is not installed",
+            "token_preview": None,
+            "expires_at": None,
+            "has_refresh_token": False,
         }
-    return {"logged_in": False, "source": None}
+
+    status_env = os.environ.copy()
+    api_key_override = any(
+        status_env.get(name)
+        for name in (
+            "ANTHROPIC_API_KEY",
+            "ANTHROPIC_AUTH_TOKEN",
+            "ANTHROPIC_TOKEN",
+            "CLAUDE_CODE_OAUTH_TOKEN",
+        )
+    )
+    for name in (
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANTHROPIC_TOKEN",
+        "CLAUDE_CODE_OAUTH_TOKEN",
+    ):
+        status_env.pop(name, None)
+
+    logged_in = False
+    try:
+        result = subprocess.run(
+            [claude_path, "auth", "status", "--json"],
+            capture_output=True,
+            check=False,
+            encoding="utf-8",
+            errors="replace",
+            env=status_env,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            payload = json.loads(result.stdout or "{}")
+            logged_in = bool(
+                payload.get("loggedIn")
+                or payload.get("logged_in")
+                or payload.get("authenticated")
+            )
+    except (OSError, subprocess.SubprocessError, ValueError, TypeError):
+        logged_in = False
+
+    source_label = "Claude Code CLI (use /status to verify the active account)"
+    if api_key_override:
+        source_label += "; API-key environment override detected"
+    return {
+        "logged_in": logged_in,
+        "source": "claude_code_cli",
+        "source_label": source_label,
+        "token_preview": None,
+        "expires_at": None,
+        "has_refresh_token": False,
+        "api_key_override": api_key_override,
+    }
 
 
 def _copilot_acp_status() -> Dict[str, Any]:
@@ -10563,9 +10617,8 @@ _OAUTH_PROVIDER_CATALOG: tuple[Dict[str, Any], ...] = (
         "docs_url": "https://docs.github.com/en/copilot",
         "status_fn": _copilot_acp_status,
     },
-    # ── Anthropic / Claude entries sit at the bottom: the API-key path
-    # first, then the subscription OAuth path (which only works with extra
-    # usage credits on top of a Claude Max plan — see disclaimer in name).
+    # ── Anthropic / Claude entries sit at the bottom: the separately billed
+    # API-key path first, then the official Claude Code subscription lane.
     {
         "id": "anthropic",
         "name": "Anthropic API Key",
@@ -10576,9 +10629,9 @@ _OAUTH_PROVIDER_CATALOG: tuple[Dict[str, Any], ...] = (
     },
     {
         "id": "claude-code",
-        "name": "Anthropic OAuth: Required Extra Usage Credits to Use Subscription",
+        "name": "Claude Code Subscription (official CLI)",
         "flow": "external",
-        "cli_command": "claude setup-token",
+        "cli_command": "claude",
         "docs_url": "https://docs.claude.com/en/docs/claude-code",
         "status_fn": _claude_code_only_status,
     },
@@ -10691,24 +10744,19 @@ def _oauth_provider_disconnect_command(provider: Dict[str, Any]) -> Optional[str
     user sees exactly what executes, and Hermes then stops resolving the token.
 
     Claude Code has no scriptable logout (only the interactive ``/logout``), so
-    we remove the credential the same way logout does: the macOS Keychain entry
-    (``Claude Code-credentials``) and/or the ``~/.claude/.credentials.json``
-    file — the two sources ``read_claude_code_credentials()`` consults. Returns
-    None for providers we can't safely clear (the GUI shows a manual hint).
+    Hermes never edits its Keychain entry or credential files. Returns None for
+    providers we cannot safely clear (the GUI shows a manual hint).
     """
     if provider.get("flow") != "external":
         return None
-    if provider.get("id") == "claude-code":
-        rm_file = "rm -f ~/.claude/.credentials.json"
-        if sys.platform == "darwin":
-            return f'security delete-generic-password -s "Claude Code-credentials" 2>/dev/null; {rm_file}'
-        return rm_file
     return None
 
 
 def _oauth_provider_disconnect_hint(provider: Dict[str, Any], status: Dict[str, Any]) -> Optional[str]:
     """Return the manual disconnect path when the API cannot clear this provider."""
     if provider.get("flow") == "external":
+        if provider.get("id") == "claude-code":
+            return "Run `claude`, then `/logout`, in the official Claude Code CLI."
         if _oauth_provider_disconnect_command(provider):
             # The GUI offers a one-click "run in terminal" path; this hint is the
             # fallback wording for surfaces that only show text.

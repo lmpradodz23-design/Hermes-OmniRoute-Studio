@@ -108,6 +108,8 @@ export interface MemoryProviderOAuthStatus {
 export interface EnvVarInfo {
   advanced: boolean
   category: string
+  /** Runtime default used when the override is unset; never a secret. */
+  default_value?: null | string
   // True when this var is a messaging-platform credential owned by a card on
   // the dedicated Messaging page. The Keys page hides these to avoid
   // duplicating the richer channel-configuration UI.

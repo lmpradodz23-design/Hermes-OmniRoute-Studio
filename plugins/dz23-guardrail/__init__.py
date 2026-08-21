@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import subprocess
@@ -12,19 +13,36 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
 
+_COMMAND_START = r"(?:^|(?:&&|\|\||[;&|\n]))\s*"
+_COMMAND_TAIL = r"[^;&|\n]*"
 _DESTRUCTIVE_PATTERNS = (
-    (
-        re.compile(r"\brm\s+(?:-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)\b", re.IGNORECASE),
-        "rm -rf",
-    ),
-    (re.compile(r"\bdrop\s+table\b", re.IGNORECASE), "DROP TABLE"),
-    (re.compile(r"\bdocker\s+system\s+prune\b", re.IGNORECASE), "docker system prune"),
+    (re.compile(_COMMAND_START + r"rm\b(?=" + _COMMAND_TAIL + r"(?:--recursive|-[a-z]*r))(?=" + _COMMAND_TAIL + r"(?:--force|-[a-z]*f))", re.IGNORECASE), "recursive forced rm"),
+    (re.compile(_COMMAND_START + r"(?:del|erase)\b(?=" + _COMMAND_TAIL + r"/(?:s|q)\b)", re.IGNORECASE), "recursive Windows delete"),
+    (re.compile(_COMMAND_START + r"(?:rd|rmdir)\b(?=" + _COMMAND_TAIL + r"/(?:s|q)\b)", re.IGNORECASE), "recursive Windows directory removal"),
+    (re.compile(_COMMAND_START + r"remove-item\b(?=" + _COMMAND_TAIL + r"-(?:recurse|r)\b)(?=" + _COMMAND_TAIL + r"-(?:force|fo)\b)", re.IGNORECASE), "recursive forced Remove-Item"),
+    (re.compile(_COMMAND_START + r"find\b" + _COMMAND_TAIL + r"(?:^|\s)-delete\b", re.IGNORECASE), "find -delete"),
+    (re.compile(_COMMAND_START + r"git\s+clean\b(?=" + _COMMAND_TAIL + r"-[a-z]*f)", re.IGNORECASE), "forced git clean"),
+    (re.compile(_COMMAND_START + r"git\s+reset\s+--hard\b", re.IGNORECASE), "git reset --hard"),
+    (re.compile(_COMMAND_START + r"git\s+push\b" + _COMMAND_TAIL + r"(?:--force(?:-with-lease)?|-f)\b", re.IGNORECASE), "forced git push"),
+    (re.compile(_COMMAND_START + r"(?:drop\s+(?:table|database)|truncate\s+(?:table\s+)?)\b", re.IGNORECASE), "destructive SQL"),
+    (re.compile(_COMMAND_START + r"docker\s+(?:system|volume)\s+prune\b", re.IGNORECASE), "Docker prune"),
+    (re.compile(_COMMAND_START + r"docker\s+image\s+prune\b" + _COMMAND_TAIL + r"(?:--all|-a)\b", re.IGNORECASE), "Docker image prune --all"),
+    (re.compile(_COMMAND_START + r"docker\s+rm\b" + _COMMAND_TAIL + r"(?:--force|-f)\b", re.IGNORECASE), "forced Docker removal"),
+    (re.compile(_COMMAND_START + r"(?:format-volume|clear-disk|takeown|vssadmin\s+delete\s+shadows|cipher\s+/w)\b", re.IGNORECASE), "destructive Windows administration"),
+    (re.compile(_COMMAND_START + r"(?:reg(?:\.exe)?\s+delete|icacls\b" + _COMMAND_TAIL + r"/reset\b)", re.IGNORECASE), "destructive Windows security change"),
+    (re.compile(r"\bshutil\.rmtree\s*\(", re.IGNORECASE), "shutil.rmtree"),
 )
 _WRITE_TOOLS = {"apply_patch", "edit_file", "file_write", "patch", "write_file"}
 _VERIFY_PATTERN = re.compile(
-    r"(?:^|\s)(?:npm|pnpm|yarn|bun|pytest|python\s+-m\s+pytest|cargo|go|dotnet|mvn|gradle|playwright|vitest|jest)\b"
-    r".*\b(?:test|check|lint|typecheck|build|verify|e2e)\b|"
-    r"(?:^|\s)(?:tsc|ruff|mypy|eslint|biome)\b",
+    _COMMAND_START
+    + r"(?:"
+    + r"(?:pytest|tox|nox)\b|"
+    + r"(?:python(?:\.exe)?\s+-m\s+pytest)\b|"
+    + r"(?:uv\s+run\s+pytest)\b|"
+    + r"(?:npm|pnpm|yarn|bun)\s+(?:test|run\s+(?:test|check|lint|typecheck|build|verify|e2e)\b)|"
+    + r"(?:cargo|go|dotnet|mvn|gradle|playwright|vitest|jest)\s+(?:test|check|lint|typecheck|build|verify|e2e)\b|"
+    + r"(?:tsc|ruff|mypy|eslint|biome)\b"
+    + r")",
     re.IGNORECASE,
 )
 _TERMINAL_WRITE_PATTERN = re.compile(
@@ -55,10 +73,25 @@ def _command_text(args: Dict[str, Any]) -> str:
     )
 
 
+def _runtime_workspace() -> Optional[Path]:
+    try:
+        from agent.runtime_cwd import resolve_agent_cwd
+
+        candidate = resolve_agent_cwd().expanduser().resolve(strict=False)
+    except Exception:
+        return None
+    anchor = Path(candidate.anchor) if candidate.anchor else None
+    if anchor is not None and candidate == anchor:
+        return None
+    return candidate
+
+
 def _workspace_roots() -> tuple[Path, ...]:
     configured = os.environ.get("HERMES_GUARDRAIL_WORKSPACE_ROOTS", "")
     values = [value for value in configured.split(os.pathsep) if value.strip()]
-    values.extend([str(Path.cwd()), "/workspace"])
+    runtime_workspace = _runtime_workspace()
+    if not values and runtime_workspace is not None:
+        values.append(str(runtime_workspace))
     roots = []
 
     for value in values:
@@ -84,30 +117,91 @@ def _candidate_paths(tool_name: str, args: Dict[str, Any]) -> Iterable[Path]:
             yield Path(match.group(1).strip()).expanduser()
 
     if tool_name in {"terminal", "execute_code"} and _TERMINAL_WRITE_PATTERN.search(
-        _serialized(args)
+        _command_text(args)
     ):
         for match in re.finditer(
             r"(?:[A-Za-z]:[\\/][^\s'\";|]+|/(?!workspace(?:/|\b))[^\s'\";|]+)",
-            _serialized(args),
+            _command_text(args),
         ):
             yield Path(match.group(0)).expanduser()
 
 
-def _outside_workspace(path: Path) -> bool:
-    if not path.is_absolute():
-        return False
+def _resolved_candidate(path: Path, roots: tuple[Path, ...]) -> Path:
+    if path.is_absolute():
+        candidate = path
+    else:
+        runtime_workspace = _runtime_workspace()
+        if runtime_workspace is not None and any(
+            runtime_workspace == root or root in runtime_workspace.parents
+            for root in roots
+        ):
+            candidate = runtime_workspace / path
+        elif roots:
+            candidate = roots[0] / path
+        else:
+            candidate = path
     try:
-        resolved = path.resolve(strict=False)
+        return candidate.resolve(strict=False)
     except Exception:
-        return True
+        return candidate.absolute()
 
-    for root in _workspace_roots():
+
+def _outside_workspace(path: Path) -> tuple[bool, Path]:
+    roots = _workspace_roots()
+    resolved = _resolved_candidate(path, roots)
+    if not roots:
+        return True, resolved
+
+    for root in roots:
         try:
             resolved.relative_to(root)
-            return False
+            return False, resolved
         except ValueError:
             continue
-    return True
+    return True, resolved
+
+
+def _command_detection_variants(command: str) -> Iterable[str]:
+    from tools.approval import _command_detection_variants as core_variants
+
+    return core_variants(command)
+
+
+def _destructive_match(command: str) -> Optional[str]:
+    for variant in _command_detection_variants(command):
+        for pattern, label in _DESTRUCTIVE_PATTERNS:
+            match = pattern.search(variant)
+            if not match:
+                continue
+            if label == "forced git clean" and re.search(
+                r"\bgit\s+clean\b[^;&|\n]*(?:--dry-run|-[a-z]*n)",
+                match.group(0),
+                re.IGNORECASE,
+            ):
+                continue
+            return label
+    return None
+
+
+def _is_verification_command(command: str) -> bool:
+    return any(_VERIFY_PATTERN.search(variant) for variant in _command_detection_variants(command))
+
+
+def _verification_exit_code(result: Any, status: Any) -> Optional[int]:
+    if str(status or "").strip().lower() in {"error", "failed", "blocked"}:
+        return None
+    candidate = result
+    if isinstance(candidate, str):
+        try:
+            candidate = json.loads(candidate)
+        except (TypeError, ValueError):
+            return None
+    if not isinstance(candidate, dict) or "exit_code" not in candidate:
+        return None
+    exit_code = candidate.get("exit_code")
+    if isinstance(exit_code, bool) or not isinstance(exit_code, int):
+        return None
+    return exit_code
 
 
 def _is_success(result: Any, status: Any) -> bool:
@@ -129,9 +223,10 @@ def _session_key(session_id: str) -> str:
 
 
 def _new_report_state() -> Dict[str, Any]:
+    workspace = _runtime_workspace()
     return {
         "started_at": datetime.now(timezone.utc).isoformat(),
-        "workspace": str(Path.cwd()),
+        "workspace": str(workspace) if workspace is not None else "unresolved",
         "changed_paths": set(),
         "tools": set(),
         "subagents": [],
@@ -301,30 +396,31 @@ def on_pre_tool_call(
     tool_name: str = "", args: Any = None, **_: Any
 ) -> Optional[Dict[str, str]]:
     safe_args = args if isinstance(args, dict) else {}
-    serialized = _serialized(safe_args)
     executable = _command_text(safe_args)
 
-    for pattern, label in _DESTRUCTIVE_PATTERNS:
-        if pattern.search(executable) or pattern.search(serialized):
-            return {
-                "action": "block",
-                "message": f"DZ23 Guardrail blocked a destructive operation matching {label}.",
-            }
+    label = _destructive_match(executable) if executable else None
+    if label:
+        return {
+            "action": "block",
+            "message": f"DZ23 Guardrail blocked a destructive operation matching {label}.",
+        }
 
     if tool_name in _WRITE_TOOLS or tool_name in {"terminal", "execute_code"}:
         outside = next(
             (
-                path
+                resolved
                 for path in _candidate_paths(tool_name, safe_args)
-                if _outside_workspace(path)
+                for is_outside, resolved in [_outside_workspace(path)]
+                if is_outside
             ),
             None,
         )
         if outside is not None:
+            path_scope = hashlib.sha256(str(outside).encode("utf-8")).hexdigest()[:24]
             return {
                 "action": "approve",
                 "message": f"Writing outside the active workspace requires explicit approval: {outside}",
-                "rule_key": f"dz23-guardrail:outside-workspace:{outside.parent}",
+                "rule_key": f"outside-workspace:file:{path_scope}",
             }
 
     return None
@@ -353,10 +449,9 @@ def on_post_tool_call(
                 report["changed_paths"].add(str(path))
         if tool_name in _WRITE_TOOLS and _is_success(result, status):
             _verified_by_session[key] = False
-        elif tool_name in {"terminal", "execute_code"} and _VERIFY_PATTERN.search(
-            executable
-        ):
-            _verified_by_session[key] = _is_success(result, status)
+        elif tool_name in {"terminal", "execute_code"} and _is_verification_command(executable):
+            exit_code = _verification_exit_code(result, status)
+            _verified_by_session[key] = exit_code == 0
 
 
 def on_pre_verify(

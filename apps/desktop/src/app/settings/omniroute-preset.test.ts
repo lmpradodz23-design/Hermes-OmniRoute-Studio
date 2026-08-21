@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildOmniRouteStudioConfig, DZ23_MOA_PRESET } from './omniroute-preset'
+import { buildOmniRouteStudioConfig, DZ23_MOA_PRESET, OMNIROUTE_DASHBOARD_URL } from './omniroute-preset'
 
 describe('buildOmniRouteStudioConfig', () => {
+  it('keeps the complete standalone OmniRoute dashboard reachable', () => {
+    expect(OMNIROUTE_DASHBOARD_URL).toBe('http://127.0.0.1:20128/dashboard')
+  })
+
   it('adds a virtual MoA model and bounded nested delegation', () => {
     const mcpConfig = {
       args: ['C:\\Hermes\\integrations\\omniroute-mcp-bridge.mjs'],

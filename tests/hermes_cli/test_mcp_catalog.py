@@ -201,6 +201,40 @@ class TestManifestParsing:
         assert cfg["url"] == "https://mcp.example.com/sse"
         assert cfg["headers"] == {"Authorization": "Bearer ${MCP_DEMO_API_KEY}"}
 
+    def test_http_api_key_supports_secret_safe_vendor_header(self, catalog_dir):
+        body = _basic_manifest(
+            transport={"type": "http", "url": "https://connect.example.com/mcp"},
+            auth={
+                "type": "api_key",
+                "env_var": "MCP_DEMO_API_KEY",
+                "header_name": "x-consumer-api-key",
+                "header_prefix": "",
+                "env": [{"name": "MCP_DEMO_API_KEY", "prompt": "key", "secret": True}],
+            },
+        )
+        _write_manifest(catalog_dir, "demo", body)
+        from hermes_cli.mcp_catalog import _build_server_config
+
+        cfg = _build_server_config(_entry("demo"), None)
+        assert cfg["headers"] == {"x-consumer-api-key": "${MCP_DEMO_API_KEY}"}
+
+    @pytest.mark.parametrize("header", ["Host", "Cookie", "bad header", "X-Key\r\nX-Evil"])
+    def test_http_api_key_rejects_unsafe_header_names(self, catalog_dir, header):
+        body = _basic_manifest(
+            transport={"type": "http", "url": "https://connect.example.com/mcp"},
+            auth={
+                "type": "api_key",
+                "env_var": "MCP_DEMO_API_KEY",
+                "header_name": header,
+                "env": [{"name": "MCP_DEMO_API_KEY", "prompt": "key", "secret": True}],
+            },
+        )
+        path = _write_manifest(catalog_dir, "demo", body)
+        from hermes_cli.mcp_catalog import CatalogError, _parse_manifest
+
+        with pytest.raises(CatalogError, match="header_name"):
+            _parse_manifest(path)
+
     def test_http_api_key_requires_matching_env_declaration(self, catalog_dir):
         """http+api_key manifests must declare the env key the header references.
 
@@ -298,6 +332,35 @@ class TestInstall:
         from hermes_cli.config import get_config_path
 
         raw = get_config_path().read_text()
+        assert "${MCP_DEMO_API_KEY}" in raw
+        assert "secret-val" not in raw
+
+    def test_install_http_vendor_header_keeps_secret_out_of_config(self, catalog_dir, monkeypatch):
+        body = _basic_manifest(
+            transport={"type": "http", "url": "https://connect.example.com/mcp"},
+            auth={
+                "type": "api_key",
+                "env_var": "MCP_DEMO_API_KEY",
+                "header_name": "x-consumer-api-key",
+                "header_prefix": "",
+                "env": [{"name": "MCP_DEMO_API_KEY", "prompt": "key", "secret": True}],
+            },
+        )
+        _write_manifest(catalog_dir, "demo", body)
+
+        from hermes_cli import mcp_catalog
+
+        monkeypatch.setattr(mcp_catalog, "_prompt_input", lambda *a, **kw: "secret-val")
+
+        from hermes_cli.config import get_config_path, load_config
+        from hermes_cli.mcp_catalog import install_entry
+
+        install_entry(_entry("demo"), enable=True)
+
+        server = load_config()["mcp_servers"]["demo"]
+        assert server["headers"] == {"x-consumer-api-key": "secret-val"}
+        raw = get_config_path().read_text()
+        assert "x-consumer-api-key" in raw
         assert "${MCP_DEMO_API_KEY}" in raw
         assert "secret-val" not in raw
 

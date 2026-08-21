@@ -61,6 +61,7 @@
     "lint:fix": "eslint src/ electron/ --fix",
     "fmt": "prettier --write 'src/**/*.{ts,tsx}' 'electron/**/*.ts' 'vite.config.ts'",
     "fix": "npm run lint:fix && npm run fmt",
+    "i18n:generate:pt-br": "node scripts/generate-pt-br-locale.mjs && prettier --write src/i18n/pt-br.generated.ts src/i18n/pt-br-field-copy.generated.ts",
     "test:ui": "vitest run --project ui",
     "test:desktop:platforms": "vitest run --project electron",
     "test:find-in-page-native": "electron electron/find-in-page-native-fixture",
@@ -230,6 +231,10 @@
       {
         "from": "../../integrations/omniroute-mcp-bridge.mjs",
         "to": "omniroute-mcp-bridge.mjs"
+      },
+      {
+        "from": "../../integrations/omniroute-mcp-policy.mjs",
+        "to": "omniroute-mcp-policy.mjs"
       },
       {
         "from": "../../integrations/omniroute-daily-health.py",

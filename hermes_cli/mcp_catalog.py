@@ -73,6 +73,10 @@ class AuthSpec:
     provider: Optional[str] = None
     scopes: List[str] = field(default_factory=list)
     env_var: Optional[str] = None
+    # Vendor-hosted MCPs sometimes use a dedicated API-key header rather than
+    # Authorization: Bearer. Only an ${ENV} template is persisted.
+    header_name: Optional[str] = None
+    header_prefix: Optional[str] = None
 
 
 @dataclass
@@ -252,22 +256,39 @@ def _parse_manifest(path: Path) -> CatalogEntry:
         provider=auth_raw.get("provider"),
         scopes=list(auth_raw.get("scopes") or []),
         env_var=auth_raw.get("env_var"),
+        header_name=auth_raw.get("header_name"),
+        header_prefix=auth_raw.get("header_prefix"),
     )
     if t_type == "http" and a_type == "api_key":
-        # _build_server_config emits an Authorization header referencing
-        # ${MCP_<NAME>_API_KEY} (via _bearer_auth_headers), but install_entry
-        # only persists the env vars DECLARED in auth.env. Enforce the naming
-        # contract at parse time, or a manifest declaring e.g. N8N_API_KEY
-        # would install cleanly yet send a literal-placeholder header (401)
-        # at connect time.
+        # install_entry only persists vars DECLARED in auth.env. Enforce the
+        # exact interpolation contract or the server receives a literal
+        # ${...} placeholder and fails with an opaque 401.
         from hermes_cli.mcp_config import _env_key_for_server
 
-        _required_key = _env_key_for_server(name)
+        _required_key = auth.env_var or _env_key_for_server(name)
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", _required_key):
+            raise CatalogError(f"{path}: auth.env_var is invalid: {_required_key!r}")
         if not any(spec.name == _required_key for spec in env_list):
             raise CatalogError(
                 f"{path}: http + api_key auth requires auth.env to declare "
                 f"'{_required_key}' (the key the Authorization header references)"
             )
+
+        _header_name = auth.header_name or "Authorization"
+        if not re.fullmatch(r"[A-Za-z0-9-]+", _header_name):
+            raise CatalogError(f"{path}: auth.header_name is invalid: {_header_name!r}")
+        if _header_name.lower() in {
+            "connection",
+            "content-length",
+            "cookie",
+            "host",
+            "set-cookie",
+            "transfer-encoding",
+        }:
+            raise CatalogError(f"{path}: auth.header_name is not allowed: {_header_name!r}")
+        _header_prefix = auth.header_prefix
+        if _header_prefix is not None and ("\r" in _header_prefix or "\n" in _header_prefix):
+            raise CatalogError(f"{path}: auth.header_prefix must not contain newlines")
 
     tools_raw = data.get("tools") or {}
     if not isinstance(tools_raw, dict):
@@ -576,9 +597,14 @@ def _build_server_config(
         if entry.auth.type == "oauth":
             cfg["auth"] = "oauth"
         elif entry.auth.type == "api_key":
-            from hermes_cli.mcp_config import _bearer_auth_headers
+            from hermes_cli.mcp_config import _env_key_for_server
 
-            cfg["headers"] = _bearer_auth_headers(entry.name)
+            env_var = entry.auth.env_var or _env_key_for_server(entry.name)
+            header_name = entry.auth.header_name or "Authorization"
+            prefix = entry.auth.header_prefix
+            if prefix is None:
+                prefix = "Bearer " if header_name.lower() == "authorization" else ""
+            cfg["headers"] = {header_name: f"{prefix}${{{env_var}}}"}
     return cfg
 
 

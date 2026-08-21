@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import threading
 import time
 import urllib.request
@@ -83,6 +84,13 @@ def check_package_for_malware(
     if not package:
         return None
 
+    return _check_package_identity_for_malware(package, ecosystem, version)
+
+
+def _check_package_identity_for_malware(
+    package: str, ecosystem: str, version: Optional[str] = None
+) -> Optional[str]:
+    """Query/cache one normalized package identity."""
     cache_key = (ecosystem, package, version)
     hit, cached = _cache_get(cache_key)
     if hit:
@@ -109,6 +117,98 @@ def check_package_for_malware(
         result = None
     _cache_put(cache_key, result)
     return result
+
+
+_INSTALL_ECOSYSTEMS = {
+    "cargo": "crates.io",
+    "gem": "RubyGems",
+    "go": "Go",
+}
+
+
+def _first_package_token(args: list[str]) -> Optional[str]:
+    """Return the first package-shaped token, ignoring CLI options.
+
+    This intentionally handles only the dependency-add commands gated by
+    ``tools.approval``. Lockfile/requirements restores are excluded before
+    this helper is called.
+    """
+    for arg in args:
+        if not arg or arg.startswith("-"):
+            continue
+        return arg.strip("\"'")
+    return None
+
+
+def check_install_command_for_malware(command: str) -> Optional[str]:
+    """Scan a regular package-manager add/install command via OSV.
+
+    Unlike :func:`check_package_for_malware`, which protects MCP ``npx`` and
+    ``uvx`` launches, this entry point covers dependency changes initiated in
+    the terminal. It returns a hard-block message only for a confirmed MAL-*
+    advisory. Unparseable commands and temporary network failures still fall
+    through to the separate human-approval boundary.
+    """
+    try:
+        tokens = shlex.split(command, posix=True)
+    except ValueError:
+        return None
+    if not tokens:
+        return None
+
+    lowered = [token.lower() for token in tokens]
+    start = 0
+    if len(tokens) >= 4 and lowered[0] in {"python", "python3", "py"} and lowered[1:3] == ["-m", "pip"]:
+        manager = "pip"
+        start = 3
+    else:
+        manager = os.path.basename(lowered[0]).removesuffix(".cmd").removesuffix(".exe")
+        start = 1
+
+    if start >= len(tokens):
+        return None
+    action = lowered[start]
+    args = tokens[start + 1:]
+
+    ecosystem: Optional[str] = None
+    if manager in {"npm", "pnpm"} and action in {"add", "i", "install"}:
+        ecosystem = "npm"
+    elif manager in {"yarn", "bun"} and action == "add":
+        ecosystem = "npm"
+    elif manager == "pip" and action == "install":
+        if any(arg in {"-r", "--requirement"} or arg.startswith("--requirement=") for arg in args):
+            return None
+        ecosystem = "PyPI"
+    elif manager == "uv" and action == "add":
+        ecosystem = "PyPI"
+    elif manager in _INSTALL_ECOSYSTEMS and (
+        (manager == "cargo" and action in {"add", "install"})
+        or (manager in {"gem", "go"} and action == "install")
+    ):
+        ecosystem = _INSTALL_ECOSYSTEMS[manager]
+    else:
+        return None
+
+    token = _first_package_token(args)
+    if not token or token in {".", ".."} or token.startswith(("./", "../")):
+        return None
+
+    if ecosystem == "npm":
+        package, version = _parse_npm_package(token)
+    elif ecosystem == "PyPI":
+        package, version = _parse_pypi_package(token)
+    else:
+        # Go module versions and Ruby/Cargo package versions all use an @
+        # suffix in their common CLI form. Preserve scoped npm parsing above.
+        package, sep, raw_version = token.rpartition("@")
+        if not sep or not package:
+            package, version = token, None
+        else:
+            version = None if raw_version == "latest" else raw_version
+
+    if not package:
+        return None
+    return _check_package_identity_for_malware(package, ecosystem, version)
 
 
 def _infer_ecosystem(command: str) -> Optional[str]:

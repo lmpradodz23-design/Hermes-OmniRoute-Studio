@@ -58,6 +58,7 @@ export function parseCompressionStatus(output: string): OmniRouteCompressionStat
 
 export function createOmniRouteCompressionRunner(options: {
   bridgePath: string
+  env?: Record<string, string>
   nodeCommand: string
 }): RunCompressionCli {
   return args =>
@@ -67,7 +68,7 @@ export function createOmniRouteCompressionRunner(options: {
         [options.bridgePath, ...args],
         hiddenWindowsChildOptions({
           encoding: 'utf8',
-          env: { ...process.env, NO_COLOR: '1' },
+          env: { ...process.env, ...options.env, NO_COLOR: '1' },
           timeout: 45_000,
           windowsHide: true
         }),

@@ -3,7 +3,7 @@ import { createContext, type ReactNode, useCallback, useContext, useEffect, useM
 import { getHermesConfigRecord, type HermesConfigRecord, saveHermesConfig } from '@/hermes'
 
 import { TRANSLATIONS } from './catalog'
-import { DEFAULT_LOCALE, localeConfigValue, normalizeLocale } from './languages'
+import { DEFAULT_LOCALE, isSupportedLocaleValue, localeConfigValue, normalizeLocale } from './languages'
 import { setRuntimeI18nLocale } from './runtime'
 import type { Locale, Translations } from './types'
 
@@ -92,8 +92,26 @@ export interface I18nProviderProps {
   initialLocale?: unknown
 }
 
+export function resolvePreferredLocale(initialLocale?: unknown): Locale {
+  if (isSupportedLocaleValue(initialLocale)) {
+    return normalizeLocale(initialLocale)
+  }
+
+  if (typeof window === 'undefined') {
+    return DEFAULT_LOCALE
+  }
+
+  const candidates = [
+    window.hermesDesktop?.systemLocale,
+    ...(globalThis.navigator?.languages ?? []),
+    globalThis.navigator?.language
+  ]
+
+  return normalizeLocale(candidates.find(isSupportedLocaleValue))
+}
+
 export function I18nProvider({ children, configClient = defaultConfigClient, initialLocale }: I18nProviderProps) {
-  const [locale, setLocaleState] = useState<Locale>(() => normalizeLocale(initialLocale))
+  const [locale, setLocaleState] = useState<Locale>(() => resolvePreferredLocale(initialLocale))
   const [isLoadingConfig, setIsLoadingConfig] = useState(false)
   const [isSavingLocale, setIsSavingLocale] = useState(false)
   const [configLoadError, setConfigLoadError] = useState<Error | null>(null)
@@ -121,7 +139,13 @@ export function I18nProvider({ children, configClient = defaultConfigClient, ini
       .getConfig()
       .then(config => {
         if (!cancelled) {
-          setLocaleState(normalizeLocale(getConfigDisplayLanguage(config)))
+          const configuredLocale = getConfigDisplayLanguage(config)
+
+          setLocaleState(
+            configuredLocale == null || configuredLocale === ''
+              ? resolvePreferredLocale(initialLocale)
+              : normalizeLocale(configuredLocale)
+          )
         }
       })
       .catch(error => {

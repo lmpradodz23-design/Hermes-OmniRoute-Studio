@@ -101,6 +101,18 @@ async function renderModelSettings() {
 }
 
 describe('ModelSettings', () => {
+  it('retries a transient backend startup timeout without leaving an error on screen', async () => {
+    getGlobalModelInfo.mockRejectedValueOnce(
+      new Error('Error invoking remote method: Timed out connecting to Hermes backend after 15000ms')
+    )
+
+    await renderModelSettings()
+
+    await waitFor(() => expect(getGlobalModelInfo).toHaveBeenCalledTimes(2))
+    expect(screen.queryByText(/Timed out connecting to Hermes backend/i)).toBeNull()
+    expect((await screen.findAllByRole('combobox'))[0].textContent).toContain('Nous')
+  })
+
   it('loads the current main model and lists configured providers only', async () => {
     await renderModelSettings()
 

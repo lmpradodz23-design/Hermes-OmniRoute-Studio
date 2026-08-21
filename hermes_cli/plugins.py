@@ -90,6 +90,38 @@ def get_bundled_plugins_dir() -> Path:
         return Path(env_override)
     return Path(__file__).resolve().parent.parent / "plugins"
 
+
+def get_studio_managed_plugins_dir() -> Optional[Path]:
+    """Return the desktop Studio plugin root only when it is safely namespaced.
+
+    The Electron launcher supplies this path to its backend children. A shell
+    environment cannot use the variable to turn an arbitrary directory into a
+    trusted bundled-plugin source: the resolved path must be exactly the
+    ``omniroute-studio/plugins`` directory beneath the active Hermes home (or
+    beneath the base home for a profile-scoped backend).
+    """
+    raw = os.getenv("HERMES_STUDIO_PLUGIN_ROOT", "").strip()
+    if not raw:
+        return None
+    try:
+        requested = Path(raw).expanduser().resolve(strict=False)
+        current_home = get_hermes_home().resolve(strict=False)
+    except (OSError, RuntimeError):
+        return None
+    base_home = (
+        current_home.parent.parent
+        if current_home.parent.name.lower() == "profiles"
+        else current_home
+    )
+    expected = (base_home / "omniroute-studio" / "plugins").resolve(strict=False)
+    if requested != expected:
+        logger.error(
+            "Ignoring HERMES_STUDIO_PLUGIN_ROOT outside the managed namespace: %s",
+            requested,
+        )
+        return None
+    return requested
+
 try:
     import yaml
 except ImportError:  # pragma: no cover – yaml is optional at import time
@@ -657,6 +689,7 @@ _KNOWN_MANIFEST_FIELDS: Set[str] = {
     # v1
     "name", "version", "description", "author", "requires_env",
     "provides_tools", "provides_hooks", "kind", "hooks", "label",
+    "security_critical",
     "optional_env", "platforms", "external_dependencies", "pip_dependencies",
     "provides_browser_providers", "provides_web_providers",
     # v2 (#64165)
@@ -1061,6 +1094,9 @@ class PluginManifest:
     #              in ~/.hermes/plugins/ still gated by ``plugins.enabled``
     #              (untrusted code).
     kind: str = "standalone"
+    # Security-critical plugins define a fail-closed runtime boundary. A load
+    # failure must abort discovery instead of silently disabling protection.
+    security_critical: bool = False
     # Registry key — path-derived, used by ``plugins.enabled``/``disabled``
     # lookups and by ``hermes plugins list``. For a flat plugin at
     # ``plugins/disk-cleanup/`` the key is ``disk-cleanup``; for a nested
@@ -3127,11 +3163,12 @@ class PluginContext:
             )
         callbacks = self._manager._hooks.setdefault(hook_name, [])
         callbacks.append(callback)
+        self._manager._hook_callback_owners[callback] = self.manifest.name
+        if self.manifest.security_critical:
+            self._manager._security_critical_hook_callbacks.add(callback)
         handle = self._track(
             "hook", hook_name,
-            lambda: self._manager._remove_callback(
-                self._manager._hooks, hook_name, callback
-            ),
+            lambda: self._manager._remove_hook_callback(hook_name, callback),
         )
         logger.debug("Plugin %s registered hook: %s", self.manifest.name, hook_name)
         return handle
@@ -3402,6 +3439,8 @@ class PluginManager:
         self._discovery_lock = threading.RLock()
         self._plugins: Dict[str, LoadedPlugin] = {}
         self._hooks: Dict[str, List[Callable]] = {}
+        self._hook_callback_owners: Dict[Callable, str] = {}
+        self._security_critical_hook_callbacks: Set[Callable] = set()
         self._middleware: Dict[str, List[Callable]] = {}
         self._plugin_tool_names: Set[str] = set()
         self._plugin_platform_names: Set[str] = set()
@@ -3515,6 +3554,11 @@ class PluginManager:
         self._remove_identity(callbacks, callback)
         if not callbacks:
             mapping.pop(key, None)
+
+    def _remove_hook_callback(self, hook_name: str, callback: Callable) -> None:
+        self._remove_callback(self._hooks, hook_name, callback)
+        self._security_critical_hook_callbacks.discard(callback)
+        self._hook_callback_owners.pop(callback, None)
 
     def _restore_mapping(
         self,
@@ -3719,6 +3763,8 @@ class PluginManager:
             self._ownership_ledger.clear()
             self._plugins.clear()
             self._hooks.clear()
+            self._security_critical_hook_callbacks.clear()
+            self._hook_callback_owners.clear()
             self._middleware.clear()
             self._plugin_tool_names.clear()
             self._plugin_platform_names.clear()
@@ -4127,6 +4173,18 @@ class PluginManager:
                 "Project plugins disabled (set HERMES_ENABLE_PROJECT_PLUGINS=1 to enable)"
             )
 
+        # 4. Desktop Studio-managed plugins. Scan last so a user/project plugin
+        # cannot shadow the mandatory guardrail by reusing its manifest name.
+        # The helper above accepts only the dedicated namespaced root supplied
+        # by the Studio launcher; these plugins therefore receive bundled trust
+        # semantics without modifying the shared Hermes runtime tree.
+        studio_dir = get_studio_managed_plugins_dir()
+        if studio_dir is not None:
+            logger.debug("Scanning Studio-managed plugins: %s", studio_dir)
+            studio_manifests = self._scan_directory(studio_dir, source="bundled")
+            logger.debug("  Studio-managed: %d manifest(s)", len(studio_manifests))
+            manifests.extend(studio_manifests)
+
         return manifests
 
     def has_enabled_portable_mcp(self, raw_config: Mapping[str, Any]) -> bool:
@@ -4372,6 +4430,7 @@ class PluginManager:
                 source=source,
                 path=str(plugin_dir),
                 kind=kind,
+                security_critical=data.get("security_critical") is True,
                 key=key,
                 capabilities=_parse_declared_capabilities(
                     data.get("capabilities"), name
@@ -4897,6 +4956,12 @@ class PluginManager:
                 "Failed to load plugin '%s': %s",
                 manifest.name, exc, exc_info=_PLUGINS_DEBUG,
             )
+            if manifest.security_critical:
+                self._plugins[plugin_key] = loaded
+                raise RuntimeError(
+                    "security-critical plugin "
+                    f"'{plugin_key}' failed to load; startup aborted: {exc}"
+                ) from exc
         # A materialization that did NOT succeed has already had its
         # discovery-time pre-registrations disposed: the failure path above
         # sweeps the whole ownership ledger for this plugin key, not just the
@@ -5136,12 +5201,36 @@ class PluginManager:
             try:
                 ret = self._invoke_hook_callback(cb, kwargs)
                 if ret is not None:
+                    if isinstance(ret, dict):
+                        ret = dict(ret)
+                        ret["_plugin_id"] = self._hook_callback_owners.get(cb, "unattributed")
                     results.append(ret)
             except Exception as exc:
+                callback_name = getattr(cb, "__name__", repr(cb))
+                if cb in self._security_critical_hook_callbacks:
+                    logger.error(
+                        "Security-critical hook '%s' callback %s raised: %s",
+                        hook_name,
+                        callback_name,
+                        exc,
+                        exc_info=True,
+                    )
+                    if hook_name == "pre_tool_call":
+                        results.append({
+                            "action": "block",
+                            "message": (
+                                "BLOCKED: a security-critical pre-tool hook failed "
+                                f"({callback_name}: {exc})"
+                            ),
+                        })
+                        continue
+                    raise RuntimeError(
+                        f"security-critical hook '{hook_name}' failed in {callback_name}: {exc}"
+                    ) from exc
                 logger.warning(
                     "Hook '%s' callback %s raised: %s",
                     hook_name,
-                    getattr(cb, "__name__", repr(cb)),
+                    callback_name,
                     exc,
                 )
         return results
@@ -6087,6 +6176,15 @@ def _get_pre_tool_call_directive_details(
         rule_key = rule_key.strip() if isinstance(rule_key, str) else None
         if not rule_key:
             rule_key = None
+        elif rule_key:
+            plugin_id = result.get("_plugin_id")
+            plugin_id = plugin_id.strip() if isinstance(plugin_id, str) else ""
+            if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", plugin_id):
+                plugin_id = "unattributed"
+            # A plugin cannot choose another plugin's persistent approval
+            # namespace. The exact plugin owner is injected by PluginManager,
+            # overwriting any value returned by the callback itself.
+            rule_key = f"{plugin_id}:{rule_key}"
         return _PreToolCallDirective(
             action=action, message=message, rule_key=rule_key,
             modified_args=modified_args,

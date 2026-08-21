@@ -112,6 +112,42 @@ const STATUS_FILTERS: Option<SessionStatusBucket>[] = [
   { dot: cn(sessionDotClassName('idle'), 'bg-(--ui-text-quaternary)'), id: 'idle', label: 'Idle' }
 ]
 
+const PT_BR_FILTER_LABELS: Record<string, string> = {
+  Updated: 'Atualização',
+  Project: 'Projeto',
+  Status: 'Status',
+  Profile: 'Perfil',
+  Created: 'Criação',
+  Tokens: 'Tokens',
+  Cost: 'Custo',
+  Manual: 'Manual',
+  Preview: 'Prévia',
+  Open: 'Aberta',
+  Draft: 'Rascunho',
+  Merged: 'Mesclada',
+  Closed: 'Fechada',
+  'No PR': 'Sem PR',
+  'Needs input': 'Requer atenção',
+  Working: 'Em andamento',
+  Unread: 'Não lida',
+  Idle: 'Inativa',
+  Grouping: 'Agrupamento',
+  Ordering: 'Ordenação',
+  Show: 'Exibir',
+  'Inbox style': 'Estilo caixa de entrada',
+  Filters: 'Filtros',
+  'Pull request': 'Pull request',
+  Archived: 'Arquivadas',
+  'Reset to defaults': 'Restaurar padrões',
+  'Expand all': 'Expandir tudo',
+  'Collapse all': 'Recolher tudo',
+  'Mark all as read': 'Marcar todas como lidas'
+}
+
+function localizedFilterLabel(locale: string, label: string): string {
+  return locale === 'pt-br' ? (PT_BR_FILTER_LABELS[label] ?? label) : label
+}
+
 function OptionGlyph({ option }: { option: Option }) {
   if (option.dot) {
     return <span aria-hidden="true" className={cn('shrink-0', option.dot)} />
@@ -149,7 +185,8 @@ function OptionRadio({ option }: { option: Option }) {
 }
 
 export function SidebarFilterMenu({ className }: { className?: string }) {
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
+  const label = (value: string) => localizedFilterLabel(locale, value)
   const grouping = useStore($sidebarGrouping)
   const ordering = useStore($sidebarOrdering)
   const rowMeta = useStore($sidebarRowMeta)
@@ -176,7 +213,7 @@ export function SidebarFilterMenu({ className }: { className?: string }) {
   // been explicitly shut.
   const projectsCollapsed = projects.length > 0 && projects.every(project => nodeOpen[project.id] === false)
 
-  const groupingLabel = GROUPINGS.find(option => option.id === grouping)?.label
+  const groupingLabel = label(GROUPINGS.find(option => option.id === grouping)?.label ?? '')
 
   // Two options are conditional: dragging a row is what picks manual, so it
   // only appears as a way back out once there's a hand-picked order to leave;
@@ -206,7 +243,7 @@ export function SidebarFilterMenu({ className }: { className?: string }) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          aria-label="Filters"
+          aria-label={label('Filters')}
           className={cn(
             className,
             'data-[state=open]:bg-(--ui-control-active-background) data-[state=open]:text-foreground data-[state=open]:opacity-100',
@@ -227,7 +264,7 @@ export function SidebarFilterMenu({ className }: { className?: string }) {
         <DropdownMenuGroup>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger hideChevron>
-              Grouping
+              {label('Grouping')}
               <span className="ml-auto flex items-center gap-1 pl-4 text-(--ui-text-tertiary)">
                 {groupingLabel}
                 <Codicon name="chevron-right" size="1rem" />
@@ -239,35 +276,35 @@ export function SidebarFilterMenu({ className }: { className?: string }) {
                 value={grouping}
               >
                 {GROUPINGS.map(option => (
-                  <OptionRadio key={option.id} option={option} />
+                  <OptionRadio key={option.id} option={{ ...option, label: label(option.label) }} />
                 ))}
               </DropdownMenuRadioGroup>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
 
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger>Ordering</DropdownMenuSubTrigger>
+            <DropdownMenuSubTrigger>{label('Ordering')}</DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
               <DropdownMenuRadioGroup
                 onValueChange={value => setSidebarOrdering(value as SidebarOrdering)}
                 value={ordering}
               >
                 {orderings.map(option => (
-                  <OptionRadio key={option.id} option={option} />
+                  <OptionRadio key={option.id} option={{ ...option, label: label(option.label) }} />
                 ))}
               </DropdownMenuRadioGroup>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
 
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger>Show</DropdownMenuSubTrigger>
+            <DropdownMenuSubTrigger>{label('Show')}</DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
               {rowMetaOptions.map(option => (
                 <OptionCheckbox
                   checked={rowMeta.includes(option.id)}
                   key={option.id}
                   onCheck={() => toggleSidebarRowMeta(option.id)}
-                  option={option}
+                  option={{ ...option, label: label(option.label) }}
                 />
               ))}
             </DropdownMenuSubContent>
@@ -278,24 +315,24 @@ export function SidebarFilterMenu({ className }: { className?: string }) {
           <OptionCheckbox
             checked={cardRows}
             onCheck={() => setSidebarCardRows(!cardRows)}
-            option={{ icon: 'inbox', id: 'card-rows', label: 'Inbox style' }}
+            option={{ icon: 'inbox', id: 'card-rows', label: label('Inbox style') }}
           />
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator />
 
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Filters</DropdownMenuLabel>
+          <DropdownMenuLabel>{label('Filters')}</DropdownMenuLabel>
 
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger>Status</DropdownMenuSubTrigger>
+            <DropdownMenuSubTrigger>{label('Status')}</DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
               {STATUS_FILTERS.map(option => (
                 <OptionCheckbox
                   checked={statusFilter.includes(option.id)}
                   key={option.id}
                   onCheck={() => toggleSidebarStatusFilter(option.id)}
-                  option={option}
+                  option={{ ...option, label: label(option.label) }}
                 />
               ))}
             </DropdownMenuSubContent>
@@ -305,14 +342,14 @@ export function SidebarFilterMenu({ className }: { className?: string }) {
               this submenu never appears rather than filtering everything out. */}
           {prAvailable && (
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger>Pull request</DropdownMenuSubTrigger>
+              <DropdownMenuSubTrigger>{label('Pull request')}</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
                 {PR_FILTERS.map(option => (
                   <OptionCheckbox
                     checked={prFilter.includes(option.id)}
                     key={option.id}
                     onCheck={() => toggleSidebarPrFilter(option.id)}
-                    option={option}
+                    option={{ ...option, label: label(option.label) }}
                   />
                 ))}
               </DropdownMenuSubContent>
@@ -320,7 +357,7 @@ export function SidebarFilterMenu({ className }: { className?: string }) {
           )}
 
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger>Profile</DropdownMenuSubTrigger>
+            <DropdownMenuSubTrigger>{label('Profile')}</DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
               {/* Scoped to one profile the rail is already the filter, so the
                   per-profile boxes only appear where they can narrow something.
@@ -347,7 +384,7 @@ export function SidebarFilterMenu({ className }: { className?: string }) {
 
           {projects.length > 1 && (
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger>Project</DropdownMenuSubTrigger>
+              <DropdownMenuSubTrigger>{label('Project')}</DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
                 {projects.map(project => (
                   <OptionCheckbox
@@ -382,12 +419,14 @@ export function SidebarFilterMenu({ className }: { className?: string }) {
           <OptionCheckbox
             checked={showArchived}
             onCheck={() => setSidebarShowArchived(!showArchived)}
-            option={{ id: 'archived', label: 'Archived' }}
+            option={{ id: 'archived', label: label('Archived') }}
           />
 
           {/* One way back rather than two near-identical ones: this drops the
               grouping and sort too, which "clear filters" left behind. */}
-          {viewCustomized && <DropdownMenuItem onSelect={resetSidebarView}>Reset to defaults</DropdownMenuItem>}
+          {viewCustomized && (
+            <DropdownMenuItem onSelect={resetSidebarView}>{label('Reset to defaults')}</DropdownMenuItem>
+          )}
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator />
@@ -405,11 +444,11 @@ export function SidebarFilterMenu({ className }: { className?: string }) {
               )
             }
           >
-            {projectsCollapsed ? 'Expand all' : 'Collapse all'}
+            {projectsCollapsed ? label('Expand all') : label('Collapse all')}
           </DropdownMenuItem>
         )}
         <DropdownMenuItem disabled={unreadIds.length === 0} onSelect={markAllSessionsRead}>
-          Mark all as read
+          {label('Mark all as read')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

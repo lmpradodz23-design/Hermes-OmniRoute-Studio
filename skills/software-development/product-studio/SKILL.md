@@ -1,7 +1,7 @@
 ---
 name: product-studio
 description: Build any production software product end to end.
-version: 0.2.0
+version: 0.3.0
 author: DZ23, Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -35,6 +35,8 @@ Act as the accountable senior engineer for a product from discovery through a ve
 - Load `references/knowledge-and-rules.md` when saving reusable project knowledge or defining workspace-specific behavior.
 - Load `references/task-report.md` before closing a coding task or handing changes to a reviewer.
 - Load `references/nontechnical-intake.md` when the user describes a business or product without technical requirements.
+- Load `references/deployment-integrations.md` before connecting a hosting/database account or publishing a project.
+- Load `references/subscription-auth.md` before connecting ChatGPT/Codex, Claude Code, Copilot, or another subscription-backed CLI.
 
 ## Procedure
 
@@ -48,6 +50,8 @@ Act as the accountable senior engineer for a product from discovery through a ve
 8. **Validate the experience and live preview.** Run focused tests first, then the relevant integration, end-to-end, build, and security checks. For a UI, start the real project server, open its localhost URL in the embedded preview, and exercise rendered behavior with `drive_preview`, `read_preview`, or browser tools. Completion criterion: important happy paths, failures, edge cases, keyboard use, responsive layout, and the live preview have evidence.
 9. **Harden release readiness.** Review OWASP risks, data exposure, dependency advisories, rate limits, timeouts, retry/idempotency, logs, metrics, backups, migration safety, and rollback. Completion criterion: residual risks are documented with severity and owner.
 10. **Distill knowledge and report honestly.** Save durable facts as source-backed Knowledge Cards, keep procedural guidance in Skills, respect hierarchical `AGENTS.md`, and use the generated task report for changed files, tools, delegates, models, and verification evidence. Never call local compilation production proof.
+
+When the user says “publish this”, “put it online”, “deploy my app”, or equivalent plain language, follow `references/deployment-integrations.md`; do not require them to know Supabase, Vercel, MCP, CLI flags, or infrastructure terminology.
 
 ## Product Design Rules
 

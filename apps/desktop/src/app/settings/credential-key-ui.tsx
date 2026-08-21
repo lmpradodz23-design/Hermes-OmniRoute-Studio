@@ -27,11 +27,13 @@ const CRED_BARE = 'border-0! bg-transparent! shadow-none! h-auto! p-0! @2xl:h-8!
 export const isKeyVar = (key: string, info: EnvVarInfo) => info.is_password || /(?:_API_KEY|_TOKEN|_KEY)$/.test(key)
 
 export const friendlyFieldLabel = (key: string, info: EnvVarInfo) =>
-  info.description?.trim() ||
-  key
-    .replace(/_/g, ' ')
-    .toLowerCase()
-    .replace(/\b\w/g, c => c.toUpperCase())
+  !isKeyVar(key, info) && /(?:_BASE_URL|_URL)$/i.test(key)
+    ? translateNow('settings.credentials.baseUrlAdvanced')
+    : info.description?.trim() ||
+      key
+        .replace(/_/g, ' ')
+        .toLowerCase()
+        .replace(/\b\w/g, c => c.toUpperCase())
 
 export const credentialPlaceholder = (key: string, info: EnvVarInfo, label: string): string =>
   isKeyVar(key, info)
@@ -62,11 +64,13 @@ export function KeyField({
   // Bare (plain subtext) only while the group is collapsed and idle. Expanding
   // the card counts as "focused in", so it gets full input chrome too.
   const bare = !editing && !expanded
+  const defaultValue = info.is_password ? '' : info.default_value?.trim() || ''
+  const currentValue = info.is_password ? '' : info.redacted_value?.trim() || defaultValue
   const draft = edits[varKey] ?? ''
-  const dirty = draft.trim().length > 0
+  const dirty = draft.trim().length > 0 && draft.trim() !== currentValue
   const busy = saving === varKey
-  const masked = info.redacted_value ?? '••••••••'
-  const startEdit = () => setEdits(c => ({ ...c, [varKey]: '' }))
+  const masked = info.redacted_value ?? (info.is_password ? '••••••••' : defaultValue)
+  const startEdit = () => setEdits(c => ({ ...c, [varKey]: currentValue }))
   const cancel = () => setEdits(c => withoutKey(c, varKey))
   const update = (e: ChangeEvent<HTMLInputElement>) => setEdits(c => ({ ...c, [varKey]: e.target.value }))
 
@@ -107,7 +111,7 @@ export function KeyField({
         onKeyDown={keydown}
         placeholder={placeholder ?? t.settings.credentials.pasteKey}
         type={editType}
-        value={draft}
+        value={editing ? draft : defaultValue}
       />
       {/* Inline trailing controls — mirrors SearchField's inline clear button.
           No floating hint row that reflows the grid or overlaps the card body;
@@ -116,12 +120,20 @@ export function KeyField({
         <div className="flex items-center gap-1">
           {info.is_set && (
             <Button
-              aria-label={t.settings.credentials.remove}
+              aria-label={
+                defaultValue && !info.is_password
+                  ? t.settings.credentials.restoreDefault
+                  : t.settings.credentials.remove
+              }
               className="text-muted-foreground hover:text-destructive"
               disabled={busy}
               onClick={() => void onClear(varKey)}
               size="icon-xs"
-              title={t.settings.credentials.remove}
+              title={
+                defaultValue && !info.is_password
+                  ? t.settings.credentials.restoreDefault
+                  : t.settings.credentials.remove
+              }
               type="button"
               variant="ghost"
             >
@@ -256,7 +268,7 @@ export function CredentialKeyCard({
 export function ProviderKeyRows({ expanded, group, onExpand, onToggle, rowProps }: ProviderKeyRowsProps) {
   const { t } = useI18n()
   const docsUrl = group.docsUrl?.trim()
-  const description = group.description?.trim()
+  const description = t.settings.providers.groupDescriptions?.[group.name]?.trim() || group.description?.trim()
   const expandable = Boolean(description || docsUrl || group.advanced.length > 0)
 
   return (

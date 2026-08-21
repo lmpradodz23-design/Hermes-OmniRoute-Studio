@@ -900,7 +900,10 @@ export const zh: Translations = {
       couldNotSave: '无法保存凭据。',
       remove: '移除',
       getKey: '获取密钥',
-      saving: '保存中'
+      saving: '保存中',
+      baseUrlAdvanced: '基础 URL（高级）',
+      restoreDefault: '恢复提供商默认值',
+      defaultValue: '提供商默认值'
     },
     envActions: {
       actions: '操作',
@@ -1246,6 +1249,9 @@ export const zh: Translations = {
       online: '在线',
       offline: '离线',
       configured: '已配置',
+      securityReady: '安全组件已启用',
+      securityFailed: '安全组件安装失败',
+      componentsReady: (ready, total) => `${ready}/${total} 个托管组件已就绪`,
       modelsFound: count => `${count} 个模型可用`,
       check: '检查连接',
       configure: '配置 OmniRoute',

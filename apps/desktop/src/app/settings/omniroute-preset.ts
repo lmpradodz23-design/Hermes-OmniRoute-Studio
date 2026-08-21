@@ -11,6 +11,8 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
 }
 
+export const OMNIROUTE_DASHBOARD_URL = 'http://127.0.0.1:20128/dashboard'
+
 function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []
 }

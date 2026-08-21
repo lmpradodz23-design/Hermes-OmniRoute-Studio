@@ -772,6 +772,52 @@ def _sudo_stdin_block_result(description: str) -> dict:
 # =========================================================================
 
 DANGEROUS_PATTERNS = [
+    # Supply-chain boundary: restoring dependencies already pinned by a
+    # lockfile is routine, but naming a new package mutates the dependency
+    # graph and may immediately execute untrusted lifecycle hooks. Keep this
+    # an approvable warning (rather than a hard block) so the user can inspect
+    # the package/version before it runs. Options may precede the package; a
+    # bare restore such as `npm install`, `npm ci`, `uv sync --frozen`, or
+    # `pip install -r requirements.txt` deliberately does not match.
+    (
+        r'\b(?:npm|pnpm)\s+(?:add|i|install)\b'
+        r'(?:\s+--?[a-z][\w-]*(?:=\S+)?)*\s+'
+        r'(?!-)(?:["\']?[@a-z0-9][^\s;&|]*|(?:git|https?)://\S+)',
+        "new JavaScript dependency installation requires explicit approval",
+    ),
+    (
+        r'\b(?:yarn|bun)\s+add\b'
+        r'(?:\s+--?[a-z][\w-]*(?:=\S+)?)*\s+'
+        r'(?!-)(?:["\']?[@a-z0-9][^\s;&|]*|(?:git|https?)://\S+)',
+        "new JavaScript dependency installation requires explicit approval",
+    ),
+    (
+        r'\b(?:(?:python(?:\d+(?:\.\d+)?)?|py)\s+-m\s+)?pip(?:\d+)?\s+install\b'
+        r'(?![^\n;&|]*(?:-r|--requirement)(?:\s|=))'
+        r'(?:\s+--?[a-z][\w-]*(?:=\S+)?)*\s+'
+        r'(?!-|\.)(?:["\']?[a-z0-9][^\s;&|]*|(?:git|https?)://\S+)',
+        "new Python dependency installation requires explicit approval",
+    ),
+    (
+        r'\buv\s+add\b(?:\s+--?[a-z][\w-]*(?:=\S+)?)*\s+'
+        r'(?!-)(?:["\']?[a-z0-9][^\s;&|]*|(?:git|https?)://\S+)',
+        "new Python dependency installation requires explicit approval",
+    ),
+    (
+        r'\bcargo\s+(?:add|install)\b(?:\s+--?[a-z][\w-]*(?:=\S+)?)*\s+'
+        r'(?!-)(?:["\']?[a-z0-9][^\s;&|]*|(?:git|https?)://\S+)',
+        "new Rust dependency installation requires explicit approval",
+    ),
+    (
+        r'\bgem\s+install\b(?:\s+--?[a-z][\w-]*(?:=\S+)?)*\s+'
+        r'(?!-)(?:["\']?[a-z0-9][^\s;&|]*|(?:git|https?)://\S+)',
+        "new Ruby dependency installation requires explicit approval",
+    ),
+    (
+        r'\bgo\s+install\b(?:\s+--?[a-z][\w-]*(?:=\S+)?)*\s+'
+        r'(?!-)(?:["\']?[a-z0-9][^\s;&|]*|(?:git|https?)://\S+)',
+        "new Go dependency installation requires explicit approval",
+    ),
     (r'\brm\s+(-[^\s]*\s+)*/', "delete in root path"),
     (r'\brm\s+-[^\s]*r', "recursive delete"),
     (r'\brm\s+--recursive\b', "recursive delete (long flag)"),
@@ -4386,6 +4432,28 @@ def check_all_command_guards(command: str, env_type: str,
         logger.warning("User deny rule %r blocked command: %s",
                        deny_pattern, command[:200])
         return _user_deny_block_result(deny_pattern)
+
+    # Confirmed supply-chain malware is an unconditional block. Network or
+    # parse failures return None here; new dependency commands still hit the
+    # normal explicit-approval patterns below, so OSV availability never turns
+    # into silent installation authority.
+    try:
+        from tools.osv_check import check_install_command_for_malware
+
+        malware_block = check_install_command_for_malware(command)
+    except Exception as exc:
+        logger.debug("Package-install OSV preflight unavailable: %s", exc)
+        malware_block = None
+    if malware_block:
+        logger.warning("OSV malware block: %s", malware_block)
+        return {
+            "approved": False,
+            "hard_blocked": True,
+            "message": malware_block,
+            "description": "known package malware",
+            "outcome": "blocked",
+            "user_consent": False,
+        }
 
     # --yolo or approvals.mode=off: bypass all approval prompts.
     # Gateway /yolo is session-scoped; CLI --yolo remains process-scoped.

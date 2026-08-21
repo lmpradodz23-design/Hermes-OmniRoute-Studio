@@ -23,6 +23,7 @@ import asyncio
 import json
 import time
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import httpx
@@ -524,14 +525,36 @@ def test_oauth_catalog_marks_external_providers_not_disconnectable():
     assert "provider's CLI" in providers["qwen-oauth"]["disconnect_hint"]
     assert providers["qwen-oauth"]["disconnect_command"] is None
 
-    # Claude Code: still not API-disconnectable, but we hand the GUI a runnable
-    # command (clears the keychain entry / credentials file) so it can offer a
-    # one-click "run in terminal" disconnect.
+    # Claude Code: Hermes never deletes another CLI's keychain/file credentials.
+    # The user logs out interactively inside the official client.
     assert providers["claude-code"]["flow"] == "external"
     assert providers["claude-code"]["disconnectable"] is False
-    assert providers["claude-code"]["disconnect_hint"]
-    cmd = providers["claude-code"]["disconnect_command"]
-    assert cmd and ".claude/.credentials.json" in cmd
+    assert "`/logout`" in providers["claude-code"]["disconnect_hint"]
+    assert providers["claude-code"]["disconnect_command"] is None
+
+
+def test_claude_subscription_status_uses_official_cli_without_forwarding_api_keys(monkeypatch):
+    """The Accounts screen probes Claude Code, never its private credential store."""
+    from hermes_cli import web_server
+
+    monkeypatch.setattr(web_server.shutil, "which", lambda name: "claude" if name == "claude" else None)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "separately-billed-test-key")
+    seen = {}
+
+    def fake_run(argv, **kwargs):
+        seen["argv"] = argv
+        seen["env"] = kwargs["env"]
+        return SimpleNamespace(returncode=0, stdout='{"loggedIn": true}', stderr="")
+
+    monkeypatch.setattr(web_server.subprocess, "run", fake_run)
+
+    status = web_server._claude_code_only_status()
+
+    assert seen["argv"] == ["claude", "auth", "status", "--json"]
+    assert "ANTHROPIC_API_KEY" not in seen["env"]
+    assert status["logged_in"] is True
+    assert status["api_key_override"] is True
+    assert status["token_preview"] is None
 
 
 def test_external_oauth_disconnect_rejected_before_auth_mutation(monkeypatch):
@@ -693,7 +716,5 @@ def test_status_falls_through_to_generic_dispatcher_for_catalog_only_provider():
     assert out["token_preview"] and "sk-future-secret-token-xyz" not in out["token_preview"]
     assert out["expires_at"] == "2026-12-01T00:00:00Z"
     assert out["has_refresh_token"] is True
-
-
 
 

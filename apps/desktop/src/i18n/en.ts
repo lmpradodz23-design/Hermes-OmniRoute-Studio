@@ -695,7 +695,10 @@ export const en: Translations = {
       couldNotSave: 'Could not save credential.',
       remove: 'Remove',
       getKey: 'Get a key',
-      saving: 'Saving'
+      saving: 'Saving',
+      baseUrlAdvanced: 'Base URL (advanced)',
+      restoreDefault: 'Restore provider default',
+      defaultValue: 'Provider default'
     },
     envActions: {
       actions: 'Actions',
@@ -1049,6 +1052,9 @@ export const en: Translations = {
       online: 'Online',
       offline: 'Offline',
       configured: 'Configured',
+      securityReady: 'Security components active',
+      securityFailed: 'Security component failed',
+      componentsReady: (ready, total) => `${ready}/${total} managed components ready`,
       modelsFound: count => `${count} models available`,
       check: 'Check connection',
       configure: 'Configure OmniRoute',
@@ -1062,7 +1068,9 @@ export const en: Translations = {
       cavemanEnabled: 'Caveman enabled',
       cavemanDisabled: 'Caveman disabled',
       cavemanUnavailable: 'OmniRoute CLI is unavailable on this device.',
-      cavemanFailed: 'Could not change Caveman compression'
+      cavemanFailed: 'Could not change Caveman compression',
+      openDashboard: 'Open full OmniRoute dashboard',
+      dashboardPreserved: 'The full standalone OmniRoute dashboard and all of its settings remain available.'
     },
     customEndpoints: {
       loadFailed: 'Could not load custom endpoints',
@@ -2674,6 +2682,11 @@ export const en: Translations = {
     chooseLater: "I'll choose a provider later",
     recommended: 'Recommended',
     connected: 'Connected',
+    providerNames: {
+      'openai-codex': 'ChatGPT or Codex Subscription',
+      anthropic: 'Anthropic API Key',
+      'claude-code': 'Claude Code Subscription (official CLI)'
+    },
     featuredPitch: 'One subscription, 300+ frontier models — the recommended way to run Hermes',
     fireworksPitch: 'Direct model API — Fireworks-hosted frontier models',
     openRouterPitch: 'One key, hundreds of models — a solid default',

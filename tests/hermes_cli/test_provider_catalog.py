@@ -33,6 +33,13 @@ def test_profileless_providers_still_present():
         assert by[slug].description, f"{slug} has empty description despite fallback"
 
 
+def test_fixed_endpoint_overrides_expose_the_runtime_default_for_beginner_ui():
+    by = provider_catalog_by_slug()
+    assert by["xai"].base_url_env_var == "XAI_BASE_URL"
+    assert by["xai"].default_base_url == "https://api.x.ai/v1"
+    assert by["openai-api"].default_base_url == "https://api.openai.com/v1"
+
+
 def test_copilot_surfaces_as_a_provider_with_its_own_token_var():
     """Regression for the reported bug: a GitHub Copilot login showed up under
     tools, never as a provider, because the shared GITHUB_TOKEN is tool-category.

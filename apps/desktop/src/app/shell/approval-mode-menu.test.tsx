@@ -78,4 +78,20 @@ describe('approval mode statusbar item', () => {
     expect(await screen.findByText('必要な場合にのみ確認します')).toBeTruthy()
     expect(screen.getByText('承認プロンプトなしで実行します')).toBeTruthy()
   })
+
+  it('renders all three approval choices in Brazilian Portuguese', async () => {
+    const response = new Promise<never>(() => undefined)
+    render(
+      <I18nProvider configClient={null} initialLocale="pt-BR">
+        <Harness requestGateway={vi.fn(() => response)} />
+      </I18nProvider>
+    )
+
+    fireEvent.pointerDown(screen.getByRole('button', { name: /aprovar automaticamente/i }), { button: 0 })
+
+    expect(await screen.findByText('Aprovar manualmente')).toBeTruthy()
+    expect(screen.getAllByText('Aprovar automaticamente')).toHaveLength(2)
+    expect(screen.getByText('Ignorar todas as aprovações')).toBeTruthy()
+    expect(screen.getByText(/bloqueios críticos de segurança continuam ativos/i)).toBeTruthy()
+  })
 })

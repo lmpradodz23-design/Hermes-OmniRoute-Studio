@@ -8,12 +8,14 @@ import {
   audioSpeakRequestTimeoutMs,
   audioTranscribeRequestTimeoutMs,
   getAllSessionMessages,
+  getAuxiliaryModels,
   getCronJobs,
   getGlobalModelInfo,
   getGlobalModelOptions,
   getHermesConfig,
   getHermesConfigDefaults,
   getLatestSessionMessages,
+  getMoaModels,
   getOlderSessionMessages,
   getProfiles,
   getSessionMessages,
@@ -345,6 +347,8 @@ describe('Hermes REST helpers', () => {
       [getHermesConfigDefaults, '/api/config/defaults'],
       [getGlobalModelInfo, '/api/model/info'],
       [() => getGlobalModelOptions(), '/api/model/options?explicit_only=1'],
+      [getAuxiliaryModels, '/api/model/auxiliary'],
+      [getMoaModels, '/api/model/moa'],
       [getCronJobs, '/api/cron/jobs']
     ]
 

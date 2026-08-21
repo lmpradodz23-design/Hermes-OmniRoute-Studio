@@ -1,5 +1,6 @@
 import { type CSSProperties, useState } from 'react'
 
+import { useI18n } from '@/i18n'
 import { capitalize, normalize } from '@/lib/text'
 
 import introCopyJsonl from './intro-copy.jsonl?raw'
@@ -40,6 +41,21 @@ const FALLBACK_COPY: IntroCopy[] = [
   {
     headline: 'What needs attention?',
     body: "Send the context you have. I'll help sort it into a plan or a fix."
+  }
+]
+
+const PT_BR_COPY: IntroCopy[] = [
+  {
+    headline: 'O que vamos fazer hoje?',
+    body: 'Envie um erro, uma tarefa, um arquivo ou uma ideia. Vou analisar o contexto e transformar isso no próximo passo concreto.'
+  },
+  {
+    headline: 'Por onde começamos?',
+    body: 'Traga o problema, o objetivo ou o trecho que travou. Vou investigar antes de fazer alterações.'
+  },
+  {
+    headline: 'O que precisa de atenção?',
+    body: 'Envie o contexto que você possui. Vou organizar tudo em um plano ou em uma correção verificável.'
   }
 ]
 
@@ -157,8 +173,13 @@ function resolveCopy(personality?: string, seed?: number): IntroCopy {
 }
 
 export function Intro({ personality, seed }: IntroProps) {
+  const { locale } = useI18n()
   const [mountSeed] = useState(() => Math.floor(Math.random() * 100000))
-  const copy = resolveCopy(personality, mountSeed + (seed ?? 0))
+
+  const copy =
+    locale === 'pt-br'
+      ? pickCopy(PT_BR_COPY, mountSeed + (seed ?? 0))
+      : resolveCopy(personality, mountSeed + (seed ?? 0))
 
   return (
     <div

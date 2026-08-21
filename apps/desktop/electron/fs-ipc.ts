@@ -18,6 +18,7 @@ export interface FsIpcDeps {
   resolveRequestedPathForIpc: (value: string, options: { purpose: string }) => string
   directoryExists: (value: string) => boolean
   resolveGitBinary: () => string
+  resolveAllowedPath: (value: string) => string
 }
 
 export function registerFsIpc({
@@ -26,11 +27,14 @@ export function registerFsIpc({
   expandUserPath,
   resolveRequestedPathForIpc,
   directoryExists,
-  resolveGitBinary
+  resolveGitBinary,
+  resolveAllowedPath
 }: FsIpcDeps) {
-  ipcMain.handle('hermes:fs:readDir', async (_event, dirPath) => readDirForIpc(dirPath))
+  ipcMain.handle('hermes:fs:readDir', async (_event, dirPath) => readDirForIpc(resolveAllowedPath(String(dirPath || ''))))
 
-  ipcMain.handle('hermes:fs:gitRoot', async (_event, startPath) => gitRootForIpc(startPath))
+  ipcMain.handle('hermes:fs:gitRoot', async (_event, startPath) =>
+    gitRootForIpc(resolveAllowedPath(String(startPath || '')))
+  )
 
   // Reveal a path in the OS file manager (Finder / Explorer / Files).
   ipcMain.handle('hermes:fs:reveal', async (_event, targetPath) => {
@@ -41,7 +45,7 @@ export function registerFsIpc({
     }
 
     try {
-      shell.showItemInFolder(target)
+      shell.showItemInFolder(resolveAllowedPath(target))
 
       return true
     } catch {
@@ -62,8 +66,9 @@ export function registerFsIpc({
     }
 
     try {
-      await fs.promises.mkdir(dir, { recursive: true })
-      const error = await shell.openPath(path.normalize(dir))
+      const allowedDir = resolveAllowedPath(dir)
+      await fs.promises.mkdir(allowedDir, { recursive: true })
+      const error = await shell.openPath(path.normalize(allowedDir))
 
       return error ? { ok: false, error } : { ok: true }
     } catch (error) {
@@ -138,9 +143,10 @@ export function registerFsIpc({
       throw new Error('Invalid rename')
     }
 
-    const dst = path.join(path.dirname(src), name)
+    const allowedSrc = resolveAllowedPath(src)
+    const dst = resolveAllowedPath(path.join(path.dirname(allowedSrc), name))
 
-    if (dst === src) {
+    if (dst === allowedSrc) {
       return { path: dst }
     }
 
@@ -148,7 +154,7 @@ export function registerFsIpc({
       throw new Error(`"${name}" already exists`)
     }
 
-    await fs.promises.rename(src, dst)
+    await fs.promises.rename(allowedSrc, dst)
 
     return { path: dst }
   })
@@ -170,7 +176,9 @@ export function registerFsIpc({
       throw new Error('Content too large')
     }
 
-    const resolved = resolveRequestedPathForIpc(expandUserPath(raw), { purpose: 'Write text file' })
+    const resolved = resolveAllowedPath(
+      resolveRequestedPathForIpc(expandUserPath(raw), { purpose: 'Write text file' })
+    )
 
     if (!directoryExists(path.dirname(resolved))) {
       throw new Error('Parent directory does not exist')
@@ -190,7 +198,7 @@ export function registerFsIpc({
       throw new Error('Invalid delete')
     }
 
-    await shell.trashItem(target)
+    await shell.trashItem(resolveAllowedPath(target))
 
     return true
   })

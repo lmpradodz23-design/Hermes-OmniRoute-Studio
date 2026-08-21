@@ -15,13 +15,13 @@ import {
 } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
-import { Check, Globe, Loader2, Network, Plus, RefreshCw, Save, Trash2, Zap } from '@/lib/icons'
+import { Check, ExternalLink, Globe, Loader2, Network, Plus, RefreshCw, Save, Trash2, Zap } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { confirm } from '@/store/confirm'
 import { notify, notifyError } from '@/store/notifications'
 import type { CustomEndpoint, CustomEndpointUpdate } from '@/types/hermes'
 
-import { buildOmniRouteStudioConfig, OMNIROUTE_ENDPOINT } from './omniroute-preset'
+import { buildOmniRouteStudioConfig, OMNIROUTE_DASHBOARD_URL, OMNIROUTE_ENDPOINT } from './omniroute-preset'
 import { EmptyState, Pill, SectionHeading, SettingsContent, SettingsSkeleton } from './primitives'
 
 interface CustomEndpointsSettingsProps {
@@ -60,6 +60,10 @@ interface CompressionStatus {
   mode: 'caveman' | 'off'
   strategy: string
 }
+
+type ManagedComponentStatus = Awaited<
+  ReturnType<NonNullable<NonNullable<Window['hermesDesktop']>['omniRouteManaged']>['getStatus']>
+>
 
 function omniRoutePayload(models?: string[]): CustomEndpointUpdate {
   return {
@@ -117,6 +121,7 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
   const [omniRouteStatus, setOmniRouteStatus] = useState<OmniRouteStatus>({ kind: 'checking', models: [] })
   const [compression, setCompression] = useState<CompressionStatus | null>(null)
   const [compressionBusy, setCompressionBusy] = useState(false)
+  const [managedComponents, setManagedComponents] = useState<ManagedComponentStatus | null>(null)
 
   async function refresh() {
     const data = await getCustomEndpoints()
@@ -177,6 +182,23 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
         })
     } else {
       setCompression({ available: false, enabled: false, mode: 'off', strategy: 'unavailable' })
+    }
+
+    const managedController = window.hermesDesktop.omniRouteManaged
+
+    if (managedController) {
+      void managedController
+        .getStatus()
+        .then(status => {
+          if (!cancelled) {
+            setManagedComponents(status)
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setManagedComponents({ studio: { status: 'failed', error: 'status unavailable' } })
+          }
+        })
     }
 
     return () => {
@@ -363,6 +385,9 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
 
   const allModelOptions = Array.from(new Set([...discoveredModels, form.model].filter(Boolean)))
   const canSave = form.name.trim() && form.baseUrl.trim() && form.model.trim()
+  const managedStates = Object.values(managedComponents ?? {})
+  const managedReady = managedStates.filter(state => state.status === 'ready').length
+  const managedFailed = managedStates.some(state => state.status === 'failed')
 
   return (
     <SettingsContent>
@@ -388,11 +413,23 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
               </Pill>
               {endpoints.some(endpoint => endpoint.id === OMNIROUTE_ENDPOINT.id) && <Pill>{omni.configured}</Pill>}
               {omniRouteStatus.models.length > 0 && <Pill>{omni.modelsFound(omniRouteStatus.models.length)}</Pill>}
+              {managedStates.length > 0 && (
+                <Pill tone={managedFailed ? 'muted' : 'primary'}>
+                  {managedFailed ? <Network /> : <Check />}
+                  {managedFailed ? omni.securityFailed : omni.securityReady}
+                </Pill>
+              )}
             </div>
+            {managedStates.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {omni.componentsReady(managedReady, managedStates.length)}
+              </p>
+            )}
             <div className="font-mono text-[0.72rem] text-muted-foreground">
               {omni.endpoint}: {OMNIROUTE_ENDPOINT.baseUrl}
             </div>
             <p className="text-xs text-muted-foreground">{omni.fallbackDescription}</p>
+            {omni.dashboardPreserved && <p className="text-xs text-muted-foreground">{omni.dashboardPreserved}</p>}
             <div className="flex items-center justify-between gap-4 rounded-md border border-border/50 p-3">
               <div className="min-w-0">
                 <div className="text-sm font-medium">{omni.cavemanTitle}</div>
@@ -424,6 +461,15 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
                 {saving ? <Loader2 className="animate-spin" /> : <Zap />}
                 {saving ? omni.configuring : omni.configure}
               </Button>
+              {omni.openDashboard && (
+                <Button
+                  onClick={() => void window.hermesDesktop?.openExternal?.(OMNIROUTE_DASHBOARD_URL)}
+                  variant="outline"
+                >
+                  <ExternalLink />
+                  {omni.openDashboard}
+                </Button>
+              )}
             </div>
           </div>
         </section>

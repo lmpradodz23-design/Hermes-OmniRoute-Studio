@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu'
 import { useI18n } from '@/i18n'
-import { Zap, ZapFilled } from '@/lib/icons'
+import { AlertCircle, AlertTriangle, Zap, ZapFilled } from '@/lib/icons'
 import {
   $approvalModes,
   type ApprovalMode,
@@ -38,6 +38,12 @@ export function useApprovalModeStatusbarItem(profile: string, requestGateway: Ap
     [copy.manualDescription, copy.offDescription, copy.smartDescription]
   )
 
+  const icons = {
+    manual: AlertCircle,
+    smart: Zap,
+    off: AlertTriangle
+  } as const
+
   useEffect(() => {
     void syncApprovalModeForProfile(requestGateway, profile).catch(() => undefined)
   }, [profile, requestGateway])
@@ -59,14 +65,23 @@ export function useApprovalModeStatusbarItem(profile: string, requestGateway: Ap
           }}
           value={mode}
         >
-          {(['manual', 'smart', 'off'] as const).map(value => (
-            <DropdownMenuRadioItem className="items-start gap-2" key={value} value={value}>
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="text-xs text-foreground">{labels[value]}</span>
-                <span className="text-[0.6875rem] leading-snug text-(--ui-text-tertiary)">{descriptions[value]}</span>
-              </span>
-            </DropdownMenuRadioItem>
-          ))}
+          {(['manual', 'smart', 'off'] as const).map(value => {
+            const Icon = icons[value]
+
+            return (
+              <DropdownMenuRadioItem
+                className={value === 'off' ? 'items-start gap-2 text-destructive' : 'items-start gap-2'}
+                key={value}
+                value={value}
+              >
+                <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-xs text-foreground">{labels[value]}</span>
+                  <span className="text-[0.6875rem] leading-snug text-(--ui-text-tertiary)">{descriptions[value]}</span>
+                </span>
+              </DropdownMenuRadioItem>
+            )
+          })}
         </DropdownMenuRadioGroup>
       </>
     ),

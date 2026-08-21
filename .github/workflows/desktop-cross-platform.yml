@@ -1,0 +1,86 @@
+name: Hermes OmniRoute desktop packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'hermes-omniroute-v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hermes-omniroute-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Package ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Windows
+            runner: windows-latest
+            script: dist:win
+            artifact: windows
+          - label: macOS
+            runner: macos-latest
+            script: dist:mac
+            artifact: macos
+          - label: Linux
+            runner: ubuntu-latest
+            script: dist:linux
+            artifact: linux
+
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      HERMES_DESKTOP_APP_NAME: Hermes OmniRoute Studio
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install npm 12
+        shell: bash
+        run: npm --version | grep -q '^12\.' || npm install --global npm@12
+
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq rpm
+
+      - name: Install dependencies
+        uses: ./.github/actions/retry
+        with:
+          command: npm ci
+
+      - name: Verify TypeScript and desktop contracts
+        run: npm run --workspace apps/desktop typecheck
+
+      - name: Package application
+        run: npm run --workspace apps/desktop ${{ matrix.script }}
+
+      - name: Upload installable packages
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hermes-omniroute-${{ matrix.artifact }}-${{ github.ref_name }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.msi
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/*.deb
+            apps/desktop/release/*.rpm

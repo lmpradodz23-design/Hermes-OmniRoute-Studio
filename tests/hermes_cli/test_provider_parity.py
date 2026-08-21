@@ -86,3 +86,10 @@ def test_each_provider_lands_on_the_tab_its_auth_type_dictates():
             assert d.slug in accounts, f"{d.slug} (accounts tab) missing from /api/providers/oauth"
 
 
+def test_base_url_rows_surface_editable_runtime_defaults_without_marking_them_set():
+    data = client.get("/api/env", headers=HEADERS).json()
+    row = data["XAI_BASE_URL"]
+    assert row["default_value"] == "https://api.x.ai/v1"
+    assert row["is_set"] is False
+    assert row["is_password"] is False
+

@@ -189,7 +189,7 @@ export function TreeGroup({
   parentAxis?: 'column' | 'row'
   railSide?: 'left' | 'right'
 }) {
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
   const ref = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
   // The scrolling tab list inside the header (the strip also holds the
@@ -339,7 +339,15 @@ export function TreeGroup({
     !paneChrome(paneFor(paneId)).hideOnly && (!paneChrome(paneFor(paneId)).uncloseable || panesWithCloser.has(paneId))
 
   // A pane's own live label when it has one, else its registered string.
-  const tabLabel = (paneId: string) => paneChrome(paneFor(paneId)).tabTitle?.() ?? paneFor(paneId)?.title ?? paneId
+  const tabLabel = (paneId: string) => {
+    const title = paneChrome(paneFor(paneId)).tabTitle?.() ?? paneFor(paneId)?.title ?? paneId
+
+    if (paneId === 'sessions') {
+      return t.sidebar.sessions
+    }
+
+    return locale === 'pt-br' && typeof title === 'string' && title.toLocaleLowerCase() === 'bots' ? 'Agentes' : title
+  }
 
   // Collapse/restore a tool panel (or plain minimize elsewhere) — the header
   // chevron + tap gesture, routed so ⌃`/the titlebar toggle stay truthful.

@@ -15,6 +15,7 @@ export {}
 declare global {
   interface Window {
     hermesDesktop: {
+      systemLocale: string
       // Resolve a backend connection. Omit `profile` (or pass the primary) for
       // the window's backend; pass a named profile to lazily spawn/reuse that
       // profile's backend from the pool.
@@ -272,6 +273,18 @@ declare global {
           env: Record<string, string>
           timeout: number
         }>
+      }
+      omniRouteManaged?: {
+        getStatus: () => Promise<
+          Record<
+            string,
+            | {
+                result: 'installed' | 'skipped-missing' | 'skipped-unmanaged' | 'updated'
+                status: 'ready'
+              }
+            | { error: string; status: 'failed' }
+          >
+        >
       }
       openPreviewInBrowser?: (url: string) => Promise<void>
       fetchLinkTitle: (url: string) => Promise<string>

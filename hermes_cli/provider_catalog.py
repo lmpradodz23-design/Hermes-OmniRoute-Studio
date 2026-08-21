@@ -64,6 +64,7 @@ class ProviderDescriptor:
     tab: str                       # "keys" | "accounts"
     api_key_env_vars: tuple[str, ...]  # credential env vars (may be empty)
     base_url_env_var: str          # base-URL override env var (may be "")
+    default_base_url: str          # official/runtime default shown read-only in GUI
     signup_url: str                # signup / console URL (may be "")
     order: int                     # CANONICAL_PROVIDERS index — mirrors `hermes model`
 
@@ -160,6 +161,18 @@ def provider_catalog() -> list[ProviderDescriptor]:
             info = OPTIONAL_ENV_VARS.get(api_key_vars[0]) or {}
             signup_url = info.get("url") or ""
 
+        # Show the same endpoint the runtime will use when the override env var
+        # is absent. This is presentation metadata only: the desktop does not
+        # write the default into .env, so upstream endpoint changes can still
+        # flow through future Hermes updates. User-specific endpoints (Azure,
+        # private gateways) legitimately remain blank until configured.
+        default_base_url = (
+            (getattr(overlay, "base_url_override", "") if overlay else "")
+            or (getattr(prof, "base_url", "") if prof else "")
+            or (getattr(cfg, "inference_base_url", "") if cfg else "")
+            or ""
+        )
+
         out.append(
             ProviderDescriptor(
                 slug=slug,
@@ -169,6 +182,7 @@ def provider_catalog() -> list[ProviderDescriptor]:
                 tab=tab_for_auth_type(auth_type),
                 api_key_env_vars=api_key_vars,
                 base_url_env_var=base_url_var,
+                default_base_url=default_base_url,
                 signup_url=signup_url,
                 order=order,
             )

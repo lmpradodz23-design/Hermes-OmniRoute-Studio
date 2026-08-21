@@ -43,6 +43,8 @@ def test_product_studio_references_ship_with_the_skill() -> None:
         "knowledge-and-rules.md",
         "task-report.md",
         "nontechnical-intake.md",
+        "deployment-integrations.md",
+        "subscription-auth.md",
     ):
         assert name in body
         assert (SKILL.parent / "references" / name).is_file()
@@ -84,3 +86,25 @@ def test_nontechnical_users_are_not_forced_to_choose_engineering_tools() -> None
     assert "Never ask the user to choose a framework" in intake
     assert "embedded live preview" in intake
     assert "multi-gigabyte SDKs" in intake
+
+
+def test_deployment_integrations_use_preview_first_and_secret_safe_auth() -> None:
+    deployment = (SKILL.parent / "references" / "deployment-integrations.md").read_text(encoding="utf-8")
+
+    assert "supabase db push --dry-run" in deployment
+    assert "vercel deploy" in deployment
+    assert "vercel curl" in deployment
+    assert "MCP_COMPOSIO_API_KEY" in deployment
+    assert "Never scrape browser cookies" in deployment
+    assert "Production is a separate promotion gate" in deployment
+
+
+def test_subscription_auth_keeps_vendor_cli_credentials_isolated() -> None:
+    auth = (SKILL.parent / "references" / "subscription-auth.md").read_text(encoding="utf-8")
+
+    assert "openai-codex" in auth
+    assert "codex_app_server" in auth
+    assert 'acp_command: "claude"' in auth
+    assert "keep `ANTHROPIC_API_KEY` unset" in auth
+    assert "Do not import `~/.codex/auth.json`" in auth
+    assert "Never read, copy, or refresh Claude Code credentials" in auth

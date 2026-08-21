@@ -584,6 +584,9 @@ export interface Translations {
       remove: string
       getKey: string
       saving: string
+      baseUrlAdvanced: string
+      restoreDefault: string
+      defaultValue: string
     }
     envActions: {
       actions: string
@@ -906,6 +909,9 @@ export interface Translations {
       online: string
       offline: string
       configured: string
+      securityReady: string
+      securityFailed: string
+      componentsReady: (ready: number, total: number) => string
       modelsFound: (count: number) => string
       check: string
       configure: string
@@ -919,6 +925,8 @@ export interface Translations {
       cavemanDisabled: string
       cavemanUnavailable: string
       cavemanFailed: string
+      openDashboard?: string
+      dashboardPreserved?: string
     }
     customEndpoints: {
       loadFailed: string
@@ -980,6 +988,7 @@ export interface Translations {
         description: string
       }
       loading: string
+      groupDescriptions?: Record<string, string>
     }
     sessions: {
       loading: string
@@ -2272,6 +2281,7 @@ export interface Translations {
     chooseLater: string
     recommended: string
     connected: string
+    providerNames?: Record<string, string>
     featuredPitch: string
     fireworksPitch: string
     openRouterPitch: string

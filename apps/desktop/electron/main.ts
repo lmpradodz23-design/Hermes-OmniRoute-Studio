@@ -65,7 +65,13 @@ import {
   installBundledDz23Guardrail,
   installBundledOmniRouteHealthScript,
   installBundledOmniRouteMcpBridge,
-  installBundledProductStudioSkill
+  installBundledOmniRouteMcpPolicy,
+  installBundledProductStudioSkill,
+  installManagedComponents,
+  type ManagedComponentState,
+  resolveStudioManagedPaths,
+  uninstallManagedDirectory,
+  uninstallManagedFile
 } from './bundled-product-studio'
 import { applyConnectionChange } from './connection-apply'
 import {
@@ -123,6 +129,11 @@ import {
   updateEligibility,
   upsertConnection
 } from './connection-registry'
+import {
+  contentSecurityPolicyHeaders,
+  hardenWebviewAttachment,
+  isTrustedRendererNavigation
+} from './content-security'
 import { describeCrashReason, installCrashForensics } from './crash-forensics'
 import { adoptServedDashboardToken } from './dashboard-token'
 import { loadOrCreateInstallationId, sshOwnershipId } from './desktop-installation'
@@ -219,6 +230,11 @@ import {
   unavailableCompressionStatus
 } from './omniroute-compression'
 import {
+  ensureOmniRouteLocalToken,
+  type OmniRouteLocalToken,
+  revokeOmniRouteLocalToken
+} from './omniroute-local-auth'
+import {
   createParentStartMarkerResolver,
   electronProcessStartMarker,
   parentWatchdogEnv
@@ -270,6 +286,11 @@ import {
 } from './remote-liveness'
 import { missingRendererAssets } from './renderer-bundle'
 import { attachRendererConsoleCapture, formatRendererBoundaryReport } from './renderer-log'
+import {
+  DEFAULT_OMNIROUTE_MCP_SCOPES,
+  externalFileBlockReason,
+  resolveAllowedFsIpcPath
+} from './security-boundaries'
 import {
   buildInstanceWindowUrl,
   buildSessionWindowUrl,
@@ -719,6 +740,45 @@ function resolveHermesHome() {
 }
 
 const HERMES_HOME = resolveHermesHome()
+const OMNIROUTE_STUDIO_PATHS = resolveStudioManagedPaths(HERMES_HOME)
+let omniRouteManagedComponentState: Record<string, ManagedComponentState> = {}
+let omniRouteLocalAccess: OmniRouteLocalToken | null = null
+
+function omniRouteLocalToken(): string {
+  if (omniRouteLocalAccess && Date.parse(omniRouteLocalAccess.expiresAt) > Date.now() + 60_000) {
+    return omniRouteLocalAccess.token
+  }
+
+  omniRouteLocalAccess = ensureOmniRouteLocalToken({
+    safeStorageApi: safeStorage,
+    userDataDirectory: app.getPath('userData')
+  })
+
+  return omniRouteLocalAccess.token
+}
+
+function omniRouteBackendSecretEnv(): Record<string, string> {
+  try {
+    return { OMNIROUTE_MCP_TOKEN: omniRouteLocalToken() }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    rememberLog(`[omniroute] local bridge token unavailable: ${message}`)
+
+    return {}
+  }
+}
+
+const nativeApprovedFsRoots = new Set<string>()
+
+function desktopAllowedFsRoots(): string[] {
+  return [HERMES_HOME, app.getPath('downloads'), readDefaultProjectDir(), ...nativeApprovedFsRoots].filter(
+    (value): value is string => Boolean(value)
+  )
+}
+
+function approveNativeSelectedPath(selectedPath: string, directory: boolean): void {
+  nativeApprovedFsRoots.add(path.resolve(directory ? selectedPath : path.dirname(selectedPath)))
+}
 
 function pathWithHermesManagedNode(...entries) {
   const managed = hermesManagedNodePathEntries(HERMES_HOME).filter(directoryExists)
@@ -1557,6 +1617,11 @@ function openExternalUrl(rawUrl) {
 
     try {
       localPath = resolveRequestedPathForIpc(parsed.toString(), { purpose: 'Open external file' })
+      localPath = resolveAllowedFsIpcPath(localPath, desktopAllowedFsRoots())
+
+      if (externalFileBlockReason(localPath)) {
+        return false
+      }
     } catch {
       return false
     }
@@ -1630,6 +1695,11 @@ async function openPreviewInBrowser(rawUrl) {
 
     try {
       localPath = resolveRequestedPathForIpc(parsed.toString(), { purpose: 'Open preview in browser' })
+      localPath = resolveAllowedFsIpcPath(localPath, desktopAllowedFsRoots())
+
+      if (externalFileBlockReason(localPath)) {
+        return false
+      }
     } catch {
       return false
     }
@@ -4399,11 +4469,15 @@ function createPythonBackend(root, label, backendArgs, options: any = {}) {
     label,
     command,
     args: ['-m', 'hermes_cli.main', ...backendArgs],
-    env: buildDesktopBackendEnv({
-      hermesHome: HERMES_HOME,
-      pythonPathEntries: [root, ...getVenvSitePackagesEntries(venvRoot)],
-      venvRoot
-    }),
+    env: {
+      ...buildDesktopBackendEnv({
+        hermesHome: HERMES_HOME,
+        pythonPathEntries: [root, ...getVenvSitePackagesEntries(venvRoot)],
+        venvRoot
+      }),
+      ...omniRouteBackendSecretEnv(),
+      HERMES_STUDIO_PLUGIN_ROOT: path.join(OMNIROUTE_STUDIO_PATHS.root, 'plugins')
+    },
     root,
     bootstrap: Boolean(options.bootstrap),
     shell: false
@@ -4423,11 +4497,15 @@ function createActiveBackend(backendArgs) {
     label: `Hermes at ${ACTIVE_HERMES_ROOT}`,
     command,
     args: ['-m', 'hermes_cli.main', ...backendArgs],
-    env: buildDesktopBackendEnv({
-      hermesHome: HERMES_HOME,
-      pythonPathEntries: [ACTIVE_HERMES_ROOT, ...getVenvSitePackagesEntries(VENV_ROOT)],
-      venvRoot: VENV_ROOT
-    }),
+    env: {
+      ...buildDesktopBackendEnv({
+        hermesHome: HERMES_HOME,
+        pythonPathEntries: [ACTIVE_HERMES_ROOT, ...getVenvSitePackagesEntries(VENV_ROOT)],
+        venvRoot: VENV_ROOT
+      }),
+      ...omniRouteBackendSecretEnv(),
+      HERMES_STUDIO_PLUGIN_ROOT: path.join(OMNIROUTE_STUDIO_PATHS.root, 'plugins')
+    },
     root: ACTIVE_HERMES_ROOT,
     bootstrap: true,
     shell: false
@@ -6677,20 +6755,48 @@ function installDownloadHandling() {
 
 function installMediaPermissions() {
   // Async request handler: the prompt-style path (most platforms).
-  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
-    callback(isMediaCapturePermission(permission, details))
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    const trusted = isTrustedRendererNavigation(webContents?.getURL?.() || '', {
+      devServer: DEV_SERVER,
+      rendererIndexPath: resolveRendererIndex()
+    })
+
+    callback(trusted && isMediaCapturePermission(permission, details))
   })
 
   // Synchronous check handler: Chromium consults this for getUserMedia on
   // Windows in addition to (or instead of) the request handler. Without it,
   // the check defaults to false and capture is denied before the request
   // handler ever runs.
-  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
+  session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
+    const trusted = isTrustedRendererNavigation(webContents?.getURL?.() || '', {
+      devServer: DEV_SERVER,
+      rendererIndexPath: resolveRendererIndex()
+    })
+
+    if (!trusted) {return false}
+
     return (
       permission === 'media' ||
       permission === ('audioCapture' as any) /* todo: is this needed? */ ||
       permission === ('videoCapture' as any)
     )
+  })
+}
+
+function installRendererContentSecurity() {
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: contentSecurityPolicyHeaders(
+        (details.responseHeaders || {}) as Record<string, string[] | undefined>
+      )
+    })
+  })
+
+  app.on('web-contents-created', (_event, contents) => {
+    contents.on('will-attach-webview', (event, webPreferences, params) => {
+      if (!hardenWebviewAttachment(webPreferences, params)) {event.preventDefault()}
+    })
   })
 }
 
@@ -10962,7 +11068,25 @@ function wireCommonWindowHandlers(win, { zoom = true }: { zoom?: boolean } = {})
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', (event, url) => {
-    if ((DEV_SERVER && url.startsWith(DEV_SERVER)) || (!DEV_SERVER && url.startsWith('file:'))) {
+    if (
+      isTrustedRendererNavigation(url, {
+        devServer: DEV_SERVER,
+        rendererIndexPath: resolveRendererIndex()
+      })
+    ) {
+      return
+    }
+
+    event.preventDefault()
+    openExternalUrl(url)
+  })
+  win.webContents.on('will-redirect', (event, url) => {
+    if (
+      isTrustedRendererNavigation(url, {
+        devServer: DEV_SERVER,
+        rendererIndexPath: resolveRendererIndex()
+      })
+    ) {
       return
     }
 
@@ -13950,6 +14074,10 @@ ipcMain.handle('hermes:selectPaths', async (_event, options: any = {}) => {
     return []
   }
 
+  for (const selectedPath of result.filePaths) {
+    approveNativeSelectedPath(selectedPath, Boolean(options?.directories))
+  }
+
   return result.filePaths
 })
 
@@ -13971,6 +14099,8 @@ ipcMain.handle('hermes:selectSavePath', async (_event, options: any = {}) => {
   if (result.canceled || !result.filePath) {
     return null
   }
+
+  approveNativeSelectedPath(result.filePath, false)
 
   return result.filePath
 })
@@ -14177,6 +14307,10 @@ ipcMain.on('hermes:translucency:support', event => {
   event.returnValue = { glass: GLASS_SUPPORTED, translucency: TRANSLUCENCY_SUPPORTED }
 })
 
+ipcMain.on('hermes:system-locale', event => {
+  event.returnValue = app.getSystemLocale?.() || app.getLocale?.() || 'en-US'
+})
+
 ipcMain.on('hermes:translucency', (_event, payload) => {
   const next = normalizeTranslucency(payload, GLASS_SUPPORTED)
   const previous = translucencyState
@@ -14351,6 +14485,7 @@ ipcMain.handle('hermes:omniroute:compression:get', async () => {
     return await getOmniRouteCompressionStatus(
       createOmniRouteCompressionRunner({
         bridgePath: omniRouteMcpBridgePath(),
+        env: { OMNIROUTE_MCP_TOKEN: omniRouteLocalToken() },
         nodeCommand: omniRouteMcpNodeCommand()
       })
     )
@@ -14370,6 +14505,7 @@ ipcMain.handle('hermes:omniroute:compression:set', async (_event, mode) => {
     mode,
     createOmniRouteCompressionRunner({
       bridgePath: omniRouteMcpBridgePath(),
+      env: { OMNIROUTE_MCP_TOKEN: omniRouteLocalToken() },
       nodeCommand: omniRouteMcpNodeCommand()
     })
   )
@@ -14377,7 +14513,7 @@ ipcMain.handle('hermes:omniroute:compression:set', async (_event, mode) => {
 
 function omniRouteMcpBridgePath(): string {
   const candidates = [
-    path.join(ACTIVE_HERMES_ROOT, 'integrations', 'omniroute-mcp-bridge.mjs'),
+    OMNIROUTE_STUDIO_PATHS.mcpBridgePath,
     path.join(process.resourcesPath, 'omniroute-mcp-bridge.mjs'),
     path.resolve(process.cwd(), 'integrations', 'omniroute-mcp-bridge.mjs')
   ]
@@ -14428,17 +14564,26 @@ function omniRouteMcpNodeCommand(): string {
   return 'node'
 }
 
-ipcMain.handle('hermes:omniroute:mcp:config', () => ({
-  command: omniRouteMcpNodeCommand(),
-  args: [omniRouteMcpBridgePath()],
-  env: {
-    OMNIROUTE_MCP_ENFORCE_SCOPES: 'true',
-    OMNIROUTE_MCP_SCOPES:
-      'execute:completions,execute:search,execute:skills,pricing:write,read:cache,read:catalog,read:combos,read:compression,read:gamification,read:health,read:local-corpus,read:memory,read:models,read:notion,read:obsidian,read:plugins,read:proxies,read:quota,read:skills,read:tools,read:usage,write:budget,write:cache,write:combos,write:compression,write:gamification,write:memory,write:notion,write:obsidian,write:plugins,write:resilience,write:skills'
-  },
-  connect_timeout: 60,
-  timeout: 120
-}))
+ipcMain.handle('hermes:omniroute:mcp:config', () => {
+  // Provision in the privileged main process, but never return the credential
+  // to the renderer or persist it in config.yaml. The Python backend inherits
+  // it from its main-process launch environment and passes it only to the MCP
+  // subprocess.
+  omniRouteLocalToken()
+
+  return {
+    command: omniRouteMcpNodeCommand(),
+    args: [omniRouteMcpBridgePath()],
+    env: {
+      OMNIROUTE_MCP_ENFORCE_SCOPES: 'true',
+      OMNIROUTE_MCP_SCOPES: DEFAULT_OMNIROUTE_MCP_SCOPES.join(',')
+    },
+    connect_timeout: 60,
+    timeout: 120
+  }
+})
+
+ipcMain.handle('hermes:omniroute:managed:status', () => omniRouteManagedComponentState)
 
 // ── Find-in-page (Ctrl/Cmd+F) ─────────────────────────────────────────────
 // The desktop supports multiple BrowserWindows (one primary plus any
@@ -14586,7 +14731,8 @@ registerFsIpc({
   expandUserPath,
   resolveRequestedPathForIpc,
   directoryExists,
-  resolveGitBinary
+  resolveGitBinary,
+  resolveAllowedPath: value => resolveAllowedFsIpcPath(value, desktopAllowedFsRoots())
 })
 
 // Git-driven features (worktrees, review pane, repo scan) — see git-ipc.ts.
@@ -14891,6 +15037,30 @@ async function runDesktopUninstall(mode) {
     })
 
     child.unref()
+
+    // The cleanup process is now guaranteed to be running. Revert only files
+    // carrying our ownership marker; unmanaged user content is never touched.
+    try {
+      uninstallManagedDirectory(path.join(HERMES_HOME, 'skills', 'software-development', 'product-studio'))
+      uninstallManagedDirectory(OMNIROUTE_STUDIO_PATHS.guardrailRoot)
+      uninstallManagedFile(OMNIROUTE_STUDIO_PATHS.mcpBridgePath)
+      uninstallManagedFile(OMNIROUTE_STUDIO_PATHS.mcpPolicyPath)
+      uninstallManagedFile(OMNIROUTE_STUDIO_PATHS.healthScriptPath)
+
+      try {
+        revokeOmniRouteLocalToken({
+          safeStorageApi: safeStorage,
+          userDataDirectory: app.getPath('userData')
+        })
+        omniRouteLocalAccess = null
+      } catch (tokenError) {
+        const message = tokenError instanceof Error ? tokenError.message : String(tokenError)
+        rememberLog(`[uninstall] OmniRoute token cleanup failed: ${message}`)
+      }
+    } catch (cleanupError) {
+      const message = cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+      rememberLog(`[uninstall] managed Studio cleanup failed: ${message}`)
+    }
   } catch (error) {
     return { ok: false, error: 'spawn-failed', message: error.message }
   }
@@ -15080,34 +15250,46 @@ app.whenReady().then(() => {
   void ensureLoginShellPath()
 
   if (IS_PACKAGED) {
-    const productStudioResult = installBundledProductStudioSkill({
-      destinationRoot: path.join(HERMES_HOME, 'skills', 'software-development', 'product-studio'),
-      sourceRoot: path.join(process.resourcesPath, 'product-studio-skill'),
-      version: app.getVersion()
+    omniRouteManagedComponentState = installManagedComponents({
+      productStudio: () =>
+        installBundledProductStudioSkill({
+          destinationRoot: path.join(HERMES_HOME, 'skills', 'software-development', 'product-studio'),
+          sourceRoot: path.join(process.resourcesPath, 'product-studio-skill'),
+          version: app.getVersion()
+        }),
+      guardrail: () =>
+        installBundledDz23Guardrail({
+          destinationRoot: OMNIROUTE_STUDIO_PATHS.guardrailRoot,
+          sourceRoot: path.join(process.resourcesPath, 'dz23-guardrail'),
+          version: app.getVersion()
+        }),
+      mcpBridge: () =>
+        installBundledOmniRouteMcpBridge({
+          destinationPath: OMNIROUTE_STUDIO_PATHS.mcpBridgePath,
+          sourcePath: path.join(process.resourcesPath, 'omniroute-mcp-bridge.mjs'),
+          version: app.getVersion()
+        }),
+      mcpPolicy: () =>
+        installBundledOmniRouteMcpPolicy({
+          destinationPath: OMNIROUTE_STUDIO_PATHS.mcpPolicyPath,
+          sourcePath: path.join(process.resourcesPath, 'omniroute-mcp-policy.mjs'),
+          version: app.getVersion()
+        }),
+      healthScript: () =>
+        installBundledOmniRouteHealthScript({
+          destinationPath: OMNIROUTE_STUDIO_PATHS.healthScriptPath,
+          sourcePath: path.join(process.resourcesPath, 'omniroute-daily-health.py'),
+          version: app.getVersion()
+        })
     })
 
-    const guardrailResult = installBundledDz23Guardrail({
-      destinationRoot: path.join(ACTIVE_HERMES_ROOT, 'plugins', 'dz23-guardrail'),
-      sourceRoot: path.join(process.resourcesPath, 'dz23-guardrail'),
-      version: app.getVersion()
-    })
-
-    const mcpBridgeResult = installBundledOmniRouteMcpBridge({
-      destinationPath: path.join(ACTIVE_HERMES_ROOT, 'integrations', 'omniroute-mcp-bridge.mjs'),
-      sourcePath: path.join(process.resourcesPath, 'omniroute-mcp-bridge.mjs'),
-      version: app.getVersion()
-    })
-
-    const healthScriptResult = installBundledOmniRouteHealthScript({
-      destinationPath: path.join(HERMES_HOME, 'scripts', 'omniroute-daily-health.py'),
-      sourcePath: path.join(process.resourcesPath, 'omniroute-daily-health.py'),
-      version: app.getVersion()
-    })
-
-    console.log(`[hermes-omniroute] product studio skill: ${productStudioResult}`)
-    console.log(`[hermes-omniroute] DZ23 guardrail: ${guardrailResult}`)
-    console.log(`[hermes-omniroute] OmniRoute MCP bridge: ${mcpBridgeResult}`)
-    console.log(`[hermes-omniroute] OmniRoute health script: ${healthScriptResult}`)
+    for (const [component, state] of Object.entries(omniRouteManagedComponentState)) {
+      if (state.status === 'failed') {
+        console.error(`[hermes-omniroute] ${component}: failed (${state.error})`)
+      } else {
+        console.log(`[hermes-omniroute] ${component}: ${state.result}`)
+      }
+    }
   }
 
   const systemCa = installWindowsSystemCaTrust(tls)
@@ -15135,6 +15317,7 @@ app.whenReady().then(() => {
     Menu.setApplicationMenu(null)
   }
 
+  installRendererContentSecurity()
   installMediaPermissions()
   installDownloadHandling()
   registerMediaProtocol()

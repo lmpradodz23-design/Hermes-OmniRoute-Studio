@@ -180,6 +180,28 @@ describe('ProvidersSettings', () => {
     expect(await screen.findByText('WidgetAI')).toBeTruthy()
   })
 
+  it('shows the provider base URL default without persisting an override', async () => {
+    getEnvVars.mockResolvedValue({
+      XAI_API_KEY: keyVar({ provider: 'xai', provider_label: 'xAI' }),
+      XAI_BASE_URL: keyVar({
+        advanced: true,
+        default_value: 'https://api.x.ai/v1',
+        description: 'xAI base URL override',
+        is_password: false,
+        provider: 'xai',
+        provider_label: 'xAI'
+      })
+    })
+    listOAuthProviders.mockResolvedValue({ providers: [] })
+
+    const { ProvidersSettings } = await import('./providers-settings')
+    render(<ProvidersSettings onClose={vi.fn()} onViewChange={vi.fn()} view="keys" />)
+    fireEvent.click(await screen.findByText('xAI'))
+
+    expect(await screen.findByText('Base URL (advanced)')).toBeTruthy()
+    expect(screen.getByDisplayValue('https://api.x.ai/v1')).toBeTruthy()
+  })
+
   it('orders API-key providers by priority then name, and filters them via search', async () => {
     // These three providers have no curated PROVIDER_GROUPS priority, so they
     // share the default priority and fall back to alphabetical among themselves

@@ -363,7 +363,7 @@ const ChatViewContent = memo(function ChatViewContent({
   onDismissError
 }: ChatViewProps) {
   const location = useLocation()
-  const { t } = useI18n()
+  const { locale, t } = useI18n()
   // The view this surface renders: the primary route-driven session (global
   // atoms) or a tile's session slice — same component either way.
   const view = useSessionView()
@@ -525,7 +525,7 @@ const ChatViewContent = memo(function ChatViewContent({
       },
       tools: {
         enabled: true,
-        label: 'Add context',
+        label: locale === 'pt-br' ? 'Adicionar contexto' : 'Add context',
         suggestions: contextSuggestions
       },
       voice: {
@@ -533,7 +533,7 @@ const ChatViewContent = memo(function ChatViewContent({
         active: false
       }
     }),
-    [contextSuggestions, currentModel, currentProvider, gatewayOpen, modelMenuContent, quickModels]
+    [contextSuggestions, currentModel, currentProvider, gatewayOpen, locale, modelMenuContent, quickModels]
   )
 
   // Drop files anywhere in the conversation area, not just on the composer

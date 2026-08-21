@@ -805,7 +805,11 @@ class TestPluginHooks:
             session_store=object(),
         )
         assert len(results) == 1
-        assert results[0] == {"action": "skip", "reason": "test"}
+        assert results[0] == {
+            "action": "skip",
+            "reason": "test",
+            "_plugin_id": "predispatch_plugin",
+        }
 
 
 
@@ -827,7 +831,9 @@ class TestPluginHooks:
         mgr.discover_and_load()
 
         assert mgr.has_hook("pre_api_request") is True
-        assert mgr.has_hook("post_api_request") is False
+        # The bundled security guardrail owns post_api_request, while this
+        # fixture contributes only the pre_api_request callback below.
+        assert mgr.has_hook("post_api_request") is True
         results = mgr.invoke_hook(
             "pre_api_request",
             session_id="s1",
@@ -840,7 +846,14 @@ class TestPluginHooks:
             request_char_count=400,
             max_tokens=8192,
         )
-        assert results == [{"seen": 2, "mc": 5, "tc": 3}]
+        assert results == [
+            {
+                "seen": 2,
+                "mc": 5,
+                "tc": 3,
+                "_plugin_id": "request_hook",
+            }
+        ]
 
 
 
@@ -1144,7 +1157,7 @@ class TestResolvePreToolBlock:
         assert seen == {
             "tool_name": "write_file",
             "reason": "why",
-            "rule_key": "write_file:ssh",
+            "rule_key": "unattributed:write_file:ssh",
         }
 
 

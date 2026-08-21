@@ -1,0 +1,36 @@
+# DZ23-curated MCP catalog entry for Hermes OmniRoute Studio.
+manifest_version: 1
+
+name: composio
+description: >-
+  Connect Hermes to Composio's on-demand catalog of external app tools.
+source: https://docs.composio.dev/docs/composio-connect
+
+transport:
+  type: http
+  url: https://connect.composio.dev/mcp
+
+auth:
+  type: api_key
+  env_var: MCP_COMPOSIO_API_KEY
+  header_name: x-consumer-api-key
+  header_prefix: ""
+  env:
+    - name: MCP_COMPOSIO_API_KEY
+      prompt: Composio consumer API key
+      required: true
+      secret: true
+
+suggest:
+  keywords:
+    - composio
+  hosts:
+    - composio.dev
+
+post_install: |
+  The key is stored in the scoped Hermes .env and is never written to
+  config.yaml. Composio exposes discovery tools and starts an app login only
+  when the requested toolkit needs it. Review the permissions in the browser.
+
+  External write actions remain subject to Hermes approvals and workspace
+  guardrails. Start a new session after enabling this integration.
