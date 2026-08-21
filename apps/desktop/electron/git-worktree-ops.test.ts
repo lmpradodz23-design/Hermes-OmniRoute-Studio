@@ -16,6 +16,19 @@ import {
   switchBranch
 } from './git-worktree-ops'
 
+function removeTemporaryDirectory(directory: string) {
+  try {
+    fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
+  } catch (error: any) {
+    // Git for Windows can release its cwd handle just after execFile's close
+    // callback. Cleanup must not turn a successful non-repo probe into a
+    // product failure; the OS temp directory will reclaim this empty folder.
+    if (process.platform !== 'win32' || error?.code !== 'EPERM') {
+      throw error
+    }
+  }
+}
+
 test('sanitizeBranch: spaces → hyphens, forbidden chars dropped, edges trimmed', () => {
   assert.equal(sanitizeBranch('beach vibes'), 'beach-vibes')
   assert.equal(sanitizeBranch('feat/cool thing'), 'feat/cool-thing')
@@ -74,7 +87,7 @@ test('ensureGitRepo: inits a plain dir with a root commit so worktrees branch', 
     await ensureGitRepo('git', dir)
     assert.equal(git('rev-list', '--count', 'HEAD'), '1')
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true })
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }
 })
 
@@ -164,7 +177,7 @@ test('listBranches: empty on a non-repo path', async () => {
   try {
     assert.deepEqual(await listBranches(dir, 'git'), [])
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true })
+    removeTemporaryDirectory(dir)
   }
 })
 

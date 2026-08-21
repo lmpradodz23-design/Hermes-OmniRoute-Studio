@@ -1,10 +1,10 @@
 {
   "name": "hermes",
-  "productName": "Hermes",
+  "productName": "Hermes OmniRoute Studio",
   "private": true,
-  "version": "0.17.0",
-  "description": "Native desktop shell for Hermes Agent.",
-  "author": "Nous Research",
+  "version": "0.17.0-omniroute.1",
+  "description": "Hermes Agent desktop studio with native OmniRoute routing and product-building capabilities.",
+  "author": "DZ23 and Nous Research",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/NousResearch/hermes-agent.git"
@@ -185,18 +185,18 @@
   },
   "build": {
     "electronVersion": "40.10.2",
-    "appId": "com.nousresearch.hermes",
-    "productName": "Hermes",
-    "executableName": "Hermes",
+    "appId": "com.dz23.hermesomniroute",
+    "productName": "Hermes OmniRoute Studio",
+    "executableName": "HermesOmniRoute",
     "protocols": [
       {
-        "name": "Hermes Protocol",
+        "name": "Hermes OmniRoute Protocol",
         "schemes": [
-          "hermes"
+          "hermes-omniroute"
         ]
       }
     ],
-    "artifactName": "Hermes-${version}-${os}-${arch}.${ext}",
+    "artifactName": "Hermes-OmniRoute-Studio-${version}-${os}-${arch}.${ext}",
     "icon": "assets/icon",
     "directories": {
       "output": "release"
@@ -218,6 +218,22 @@
       {
         "from": "assets/icon.ico",
         "to": "icon.ico"
+      },
+      {
+        "from": "../../skills/software-development/product-studio",
+        "to": "product-studio-skill"
+      },
+      {
+        "from": "../../plugins/dz23-guardrail",
+        "to": "dz23-guardrail"
+      },
+      {
+        "from": "../../integrations/omniroute-mcp-bridge.mjs",
+        "to": "omniroute-mcp-bridge.mjs"
+      },
+      {
+        "from": "../../integrations/omniroute-daily-health.py",
+        "to": "omniroute-daily-health.py"
       }
     ],
     "asar": true,
@@ -232,12 +248,12 @@
       "entitlements": "electron/entitlements.mac.plist",
       "entitlementsInherit": "electron/entitlements.mac.inherit.plist",
       "extendInfo": {
-        "CFBundleDisplayName": "Hermes",
-        "CFBundleExecutable": "Hermes",
-        "CFBundleName": "Hermes",
-        "NSAudioCaptureUsageDescription": "Hermes uses audio capture for voice conversations.",
-        "NSCameraUsageDescription": "Hermes uses the camera when a plugin or feature you enable requests it.",
-        "NSMicrophoneUsageDescription": "Hermes uses the microphone for voice input and voice conversations."
+        "CFBundleDisplayName": "Hermes OmniRoute Studio",
+        "CFBundleExecutable": "HermesOmniRoute",
+        "CFBundleName": "Hermes OmniRoute Studio",
+        "NSAudioCaptureUsageDescription": "Hermes OmniRoute Studio uses audio capture for voice conversations.",
+        "NSCameraUsageDescription": "Hermes OmniRoute Studio uses the camera when a plugin or feature you enable requests it.",
+        "NSMicrophoneUsageDescription": "Hermes OmniRoute Studio uses the microphone for voice input and voice conversations."
       },
       "gatekeeperAssess": false,
       "hardenedRuntime": true,
@@ -247,7 +263,7 @@
       ]
     },
     "dmg": {
-      "title": "Install Hermes",
+      "title": "Install Hermes OmniRoute Studio",
       "backgroundColor": "#f5f5f7",
       "iconSize": 96,
       "window": {
@@ -269,7 +285,7 @@
       ]
     },
     "win": {
-      "legalTrademarks": "Hermes",
+      "legalTrademarks": "Hermes OmniRoute Studio",
       "target": [
         "nsis",
         "msi"
@@ -278,8 +294,8 @@
     },
     "linux": {
       "category": "Development",
-      "maintainer": "Nous Research <support@nousresearch.com>",
-      "synopsis": "Native desktop shell for Hermes Agent.",
+      "maintainer": "DZ23 and Nous Research <support@nousresearch.com>",
+      "synopsis": "Hermes Agent studio with native OmniRoute routing.",
       "target": [
         "AppImage",
         "deb",
@@ -290,8 +306,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "perMachine": false,
-      "shortcutName": "Hermes",
-      "uninstallDisplayName": "Hermes",
+      "shortcutName": "Hermes OmniRoute Studio",
+      "uninstallDisplayName": "Hermes OmniRoute Studio",
       "warningsAsErrors": false
     }
   }

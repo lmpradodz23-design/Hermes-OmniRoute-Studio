@@ -2823,7 +2823,8 @@ class GatewaySlashCommandsMixin:
         # /goal draft <objective> → draft a structured completion contract,
         # then set it. The aux LLM call is sync; run it off the event loop.
         draft_contract_obj = None
-        if lower.startswith("draft"):
+        is_draft = lower.startswith("draft")
+        if is_draft:
             objective = args[len("draft"):].strip()
             if not objective:
                 return "Usage: /goal draft <objective in plain language>"
@@ -2855,8 +2856,23 @@ class GatewaySlashCommandsMixin:
         except ValueError as exc:
             return t("gateway.goal.invalid", error=str(exc))
 
-        # Queue the goal text as an immediate first turn so the agent
-        # starts making progress. The post-turn hook takes over after.
+        base = t("gateway.goal.set", budget=state.max_turns, goal=state.goal)
+        if is_draft and state.has_contract():
+            state = mgr.pause(reason="awaiting-spec-review") or state
+            return (
+                f"{base}\nSpec drafted and paused for review:\n"
+                f"{state.contract.render_block()}\n"
+                "Use /goal show to review and /goal resume to build."
+            )
+        if is_draft:
+            # Drafting was requested but the aux model couldn't produce one.
+            draft_note = "\n(Couldn't draft a contract — running as a free-form goal.)"
+        else:
+            draft_note = ""
+
+        # Queue a plain goal (or a draft fallback with no contract) as an
+        # immediate first turn. A successful draft above deliberately stops
+        # before this point so review is a real gate, not decorative UI.
         adapter = self.adapters.get(event.source.platform) if event.source else None
         _quick_key = self._session_key_for_source(event.source) if event.source else None
         if adapter and _quick_key:
@@ -2872,12 +2888,10 @@ class GatewaySlashCommandsMixin:
             except Exception as exc:
                 logger.debug("goal kickoff enqueue failed: %s", exc)
 
-        base = t("gateway.goal.set", budget=state.max_turns, goal=state.goal)
         if state.has_contract():
             return f"{base}\nCompletion contract:\n{state.contract.render_block()}"
-        if lower.startswith("draft"):
-            # Drafting was requested but the aux model couldn't produce one.
-            return f"{base}\n(Couldn't draft a contract — running as a free-form goal.)"
+        if draft_note:
+            return f"{base}{draft_note}"
         return base
 
     async def _handle_heartbeat_command(self, event: "MessageEvent") -> str:

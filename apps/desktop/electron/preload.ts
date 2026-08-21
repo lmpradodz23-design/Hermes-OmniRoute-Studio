@@ -233,6 +233,13 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   setDisableF12: blocked => ipcRenderer.send('hermes:devtools:disable-f12', blocked),
   setPreviewShortcutActive: active => ipcRenderer.send('hermes:previewShortcutActive', Boolean(active)),
   openExternal: url => ipcRenderer.invoke('hermes:openExternal', url),
+  omniRouteCompression: {
+    get: () => ipcRenderer.invoke('hermes:omniroute:compression:get'),
+    set: mode => ipcRenderer.invoke('hermes:omniroute:compression:set', mode)
+  },
+  omniRouteMcp: {
+    getConfig: () => ipcRenderer.invoke('hermes:omniroute:mcp:config')
+  },
   openPreviewInBrowser: url => ipcRenderer.invoke('hermes:openPreviewInBrowser', url),
   reachPreviewUrl: url => ipcRenderer.invoke('hermes:preview:reach', url),
   fetchLinkTitle: url => ipcRenderer.invoke('hermes:fetchLinkTitle', url),

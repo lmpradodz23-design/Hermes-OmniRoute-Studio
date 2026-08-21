@@ -1,0 +1,4 @@
+interface:
+  display_name: "Product Studio"
+  short_description: "Build secure production-ready apps end to end."
+  default_prompt: "Design, build, test, and harden this product as a senior engineer, architect, designer, and security specialist."

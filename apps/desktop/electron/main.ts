@@ -61,6 +61,12 @@ import {
 import { decideBootstrapRepair } from './bootstrap-repair-guard'
 import { runBootstrap } from './bootstrap-runner'
 import { detectBundleSkew } from './bundle-skew'
+import {
+  installBundledDz23Guardrail,
+  installBundledOmniRouteHealthScript,
+  installBundledOmniRouteMcpBridge,
+  installBundledProductStudioSkill
+} from './bundled-product-studio'
 import { applyConnectionChange } from './connection-apply'
 import {
   apiRequestRegistryConnectionId,
@@ -206,6 +212,12 @@ import {
 import { runNativeLogin } from './native-oauth-login'
 import { loadNativeTokenSet, type NativeTokenStoreIo, persistNativeTokenSet } from './native-token-store'
 import { serializeJsonBody, setJsonRequestHeaders } from './oauth-net-request'
+import {
+  createOmniRouteCompressionRunner,
+  getOmniRouteCompressionStatus,
+  setOmniRouteCompressionMode,
+  unavailableCompressionStatus
+} from './omniroute-compression'
 import {
   createParentStartMarkerResolver,
   electronProcessStartMarker,
@@ -800,7 +812,7 @@ const BOOT_FAKE_STEP_MS = (() => {
   return Math.max(120, raw)
 })()
 
-const APP_NAME = process.env.HERMES_DESKTOP_APP_NAME || 'Hermes'
+const APP_NAME = process.env.HERMES_DESKTOP_APP_NAME || 'Hermes OmniRoute Studio'
 const HUD_WINDOW_TITLE = `${APP_NAME} HUD`
 const TITLEBAR_HEIGHT = 34
 const MACOS_TRAFFIC_LIGHTS_HEIGHT = 14
@@ -1189,12 +1201,12 @@ app.setName(APP_NAME)
 // Windows toast notifications silently no-op unless an AppUserModelID is set:
 // `new Notification().show()` returns without error and nothing appears. The
 // AUMID must match the installed Start Menu shortcut's AUMID, which
-// electron-builder derives from the build `appId` (com.nousresearch.hermes) —
+// electron-builder derives from the build `appId` (com.dz23.hermesomniroute) —
 // keep this string in sync with package.json `build.appId`. macOS/Linux don't
 // need this, so gate it on Windows. (Fixes: desktop approval/turn notifications
 // never firing on Windows.)
 if (IS_WINDOWS) {
-  app.setAppUserModelId('com.nousresearch.hermes')
+  app.setAppUserModelId('com.dz23.hermesomniroute')
 }
 
 // Seed the native About panel with the live Hermes version. This is refreshed
@@ -1204,7 +1216,7 @@ if (IS_WINDOWS) {
 app.setAboutPanelOptions({
   applicationName: APP_NAME,
   applicationVersion: resolveHermesVersion(),
-  copyright: 'Copyright © 2026 Nous Research'
+  copyright: 'Copyright © 2026 DZ23 and Nous Research'
 })
 
 // Custom scheme for streaming audio/video into the renderer. Local paths read
@@ -14334,6 +14346,100 @@ ipcMain.handle('hermes:openExternal', (_event, url) => {
   }
 })
 
+ipcMain.handle('hermes:omniroute:compression:get', async () => {
+  try {
+    return await getOmniRouteCompressionStatus(
+      createOmniRouteCompressionRunner({
+        bridgePath: omniRouteMcpBridgePath(),
+        nodeCommand: omniRouteMcpNodeCommand()
+      })
+    )
+  } catch (error) {
+    rememberLog(`[omniroute] compression status unavailable: ${error.message}`)
+
+    return unavailableCompressionStatus()
+  }
+})
+
+ipcMain.handle('hermes:omniroute:compression:set', async (_event, mode) => {
+  if (mode !== 'caveman' && mode !== 'off') {
+    throw new Error('Unsupported OmniRoute compression mode')
+  }
+
+  return setOmniRouteCompressionMode(
+    mode,
+    createOmniRouteCompressionRunner({
+      bridgePath: omniRouteMcpBridgePath(),
+      nodeCommand: omniRouteMcpNodeCommand()
+    })
+  )
+})
+
+function omniRouteMcpBridgePath(): string {
+  const candidates = [
+    path.join(ACTIVE_HERMES_ROOT, 'integrations', 'omniroute-mcp-bridge.mjs'),
+    path.join(process.resourcesPath, 'omniroute-mcp-bridge.mjs'),
+    path.resolve(process.cwd(), 'integrations', 'omniroute-mcp-bridge.mjs')
+  ]
+
+  const found = candidates.find(fileExists)
+
+  if (!found) {
+    throw new Error('OmniRoute MCP bridge is not installed')
+  }
+
+  return found
+}
+
+function omniRouteMcpNodeCommand(): string {
+  const managedNames = IS_WINDOWS ? ['node.exe'] : ['node']
+
+  const candidates = hermesManagedNodePathEntries(HERMES_HOME).flatMap(directory =>
+    managedNames.map(name => path.join(directory, name))
+  )
+
+  if (IS_WINDOWS && process.env.ProgramFiles) {
+    candidates.push(path.join(process.env.ProgramFiles, 'nodejs', 'node.exe'))
+  }
+
+  const installed = candidates.find(fileExists)
+
+  if (installed) {
+    return installed
+  }
+
+  try {
+    const lookup = execFileSync(IS_WINDOWS ? 'where.exe' : 'which', ['node'], {
+      encoding: 'utf8',
+      env: { ...process.env, PATH: pathWithHermesManagedNode() },
+      windowsHide: true
+    })
+      .split(/\r?\n/)
+      .map(entry => entry.trim())
+      .find(Boolean)
+
+    if (lookup) {
+      return lookup
+    }
+  } catch {
+    // The configured command below will produce a clear connection error.
+  }
+
+  return 'node'
+}
+
+ipcMain.handle('hermes:omniroute:mcp:config', () => ({
+  command: omniRouteMcpNodeCommand(),
+  args: [omniRouteMcpBridgePath()],
+  env: {
+    OMNIROUTE_MCP_ENFORCE_SCOPES: 'true',
+    OMNIROUTE_MCP_SCOPES:
+      'execute:completions,execute:search,execute:skills,pricing:write,read:cache,read:catalog,read:combos,read:compression,read:gamification,read:health,read:local-corpus,read:memory,read:models,read:notion,read:obsidian,read:plugins,read:proxies,read:quota,read:skills,read:tools,read:usage,write:budget,write:cache,write:combos,write:compression,write:gamification,write:memory,write:notion,write:obsidian,write:plugins,write:resilience,write:skills'
+  },
+  connect_timeout: 60,
+  timeout: 120
+}))
+
 // ── Find-in-page (Ctrl/Cmd+F) ─────────────────────────────────────────────
 // The desktop supports multiple BrowserWindows (one primary plus any
 // per-session secondary windows spawned via `hermes:window:openSession`).
@@ -14828,9 +14934,9 @@ ipcMain.handle('hermes:vscode-theme:search', async (_event, query) => searchMark
 // running app. Three delivery paths: macOS 'open-url',
 // Win/Linux running-app 'second-instance' (argv), Win/Linux cold-start argv.
 // ---------------------------------------------------------------------------
-const HERMES_PROTOCOL = DEV_SERVER ? 'hermes-dev' : 'hermes'
+const HERMES_PROTOCOL = DEV_SERVER ? 'hermes-dev' : 'hermes-omniroute'
 /** Schemes accepted when parsing inbound URLs (dev accepts both). */
-const DEEPLINK_SCHEMES = DEV_SERVER ? ['hermes-dev', 'hermes'] : ['hermes']
+const DEEPLINK_SCHEMES = DEV_SERVER ? ['hermes-dev', 'hermes', 'hermes-omniroute'] : ['hermes-omniroute']
 let _pendingDeepLink = null
 let _rendererReadyForDeepLink = false
 
@@ -14972,6 +15078,37 @@ app.whenReady().then(() => {
   // Warm the login-shell PATH resolution immediately so it usually completes
   // before the backend start path awaits the same single-flight promise.
   void ensureLoginShellPath()
+
+  if (IS_PACKAGED) {
+    const productStudioResult = installBundledProductStudioSkill({
+      destinationRoot: path.join(HERMES_HOME, 'skills', 'software-development', 'product-studio'),
+      sourceRoot: path.join(process.resourcesPath, 'product-studio-skill'),
+      version: app.getVersion()
+    })
+
+    const guardrailResult = installBundledDz23Guardrail({
+      destinationRoot: path.join(ACTIVE_HERMES_ROOT, 'plugins', 'dz23-guardrail'),
+      sourceRoot: path.join(process.resourcesPath, 'dz23-guardrail'),
+      version: app.getVersion()
+    })
+
+    const mcpBridgeResult = installBundledOmniRouteMcpBridge({
+      destinationPath: path.join(ACTIVE_HERMES_ROOT, 'integrations', 'omniroute-mcp-bridge.mjs'),
+      sourcePath: path.join(process.resourcesPath, 'omniroute-mcp-bridge.mjs'),
+      version: app.getVersion()
+    })
+
+    const healthScriptResult = installBundledOmniRouteHealthScript({
+      destinationPath: path.join(HERMES_HOME, 'scripts', 'omniroute-daily-health.py'),
+      sourcePath: path.join(process.resourcesPath, 'omniroute-daily-health.py'),
+      version: app.getVersion()
+    })
+
+    console.log(`[hermes-omniroute] product studio skill: ${productStudioResult}`)
+    console.log(`[hermes-omniroute] DZ23 guardrail: ${guardrailResult}`)
+    console.log(`[hermes-omniroute] OmniRoute MCP bridge: ${mcpBridgeResult}`)
+    console.log(`[hermes-omniroute] OmniRoute health script: ${healthScriptResult}`)
+  }
 
   const systemCa = installWindowsSystemCaTrust(tls)
 

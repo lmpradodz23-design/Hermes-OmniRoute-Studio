@@ -1040,6 +1040,64 @@ export const en: Translations = {
         curator: { label: 'Curator', hint: 'Skill-usage review' }
       }
     },
+    omniroute: {
+      title: 'OmniRoute local router',
+      description:
+        'Route Hermes through the local OmniRoute gateway, discover its models, and keep a tested fallback ladder.',
+      endpoint: 'Local endpoint',
+      checking: 'Checking OmniRoute…',
+      online: 'Online',
+      offline: 'Offline',
+      configured: 'Configured',
+      modelsFound: count => `${count} models available`,
+      check: 'Check connection',
+      configure: 'Configure OmniRoute',
+      configuring: 'Configuring…',
+      configureSuccess: 'OmniRoute Studio is active with MoA, delegation, and cross-chat memory.',
+      configureFailed: 'Could not configure OmniRoute',
+      fallbackDescription: 'OmniRoute owns fallback selection so Hermes does not run a competing fallback chain.',
+      cavemanTitle: 'Caveman token compression',
+      cavemanDescription:
+        'Reduce context sent to models through OmniRoute. Exact code, commands, and errors remain recoverable; disable it when comparing raw output.',
+      cavemanEnabled: 'Caveman enabled',
+      cavemanDisabled: 'Caveman disabled',
+      cavemanUnavailable: 'OmniRoute CLI is unavailable on this device.',
+      cavemanFailed: 'Could not change Caveman compression'
+    },
+    customEndpoints: {
+      loadFailed: 'Could not load custom endpoints',
+      saved: 'Custom endpoint saved.',
+      saveFailed: 'Save failed',
+      reachable: 'Endpoint is reachable.',
+      reachableModels: count => `Endpoint is reachable. Found ${count} models.`,
+      validationFailed: 'Endpoint validation failed.',
+      activationFailed: 'Activation failed',
+      deleteFailed: 'Delete failed',
+      deleteTitle: name => `Delete ${name}?`,
+      title: 'Custom Endpoints',
+      active: 'Active',
+      apiKeySet: 'API key set',
+      use: 'Use',
+      deleteAria: name => `Delete ${name}`,
+      emptyTitle: 'No custom endpoints',
+      emptyDescription: 'Add an OpenAI-compatible endpoint below.',
+      editTitle: 'Edit Endpoint',
+      addTitle: 'Add Endpoint',
+      name: 'Name',
+      providerId: 'Provider ID',
+      endpointUrl: 'Endpoint URL',
+      defaultModel: 'Default Model',
+      context: 'Context',
+      auto: 'Auto',
+      apiKey: 'API Key',
+      keepKeyPlaceholder: 'Leave blank to keep current key',
+      optional: 'Optional',
+      useForNewChats: 'Use for new chats',
+      discoverModels: 'Discover models',
+      test: 'Test',
+      save: 'Save',
+      newEndpoint: 'New endpoint'
+    },
     providers: {
       connectAccount: 'Connect an account',
       haveApiKey: 'Have an API key instead?',
@@ -2975,7 +3033,9 @@ export const en: Translations = {
       loadFailedConsole: (code, message) => `Load failed${code ? ` (${code})` : ''}: ${message}`,
       unreachableDescription: 'The preview page could not be reached.',
       openTarget: url => `Open ${url}`,
-      fallbackTitle: 'Preview'
+      fallbackTitle: 'Preview',
+      agentAccess: 'Agent access on',
+      agentAccessDescription: 'Hermes can read and control this tab only from the chat you are viewing.'
     }
   },
 

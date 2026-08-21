@@ -51,6 +51,12 @@ def _make_goal_event() -> MessageEvent:
     )
 
 
+def _make_goal_draft_event() -> MessageEvent:
+    event = _make_goal_event()
+    event.text = "/goal draft ship the benchmark"
+    return event
+
+
 @pytest.mark.asyncio
 async def test_gateway_goal_uses_goals_max_turns_from_full_config(tmp_path, monkeypatch):
     """Gateway /goal should honor top-level goals.max_turns from config.yaml."""
@@ -71,6 +77,39 @@ async def test_gateway_goal_uses_goals_max_turns_from_full_config(tmp_path, monk
         state = goals.GoalManager("sid-gateway-goal-config").state
         assert state is not None
         assert state.max_turns == 7
+    finally:
+        goals._DB_CACHE.clear()
+
+
+@pytest.mark.asyncio
+async def test_gateway_goal_draft_pauses_for_real_spec_review(tmp_path, monkeypatch):
+    """A successful draft is reviewable before any implementation starts."""
+    home = tmp_path / ".hermes"
+    home.mkdir()
+    (home / "config.yaml").write_text("goals:\n  max_turns: 50\n", encoding="utf-8")
+    monkeypatch.setenv("HERMES_HOME", str(home))
+    monkeypatch.setattr(
+        goals,
+        "draft_contract",
+        lambda _objective: goals.GoalContract(
+            outcome="A shipped benchmark",
+            verification="npm test passes",
+            constraints="Preserve public APIs",
+            boundaries="Only benchmark files",
+            stop_when="Credentials are required",
+        ),
+    )
+    goals._DB_CACHE.clear()
+
+    try:
+        response = await GatewayRunner._handle_goal_command(_make_runner(), _make_goal_draft_event())
+
+        state = goals.GoalManager("sid-gateway-goal-config").state
+        assert state is not None
+        assert state.status == "paused"
+        assert state.paused_reason == "awaiting-spec-review"
+        assert "Spec drafted and paused for review" in response
+        assert "/goal resume to build" in response
     finally:
         goals._DB_CACHE.clear()
 

@@ -1,3 +1,5 @@
+> **Hermes OmniRoute Studio fork:** this branch builds a side-by-side Windows desktop edition with native OmniRoute routing, 107 MCP tools, Product Studio, pt-BR, project preview, goal/spec workflow, cross-chat memory, guardrails, SSH and an optional Caveman compression switch. See [the Studio guide](docs/hermes-omniroute-studio.md) and [derivative-work notice](NOTICE-OMNIROUTE-STUDIO.md). The original Hermes Agent installation is kept separate.
+
 <p align="center">
   <img src="assets/banner.png" alt="Hermes Agent" width="100%">
 </p>

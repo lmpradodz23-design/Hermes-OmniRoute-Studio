@@ -260,6 +260,19 @@ declare global {
       setDisableF12?: (blocked: boolean) => void
       setPreviewShortcutActive?: (active: boolean) => void
       openExternal: (url: string) => Promise<void>
+      omniRouteCompression?: {
+        get: () => Promise<OmniRouteCompressionStatus>
+        set: (mode: OmniRouteCompressionMode) => Promise<OmniRouteCompressionStatus>
+      }
+      omniRouteMcp?: {
+        getConfig: () => Promise<{
+          args: string[]
+          command: string
+          connect_timeout: number
+          env: Record<string, string>
+          timeout: number
+        }>
+      }
       openPreviewInBrowser?: (url: string) => Promise<void>
       fetchLinkTitle: (url: string) => Promise<string>
       /** A site's icon as a data URL, or '' when it has none we can read.
@@ -699,6 +712,15 @@ export interface HermesTitleBarTheme {
 export interface HermesActiveWork {
   count: number
   titles: string[]
+}
+
+export type OmniRouteCompressionMode = 'caveman' | 'off'
+
+export interface OmniRouteCompressionStatus {
+  available: boolean
+  enabled: boolean
+  mode: OmniRouteCompressionMode
+  strategy: string
 }
 
 export interface HermesWindowState {

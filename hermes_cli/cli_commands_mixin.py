@@ -2993,14 +2993,20 @@ class CLICommandsMixin:
 
         _cprint(f"  ⊙ Goal set ({state.max_turns}-turn budget): {state.goal}")
         if state.has_contract():
+            # A drafted contract is a review artifact, not authorization to
+            # edit. Pause it until the user explicitly resumes after reading
+            # the outcome, verification, constraints, boundaries, and stop
+            # condition. Plain `/goal <text>` keeps its immediate behavior.
+            state = mgr.pause(reason="awaiting-spec-review") or state
             _cprint(f"  {_DIM}Drafted completion contract:{_RST}")
             for line in state.contract.render_block().splitlines():
                 _cprint(f"    {line}")
             _cprint(
-                f"  {_DIM}Tighten any field by re-setting the goal with inline "
-                f"lines (e.g. verify: <command>), then /goal resume. "
-                f"Use /goal show to review.{_RST}"
+                f"  {_DIM}Spec paused for review. Tighten any field by re-setting "
+                f"the goal with inline lines (e.g. verify: <command>). Use "
+                f"/goal show to review and /goal resume to build.{_RST}"
             )
+            return
         else:
             _cprint(
                 f"  {_DIM}Couldn't draft a contract (aux model unavailable) — "

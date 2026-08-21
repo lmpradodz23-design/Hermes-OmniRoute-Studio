@@ -192,8 +192,8 @@ export const PROVIDER_GROUPS: ProviderPrefix[] = [
   {
     prefix: 'XIAOMI_',
     name: 'Xiaomi MiMo',
-    description: 'MiMo-V2.5 and Xiaomi proprietary models',
-    docsUrl: 'https://platform.xiaomimimo.com',
+    description: 'MiMo-V2.5 models through pay-as-you-go or Xiaomi Token Plan',
+    docsUrl: 'https://mimo.mi.com/docs/en-US/tokenplan/integration/hermes-agent',
     priority: 19
   },
   {

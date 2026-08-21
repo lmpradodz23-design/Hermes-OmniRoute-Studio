@@ -185,6 +185,14 @@ export function PreviewBrowserBar({
         label={t.preview.openInBrowser}
         onSelect={onOpenExternal}
       />
+      <div
+        aria-label={copy.agentAccessDescription}
+        className="hidden items-center gap-1 rounded-sm border border-border/60 px-1.5 py-1 text-[0.68rem] text-muted-foreground lg:flex"
+        role="status"
+      >
+        <Codicon name="shield" size="0.75rem" />
+        {copy.agentAccess}
+      </div>
       <PaneStripGlyph
         active={consoleOpen}
         icon={<Codicon name="terminal" size="0.8125rem" />}

@@ -95,7 +95,7 @@ function resolveRemovableAppPath(execPath, platform, env: any = {}) {
     // NSIS per-user installs Hermes.exe directly in the install dir.
     const dir = p.dirname(exe)
 
-    if (/[\\/]Hermes$/i.test(dir) || /[\\/]hermes-desktop$/i.test(dir)) {
+    if (/[\\/]Hermes$/i.test(dir) || /[\\/]hermes-desktop$/i.test(dir) || /[\\/]Hermes OmniRoute Studio$/i.test(dir)) {
       return dir
     }
 

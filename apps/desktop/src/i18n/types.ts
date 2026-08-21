@@ -5,7 +5,7 @@
 // partial locales should use `defineLocale()` so missing desktop-only strings
 // fall back to English while new keys remain type-checked.
 
-export type Locale = 'en' | 'zh' | 'zh-hant' | 'ja' | 'ar'
+export type Locale = 'en' | 'zh' | 'zh-hant' | 'ja' | 'ar' | 'pt-br'
 
 export type ToolTitleKey =
   | 'browser_click'
@@ -897,6 +897,62 @@ export interface Translations {
       fallbackEmpty: string
       notInCatalog: string
       tasks: Record<string, AuxTaskCopy>
+    }
+    omniroute: {
+      title: string
+      description: string
+      endpoint: string
+      checking: string
+      online: string
+      offline: string
+      configured: string
+      modelsFound: (count: number) => string
+      check: string
+      configure: string
+      configuring: string
+      configureSuccess: string
+      configureFailed: string
+      fallbackDescription: string
+      cavemanTitle: string
+      cavemanDescription: string
+      cavemanEnabled: string
+      cavemanDisabled: string
+      cavemanUnavailable: string
+      cavemanFailed: string
+    }
+    customEndpoints: {
+      loadFailed: string
+      saved: string
+      saveFailed: string
+      reachable: string
+      reachableModels: (count: number) => string
+      validationFailed: string
+      activationFailed: string
+      deleteFailed: string
+      deleteTitle: (name: string) => string
+      title: string
+      active: string
+      apiKeySet: string
+      use: string
+      deleteAria: (name: string) => string
+      emptyTitle: string
+      emptyDescription: string
+      editTitle: string
+      addTitle: string
+      name: string
+      providerId: string
+      endpointUrl: string
+      defaultModel: string
+      context: string
+      auto: string
+      apiKey: string
+      keepKeyPlaceholder: string
+      optional: string
+      useForNewChats: string
+      discoverModels: string
+      test: string
+      save: string
+      newEndpoint: string
     }
     providers: {
       connectAccount: string
@@ -2550,6 +2606,8 @@ export interface Translations {
       unreachableDescription: string
       openTarget: (url: string) => string
       fallbackTitle: string
+      agentAccess: string
+      agentAccessDescription: string
     }
   }
 

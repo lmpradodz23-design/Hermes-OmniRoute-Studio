@@ -36,11 +36,25 @@
 // otherwise-good build (worst case: stock icon, not a broken app).
 
 import { resolve, join } from 'node:path'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 
 import { rcedit } from 'rcedit'
 
 import { isMain } from './utils.mjs'
+
+function normalizeWindowsVersion(version) {
+  const core = String(version || '')
+    .split('-', 1)[0]
+    .split('.')
+    .map(part => Number.parseInt(part, 10) || 0)
+    .slice(0, 3)
+  const prerelease = String(version || '').split('-', 2)[1] || ''
+  const prereleaseBuild = Number.parseInt(prerelease.match(/(?:^|\.)\s*(\d+)\s*$/)?.[1] || '0', 10)
+
+  while (core.length < 3) core.push(0)
+
+  return [...core, prereleaseBuild].join('.')
+}
 
 // Stamp the Hermes icon + identity onto `exe`. Resolves on success, throws on
 // failure. `desktopRoot` defaults to this script's package root so the icon and
@@ -59,20 +73,28 @@ async function stampExeIdentity(exe, desktopRoot = resolve(import.meta.dirname, 
   console.log(`[set-exe-identity] stamping ${exe}`)
   console.log(`[set-exe-identity] icon: ${icon}`)
 
+  const packageVersion = JSON.parse(readFileSync(join(desktopRoot, 'package.json'), 'utf8')).version
+  const windowsVersion = normalizeWindowsVersion(packageVersion)
+
   await rcedit(exe, {
     icon,
+    'file-version': windowsVersion,
+    'product-version': windowsVersion,
     'version-string': {
-      ProductName: 'Hermes',
-      FileDescription: 'Hermes',
-      CompanyName: 'Nous Research',
-      LegalCopyright: 'Copyright (c) 2026 Nous Research'
+      ProductName: 'Hermes OmniRoute Studio',
+      FileDescription: 'Hermes OmniRoute Studio',
+      CompanyName: 'DZ23 and Nous Research',
+      InternalName: 'HermesOmniRoute',
+      OriginalFilename: 'HermesOmniRoute.exe',
+      SpecialBuild: packageVersion,
+      LegalCopyright: 'Copyright (c) 2026 DZ23 and Nous Research'
     }
   })
 
-  console.log('[set-exe-identity] done — Hermes icon + identity stamped')
+  console.log('[set-exe-identity] done — Hermes OmniRoute Studio identity stamped')
 }
 
-export { stampExeIdentity }
+export { normalizeWindowsVersion, stampExeIdentity }
 
 // CLI entry point: `node scripts/set-exe-identity.mjs <exe>`.
 if (isMain(import.meta.url)) {

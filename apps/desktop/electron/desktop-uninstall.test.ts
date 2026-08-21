@@ -94,6 +94,16 @@ test('resolveRemovableAppPath returns null for an unrecognized Windows dir', () 
   assert.equal(resolveRemovableAppPath('C:\\Temp\\foo\\Hermes.exe', 'win32'), null)
 })
 
+test('resolveRemovableAppPath recognizes the side-by-side OmniRoute Studio install', () => {
+  assert.equal(
+    resolveRemovableAppPath(
+      'C:\\Users\\x\\AppData\\Local\\Programs\\Hermes OmniRoute Studio\\HermesOmniRoute.exe',
+      'win32'
+    ),
+    'C:\\Users\\x\\AppData\\Local\\Programs\\Hermes OmniRoute Studio'
+  )
+})
+
 test('resolveRemovableAppPath uses APPIMAGE on Linux when set', () => {
   assert.equal(
     resolveRemovableAppPath('/tmp/.mount_HermesXXXX/hermes', 'linux', { APPIMAGE: '/home/x/Apps/Hermes.AppImage' }),

@@ -134,7 +134,10 @@ export function getVenvSitePackagesEntries(
     })
 
   if (isWindows) {
-    const sitePackages = path.join(venvRoot, 'Lib', 'site-packages')
+    // Use the target platform's path rules rather than the host running the
+    // test/build. Cross-compilation and Windows CI may inspect POSIX venvs,
+    // while POSIX CI may validate a Windows runtime layout.
+    const sitePackages = path.win32.join(venvRoot, 'Lib', 'site-packages')
 
     if (directoryExists(sitePackages)) {
       entries.push(sitePackages)
@@ -156,7 +159,7 @@ export function getVenvSitePackagesEntries(
   })()
 
   if (version) {
-    const sitePackages = path.join(venvRoot, 'lib', `python${version}`, 'site-packages')
+    const sitePackages = path.posix.join(venvRoot, 'lib', `python${version}`, 'site-packages')
 
     if (directoryExists(sitePackages)) {
       entries.push(sitePackages)
