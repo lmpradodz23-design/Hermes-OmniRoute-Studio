@@ -66,19 +66,15 @@ function toolset(overrides: Record<string, unknown> = {}) {
 
 async function renderSkills() {
   const { SkillsView } = await import('./index')
-  let result: ReturnType<typeof render>
-  await act(async () => {
-    result = render(
-      // SkillsView reads skills/toolsets via useQuery, so it needs a provider.
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={['/skills?tab=toolsets']}>
-          <SkillsView />
-        </MemoryRouter>
-      </QueryClientProvider>
-    )
-  })
 
-  return result!
+  return render(
+    // SkillsView reads skills/toolsets via useQuery, so it needs a provider.
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={['/skills?tab=toolsets']}>
+        <SkillsView />
+      </MemoryRouter>
+    </QueryClientProvider>
+  )
 }
 
 beforeEach(() => {
@@ -157,15 +153,13 @@ describe('SkillsView toolset management', () => {
     })
 
     const { SkillsView } = await import('./index')
-    await act(async () => {
-      render(
-        <QueryClientProvider client={queryClient}>
-          <MemoryRouter initialEntries={['/skills?tab=toolsets']}>
-            <SkillsView />
-          </MemoryRouter>
-        </QueryClientProvider>
-      )
-    })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/skills?tab=toolsets']}>
+          <SkillsView />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
 
     // The selector appears with >1 profile.
     const trigger = await screen.findByRole('combobox')
@@ -203,15 +197,13 @@ describe('SkillsView toolset management', () => {
     ])
 
     const { SkillsView } = await import('./index')
-    await act(async () => {
-      render(
-        <QueryClientProvider client={queryClient}>
-          <MemoryRouter initialEntries={['/skills?tab=skills']}>
-            <SkillsView />
-          </MemoryRouter>
-        </QueryClientProvider>
-      )
-    })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/skills?tab=skills']}>
+          <SkillsView />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
 
     // The selector renders on the Skills tab too (Capabilities-wide).
     const trigger = await screen.findByRole('combobox')
@@ -247,15 +239,13 @@ describe('SkillsView toolset management', () => {
     ])
 
     const { SkillsView } = await import('./index')
-    await act(async () => {
-      render(
-        <QueryClientProvider client={queryClient}>
-          <MemoryRouter initialEntries={['/skills?tab=skills']}>
-            <SkillsView />
-          </MemoryRouter>
-        </QueryClientProvider>
-      )
-    })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/skills?tab=skills']}>
+          <SkillsView />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
 
     // Frontmatter renders as metadata rows, the body as full text — not just
     // the one-line description.
@@ -303,15 +293,13 @@ describe('SkillsView toolset management', () => {
     // Embedded mode drives tabs through local state (the route hooks are
     // mocked here), starting on Skills: the picker mounts with the tab.
     const { SkillsView } = await import('./index')
-    await act(async () => {
-      render(
-        <QueryClientProvider client={queryClient}>
-          <MemoryRouter initialEntries={['/skills']}>
-            <SkillsView embedded />
-          </MemoryRouter>
-        </QueryClientProvider>
-      )
-    })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/skills']}>
+          <SkillsView embedded />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
 
     const iframe = document.querySelector('iframe')
     expect(iframe).toBeTruthy()
@@ -362,15 +350,13 @@ describe('SkillsView toolset management', () => {
     // (connection, profile) pin, not a bare profile name that would resolve
     // against the ACTIVE gateway (the wrong-machine bug).
     const { SkillsView } = await import('./index')
-    await act(async () => {
-      render(
-        <QueryClientProvider client={queryClient}>
-          <MemoryRouter initialEntries={['/skills']}>
-            <SkillsView embedded fixedConnection="homelab" fixedProfile="inbox-bot" />
-          </MemoryRouter>
-        </QueryClientProvider>
-      )
-    })
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/skills']}>
+          <SkillsView embedded fixedConnection="homelab" fixedProfile="inbox-bot" />
+        </MemoryRouter>
+      </QueryClientProvider>
+    )
 
     await waitFor(() => expect(getSkills).toHaveBeenCalled())
     expect(getSkills.mock.calls[0][0]).toEqual({ connectionId: 'homelab', profile: 'inbox-bot' })

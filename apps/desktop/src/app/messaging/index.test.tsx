@@ -73,16 +73,15 @@ afterEach(() => {
 
 async function renderMessaging() {
   const { MessagingView } = await import('./index')
-  let result: ReturnType<typeof render>
-  await act(async () => {
-    result = render(
-      <MemoryRouter>
-        <MessagingView />
-      </MemoryRouter>
-    )
-  })
 
-  return result!
+  // Testing Library's render already owns the synchronous React act(). An
+  // outer async act waits for this view's recurring refresh work and can time
+  // out before returning, leaving the mounted DOM to contaminate later tests.
+  return render(
+    <MemoryRouter>
+      <MessagingView />
+    </MemoryRouter>
+  )
 }
 
 describe('MessagingView setup-guide link', () => {
@@ -150,9 +149,11 @@ describe('MessagingView pairing', () => {
 
     await renderMessaging()
 
-    await act(async () => {
-      fireEvent.click(await screen.findByRole('button', { name: 'Approve' }))
-    })
+    // Resolve the async query before the interaction. Awaiting findByRole
+    // inside act makes act own Testing Library's polling timer and can leave
+    // the rejected mutation's restoration update outside the boundary.
+    const approve = await screen.findByRole('button', { name: 'Approve' })
+    fireEvent.click(approve)
 
     expect(await screen.findByRole('button', { name: 'Approve' })).toBeTruthy()
     expect(screen.getByText('Bee')).toBeTruthy()
