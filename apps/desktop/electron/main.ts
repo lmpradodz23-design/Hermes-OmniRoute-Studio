@@ -62,11 +62,13 @@ import { decideBootstrapRepair } from './bootstrap-repair-guard'
 import { runBootstrap } from './bootstrap-runner'
 import { detectBundleSkew } from './bundle-skew'
 import {
+  installBundledCreativeSkill,
   installBundledDz23Guardrail,
   installBundledOmniRouteHealthScript,
   installBundledOmniRouteMcpBridge,
   installBundledOmniRouteMcpPolicy,
   installBundledProductStudioSkill,
+  installBundledSkillCollection,
   installManagedComponents,
   type ManagedComponentState,
   resolveStudioManagedPaths,
@@ -790,6 +792,7 @@ function approveNativeSelectedPath(selectedPath: string, directory: boolean): vo
     if (isUnsafeBroadFsRoot(resolved, app.getPath('home'))) {
       throw new Error('Filesystem access blocked: drive roots and the home directory cannot be granted as broad roots')
     }
+
     nativeApprovedFsRoots.add(resolved)
 
     return
@@ -15276,6 +15279,36 @@ app.whenReady().then(() => {
         installBundledProductStudioSkill({
           destinationRoot: path.join(HERMES_HOME, 'skills', 'software-development', 'product-studio'),
           sourceRoot: path.join(process.resourcesPath, 'product-studio-skill'),
+          version: app.getVersion()
+        }),
+      gsapSkills: () =>
+        installBundledCreativeSkill({
+          destinationRoot: path.join(HERMES_HOME, 'skills', 'creative', 'gsap'),
+          sourceRoot: path.join(process.resourcesPath, 'gsap-skills'),
+          version: app.getVersion()
+        }),
+      img2threejs: () =>
+        installBundledCreativeSkill({
+          destinationRoot: path.join(HERMES_HOME, 'skills', 'creative', 'img2threejs'),
+          sourceRoot: path.join(process.resourcesPath, 'img2threejs-skill'),
+          version: app.getVersion()
+        }),
+      motionDesign: () =>
+        installBundledCreativeSkill({
+          destinationRoot: path.join(HERMES_HOME, 'skills', 'creative', 'motion-design'),
+          sourceRoot: path.join(process.resourcesPath, 'motion-design-skill'),
+          version: app.getVersion()
+        }),
+      designToolkit: () =>
+        installBundledCreativeSkill({
+          destinationRoot: path.join(HERMES_HOME, 'skills', 'creative', 'design-toolkit'),
+          sourceRoot: path.join(process.resourcesPath, 'design-toolkit-skills'),
+          version: app.getVersion()
+        }),
+      superpowers: () =>
+        installBundledSkillCollection({
+          destinationRoot: path.join(HERMES_HOME, 'skills', 'software-development', 'superpowers'),
+          sourceRoot: path.join(process.resourcesPath, 'superpowers-skills'),
           version: app.getVersion()
         }),
       guardrail: () =>

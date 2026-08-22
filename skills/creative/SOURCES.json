@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": "gsap-skills",
+      "repository": "https://github.com/greensock/gsap-skills",
+      "commit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "license": "MIT",
+      "paths": [
+        "skills/gsap-core",
+        "skills/gsap-timeline",
+        "skills/gsap-scrolltrigger",
+        "skills/gsap-plugins",
+        "skills/gsap-utils",
+        "skills/gsap-react",
+        "skills/gsap-performance",
+        "skills/gsap-frameworks"
+      ]
+    },
+    {
+      "id": "img2threejs",
+      "repository": "https://github.com/img2threejs/img2threejs",
+      "commit": "d6673386f89673a58736f8d398dd16ece67874f5",
+      "license": "Apache-2.0",
+      "paths": ["."]
+    },
+    {
+      "id": "motion-design",
+      "repository": "https://github.com/LottieFiles/motion-design-skill",
+      "commit": "f9a8a041b85185ee4881b3471d3415e939aac772",
+      "license": "MIT",
+      "paths": ["skills/motion-design"]
+    }
+  ]
+}

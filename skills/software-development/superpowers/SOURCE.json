@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "id": "superpowers",
+  "repository": "https://github.com/obra/superpowers",
+  "commit": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
+  "license": "MIT",
+  "paths": [
+    "skills/brainstorming",
+    "skills/dispatching-parallel-agents",
+    "skills/executing-plans",
+    "skills/finishing-a-development-branch",
+    "skills/receiving-code-review",
+    "skills/subagent-driven-development",
+    "skills/using-git-worktrees",
+    "skills/using-superpowers",
+    "skills/verification-before-completion",
+    "skills/writing-plans",
+    "skills/writing-skills"
+  ],
+  "existingHermesAdaptations": [
+    "skills/software-development/requesting-code-review",
+    "skills/software-development/systematic-debugging",
+    "skills/software-development/test-driven-development"
+  ],
+  "note": "The Studio bundles skills only. Upstream plugin hooks are not auto-enabled."
+}

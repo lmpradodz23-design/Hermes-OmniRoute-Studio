@@ -226,6 +226,26 @@
         "to": "product-studio-skill"
       },
       {
+        "from": "../../skills/creative/gsap",
+        "to": "gsap-skills"
+      },
+      {
+        "from": "../../skills/creative/img2threejs",
+        "to": "img2threejs-skill"
+      },
+      {
+        "from": "../../skills/creative/motion-design",
+        "to": "motion-design-skill"
+      },
+      {
+        "from": "../../skills/creative/design-toolkit",
+        "to": "design-toolkit-skills"
+      },
+      {
+        "from": "../../skills/software-development/superpowers",
+        "to": "superpowers-skills"
+      },
+      {
         "from": "../../plugins/dz23-guardrail",
         "to": "dz23-guardrail"
       },

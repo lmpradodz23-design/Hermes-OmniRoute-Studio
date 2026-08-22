@@ -6,6 +6,7 @@ import path from 'node:path'
 import { test } from 'vitest'
 
 import {
+  installBundledCreativeSkill,
   installBundledDz23Guardrail,
   installBundledOmniRouteHealthScript,
   installBundledOmniRouteMcpBridge,
@@ -34,6 +35,26 @@ test('installs the bundled skill and records managed ownership', () => {
     assert.equal(installBundledProductStudioSkill({ ...paths, version: '1.0.0' }), 'installed')
     assert.equal(fs.readFileSync(path.join(paths.destinationRoot, 'SKILL.md'), 'utf8'), '# skill\n')
     assert.match(fs.readFileSync(path.join(paths.destinationRoot, '.omniroute-managed.json'), 'utf8'), /1\.0\.0/)
+  } finally {
+    fs.rmSync(paths.root, { recursive: true, force: true })
+  }
+})
+
+test('installs a complete nested creative skill bundle without executing it', () => {
+  const paths = fixture()
+
+  try {
+    const nestedSkill = path.join(paths.sourceRoot, 'gsap-core')
+    fs.mkdirSync(path.join(nestedSkill, 'references'), { recursive: true })
+    fs.writeFileSync(path.join(nestedSkill, 'SKILL.md'), '# gsap core\n')
+    fs.writeFileSync(path.join(nestedSkill, 'references', 'api.md'), '# api\n')
+
+    assert.equal(installBundledCreativeSkill({ ...paths, version: '1.0.0' }), 'installed')
+    assert.equal(
+      fs.readFileSync(path.join(paths.destinationRoot, 'gsap-core', 'references', 'api.md'), 'utf8'),
+      '# api\n'
+    )
+    assert.match(fs.readFileSync(path.join(paths.destinationRoot, '.omniroute-managed.json'), 'utf8'), /third-party/)
   } finally {
     fs.rmSync(paths.root, { recursive: true, force: true })
   }

@@ -123,6 +123,32 @@ function installManagedBundle(
   return existed ? 'updated' : 'installed'
 }
 
+function bundledFiles(sourceRoot: string): string[] {
+  const files: string[] = []
+
+  const visit = (directory: string) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      if (entry.name === '.git') {
+        continue
+      }
+
+      const absolutePath = path.join(directory, entry.name)
+
+      if (entry.isDirectory()) {
+        visit(absolutePath)
+      } else if (entry.isFile()) {
+        files.push(path.relative(sourceRoot, absolutePath))
+      }
+    }
+  }
+
+  if (fs.existsSync(sourceRoot)) {
+    visit(sourceRoot)
+  }
+
+  return files.sort()
+}
+
 export function installBundledProductStudioSkill(options: {
   destinationRoot: string
   sourceRoot: string
@@ -137,6 +163,31 @@ export function installBundledDz23Guardrail(options: {
   version: string
 }): BundledSkillInstallResult {
   return installManagedBundle({ ...options, managedBy: 'Hermes OmniRoute Studio guardrail' }, GUARDRAIL_FILES)
+}
+
+export function installBundledCreativeSkill(options: {
+  destinationRoot: string
+  sourceRoot: string
+  version: string
+}): BundledSkillInstallResult {
+  return installBundledSkillCollection(options)
+}
+
+export function installBundledSkillCollection(options: {
+  destinationRoot: string
+  sourceRoot: string
+  version: string
+}): BundledSkillInstallResult {
+  const files = bundledFiles(options.sourceRoot)
+
+  if (!files.some(relativePath => path.basename(relativePath) === 'SKILL.md')) {
+    return 'skipped-missing'
+  }
+
+  return installManagedBundle(
+    { ...options, managedBy: 'Hermes OmniRoute Studio third-party skill collection' },
+    files
+  )
 }
 
 function installManagedFile(

@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": "frontend-design",
+      "repository": "https://github.com/anthropics/skills",
+      "commit": "3b3fad96af16a10759d930941b4520ba0c40edae",
+      "license": "See frontend-design/LICENSE.txt",
+      "paths": ["skills/frontend-design"]
+    },
+    {
+      "id": "ui-ux-pro-max-suite",
+      "repository": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+      "commit": "bc826e2267a36d98a2dcf5231e16c30ff546770f",
+      "license": "MIT; see LICENSE.nextlevelbuilder",
+      "paths": [
+        ".claude/skills/ui-ux-pro-max",
+        ".claude/skills/design",
+        ".claude/skills/banner-design"
+      ],
+      "modifiedFiles": [
+        "ui-ux-pro-max/SKILL.md: replaced Claude-only paths and documented Hermes path resolution",
+        "design/SKILL.md: replaced Claude-only paths and documented Hermes tool mapping",
+        "banner-design/SKILL.md: documented safe Hermes tool mapping for Claude-only examples"
+      ]
+    },
+    {
+      "id": "ui-designer",
+      "repository": "https://github.com/daymade/claude-code-skills",
+      "commit": "d0e673cf13107a35028fa9053126d1418269564b",
+      "license": "MIT; see LICENSE.daymade",
+      "paths": ["ui-designer"],
+      "note": "The requested vercel-labs/agent-skills repository does not currently contain ui-designer; this maintained skill matches the requested screenshot-to-MVP workflow.",
+      "modifiedFiles": [
+        "ui-designer/SKILL.md: documented Hermes delegation fallback"
+      ]
+    },
+    {
+      "id": "impeccable",
+      "repository": "https://github.com/pbakaus/impeccable",
+      "commit": "56f44523f76efdcec813e67b38ee550e49b16f48",
+      "license": "Apache-2.0; see LICENSE.impeccable",
+      "paths": [".agents/skills/impeccable"],
+      "note": "The requested hperrin/impeccable repository does not exist; pbakaus/impeccable is the canonical upstream."
+    }
+  ]
+}
