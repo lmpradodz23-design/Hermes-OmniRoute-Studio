@@ -2461,6 +2461,18 @@ export const zh: Translations = {
 
   composer: {
     message: '消息',
+    externalContextActive: turns => `外部上下文已启用 · ${turns} 轮`,
+    externalContextDetails: (source, detail) => `${source}: ${detail}`,
+    externalContextShow: '显示外部上下文来源',
+    externalContextHide: '隐藏外部上下文来源',
+    externalContextUnavailable: '来源详情不可用',
+    externalContextSources: {
+      'external-file': '外部文件',
+      'installed-skill': '已安装技能',
+      'mcp-external': '外部 MCP 服务',
+      memory: '记忆',
+      web: '网页'
+    },
     wakingProfile: profile => `正在唤醒 ${profile}…`,
     placeholderStarting: '正在启动 Hermes…',
     placeholderReconnecting: '正在重新连接 Hermes…',

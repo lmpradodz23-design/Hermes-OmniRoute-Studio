@@ -286,6 +286,15 @@ declare global {
           >
         >
       }
+      guardrail?: {
+        getTaintStatus: (sessionId: string) => Promise<{
+          active: boolean
+          at: string | null
+          detail: string | null
+          source: 'external-file' | 'installed-skill' | 'mcp-external' | 'memory' | 'web' | null
+          turnsAgo: number | null
+        }>
+      }
       openPreviewInBrowser?: (url: string) => Promise<void>
       fetchLinkTitle: (url: string) => Promise<string>
       /** A site's icon as a data URL, or '' when it has none we can read.

@@ -2280,6 +2280,18 @@ export const en: Translations = {
 
   composer: {
     message: 'Message',
+    externalContextActive: turns => `External context active · ${turns} turn${turns === 1 ? '' : 's'}`,
+    externalContextDetails: (source, detail) => `${source}: ${detail}`,
+    externalContextShow: 'Show external context source',
+    externalContextHide: 'Hide external context source',
+    externalContextUnavailable: 'source detail unavailable',
+    externalContextSources: {
+      'external-file': 'external file',
+      'installed-skill': 'installed skill',
+      'mcp-external': 'external MCP service',
+      memory: 'memory',
+      web: 'web'
+    },
     wakingProfile: profile => `Waking up ${profile}…`,
     placeholderStarting: 'Starting Hermes...',
     placeholderReconnecting: 'Reconnecting to Hermes…',

@@ -1,16 +1,16 @@
 """Deterministic safety and verification gates for OmniRoute Studio."""
 
-from __future__ import annotations
-
 import json
 import hashlib
 import os
 import re
 import subprocess
 import threading
+from collections import deque
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Deque, Dict, Iterable, Optional
 
 
 _COMMAND_START = r"(?:^|(?:&&|\|\||[;&|\n]))\s*"
@@ -52,9 +52,78 @@ _TERMINAL_WRITE_PATTERN = re.compile(
 _PATCH_PATH_PATTERN = re.compile(
     r"^\*\*\*\s+(?:Add|Update|Delete) File:\s*(.+?)\s*$", re.MULTILINE
 )
-_state_lock = threading.Lock()
+_state_lock = threading.RLock()
 _verified_by_session: Dict[str, bool] = {}
 _report_state_by_session: Dict[str, Dict[str, Any]] = {}
+
+
+@dataclass(frozen=True)
+class TaintMark:
+    source: str
+    detail: str
+    tool: str
+    turn: int
+    at: str
+
+
+_taint_by_session: Dict[str, Deque[TaintMark]] = {}
+_turn_by_session: Dict[str, int] = {}
+_TAINT_SOURCES = frozenset(
+    {"web", "external-file", "memory", "mcp-external", "installed-skill"}
+)
+_WEB_TOOLS = frozenset(
+    {
+        "omniroute_web_fetch",
+        "omniroute_web_search",
+        "omniroute_oneproxy_fetch",
+        "fetch_link_title",
+        "web_fetch",
+        "web_search",
+        "web_extract",
+    }
+)
+_MEMORY_TOOLS = frozenset(
+    {
+        "omniroute_memory_search",
+        "memory_search",
+        "memory_recall",
+        "recall_memory",
+    }
+)
+_INSTALLED_SKILL_TOOLS = frozenset(
+    {"omniroute_github_skills_install", "omniroute_skills_execute"}
+)
+_EXTERNAL_FILE_TOOLS = frozenset(
+    {
+        "local_corpus_read",
+        "obsidian_read_note",
+        "notion_get_page",
+        "notion_query_database",
+    }
+)
+_PRIVILEGED_TOOLS = frozenset(
+    {
+        "plugin_install",
+        "plugin_activate",
+        "omniroute_skills_enable",
+        "omniroute_github_skills_install",
+        "omniroute_memory_add",
+        "memory_write",
+        "write_memory",
+    }
+)
+_SENSITIVE_PATH_PATTERN = re.compile(
+    r"(?:^|[\\/])(?:\.env(?:\.[^\\/]+)?|\.ssh|\.aws|\.azure|\.config[\\/]gcloud|credentials?|secrets?|id_(?:rsa|ed25519)|auth\.json)(?:$|[\\/])",
+    re.IGNORECASE,
+)
+_NETWORK_COMMAND_PATTERN = re.compile(
+    r"(?:^|\s)(?:curl|wget|invoke-webrequest|iwr|invoke-restmethod|irm)\b|\brequests\.(?:get|post|put|patch|delete)\s*\(",
+    re.IGNORECASE,
+)
+_REMOTE_COMMAND_PATTERN = re.compile(
+    r"(?:^|\s)(?:ssh|scp|sftp|rsync)\b|\bgit\s+(?:push|remote\s+add)\b",
+    re.IGNORECASE,
+)
 
 
 def _serialized(args: Any) -> str:
@@ -230,6 +299,162 @@ def _session_key(session_id: str) -> str:
     return session_id or "default"
 
 
+def _guardrail_config() -> Dict[str, Any]:
+    try:
+        from hermes_cli.config import load_config
+
+        config = load_config()
+    except Exception:
+        return {}
+    section = config.get("guardrail", {}) if isinstance(config, dict) else {}
+    return section if isinstance(section, dict) else {}
+
+
+def _taint_settings() -> tuple[int, frozenset[str], str]:
+    config = _guardrail_config()
+    raw_window = config.get("taint_window_turns", 3)
+    if isinstance(raw_window, bool) or not isinstance(raw_window, int):
+        window = 3
+    else:
+        window = max(0, min(raw_window, 100))
+
+    raw_sources = config.get("taint_sources", sorted(_TAINT_SOURCES))
+    if not isinstance(raw_sources, (list, tuple, set)):
+        raw_sources = sorted(_TAINT_SOURCES)
+    sources = frozenset(
+        str(source).strip().lower()
+        for source in raw_sources
+        if str(source).strip().lower() in _TAINT_SOURCES
+    )
+    escalation = str(config.get("taint_escalation", "approve")).strip().lower()
+    if escalation not in {"approve", "block", "off"}:
+        escalation = "approve"
+    return window, sources, escalation
+
+
+def _strict_redact(value: Any) -> str:
+    try:
+        from agent.redact import redact_sensitive_text
+
+        redacted = redact_sensitive_text(str(value or ""), force=True)
+        return str(redacted)[:240] or "[empty]"
+    except Exception:
+        return "[detail unavailable: redactor failed]"
+
+
+def _detail_from_args(args: Dict[str, Any]) -> str:
+    for key in ("url", "uri", "path", "file", "file_path", "query", "server", "name"):
+        value = args.get(key)
+        if isinstance(value, str) and value.strip():
+            return _strict_redact(value.strip())
+    return "[source detail not supplied]"
+
+
+def _read_path(args: Dict[str, Any]) -> Optional[Path]:
+    for key in ("path", "file", "file_path", "source"):
+        value = args.get(key)
+        if isinstance(value, str) and value.strip():
+            return Path(value.strip()).expanduser()
+    return None
+
+
+def _taint_source_for(tool_name: str, args: Dict[str, Any]) -> Optional[str]:
+    normalized = str(tool_name or "").strip().lower()
+    if normalized in _WEB_TOOLS or "browser" in normalized or "preview" in normalized:
+        return "web"
+    if normalized in _MEMORY_TOOLS or normalized.endswith("memory_search"):
+        return "memory"
+    if normalized in _INSTALLED_SKILL_TOOLS:
+        return "installed-skill"
+    if normalized in _EXTERNAL_FILE_TOOLS:
+        return "external-file"
+
+    candidate = _read_path(args)
+    is_read = normalized in {"read_file", "file_read"} or normalized.endswith("_read")
+    if candidate is not None and is_read and _outside_workspace(candidate)[0]:
+        return "external-file"
+
+    # Standard MCP adapter names include either ``mcp__server__tool`` or an
+    # explicit server identifier. Local OmniRoute policy/diagnostic tools are
+    # not external content merely because they cross the MCP transport.
+    if normalized.startswith("mcp__") and "omniroute" not in normalized:
+        return "mcp-external"
+    return None
+
+
+def _is_privileged_operation(tool_name: str, args: Dict[str, Any]) -> bool:
+    normalized = str(tool_name or "").strip().lower()
+    executable = _command_text(args)
+    if normalized in {"terminal", "execute_code"}:
+        return bool(executable) and not _is_verification_command(executable)
+    if normalized in _PRIVILEGED_TOOLS or normalized.startswith("ssh"):
+        return True
+    if "remote" in normalized and any(token in normalized for token in ("connect", "exec", "write")):
+        return True
+    if _NETWORK_COMMAND_PATTERN.search(executable) or _REMOTE_COMMAND_PATTERN.search(executable):
+        return True
+    if normalized in _WRITE_TOOLS:
+        return any(_outside_workspace(path)[0] for path in _candidate_paths(normalized, args))
+    if normalized in {"read_file", "file_read"}:
+        candidate = _read_path(args)
+        return candidate is not None and bool(_SENSITIVE_PATH_PATTERN.search(str(candidate)))
+    return False
+
+
+def _active_taint(session_id: str) -> Optional[tuple[TaintMark, int]]:
+    window, sources, escalation = _taint_settings()
+    if escalation == "off" or not sources:
+        return None
+    key = _session_key(session_id)
+    current_turn = _turn_by_session.get(key, 0)
+    marks = _taint_by_session.setdefault(key, deque())
+    while marks and current_turn - marks[0].turn > window:
+        marks.popleft()
+    for mark in reversed(marks):
+        turns_ago = max(0, current_turn - mark.turn)
+        if mark.source in sources and turns_ago <= window:
+            return mark, turns_ago
+    return None
+
+
+def _taint_escalation_decision(
+    tool_name: str, session_id: str
+) -> Optional[Dict[str, str]]:
+    with _state_lock:
+        active = _active_taint(session_id)
+    if active is None:
+        return None
+    mark, turns_ago = active
+    _window, _sources, escalation = _taint_settings()
+    source = mark.source
+    action = "block" if escalation == "block" else "approve"
+    decision = {
+        "action": action,
+        "message": (
+            f"Esta operação foi proposta {turns_ago} turno(s) após a leitura de "
+            f"conteúdo externo ({source}: {mark.detail}). Confirme que é intenção sua."
+        ),
+    }
+    if action == "approve":
+        decision["rule_key"] = f"dz23-guardrail:tainted:{tool_name or 'unknown'}:{source}"
+    return decision
+
+
+def taint_status(session_id: str = "") -> Dict[str, Any]:
+    """Return a redacted snapshot suitable for a trusted UI status surface."""
+    with _state_lock:
+        active = _active_taint(session_id)
+        if active is None:
+            return {"active": False, "source": None, "detail": None, "turns_ago": None}
+        mark, turns_ago = active
+        return {
+            "active": True,
+            "source": mark.source,
+            "detail": mark.detail,
+            "turns_ago": turns_ago,
+        }
+
+
 def _new_report_state() -> Dict[str, Any]:
     workspace = _runtime_workspace()
     return {
@@ -240,6 +465,7 @@ def _new_report_state() -> Dict[str, Any]:
         "subagents": [],
         "models": {},
         "cost_usd": 0.0,
+        "taint": [],
     }
 
 
@@ -253,6 +479,48 @@ def _report_root() -> Path:
     from hermes_constants import get_hermes_home
 
     return get_hermes_home() / "task-reports"
+
+
+def _taint_status_path(session_id: str) -> Path:
+    from hermes_constants import get_hermes_home
+
+    digest = hashlib.sha256(_session_key(session_id).encode("utf-8")).hexdigest()
+    return get_hermes_home() / "runtime" / "guardrail-taint" / f"{digest}.json"
+
+
+def _remove_taint_status_file(session_id: str) -> None:
+    try:
+        _taint_status_path(session_id).unlink(missing_ok=True)
+    except OSError:
+        return
+
+
+def _sync_taint_status_file(session_id: str) -> None:
+    active = _active_taint(session_id)
+    if active is None:
+        _remove_taint_status_file(session_id)
+        return
+    mark, turns_ago = active
+    destination = _taint_status_path(session_id)
+    temporary = destination.with_suffix(".tmp")
+    payload = {
+        "active": True,
+        "source": mark.source,
+        "detail": mark.detail,
+        "turns_ago": turns_ago,
+        "at": mark.at,
+    }
+    try:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        if os.name != "nt":
+            temporary.chmod(0o600)
+        temporary.replace(destination)
+    except OSError:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def _redact(value: str) -> str:
@@ -397,11 +665,15 @@ def _write_task_report(
 
 def on_session_start(session_id: str = "", **_: Any) -> None:
     with _state_lock:
-        _report_state_by_session[_session_key(session_id)] = _new_report_state()
+        key = _session_key(session_id)
+        _report_state_by_session[key] = _new_report_state()
+        _taint_by_session[key] = deque()
+        _turn_by_session[key] = 0
+        _remove_taint_status_file(session_id)
 
 
 def on_pre_tool_call(
-    tool_name: str = "", args: Any = None, **_: Any
+    tool_name: str = "", args: Any = None, session_id: str = "", **_: Any
 ) -> Optional[Dict[str, str]]:
     safe_args = args if isinstance(args, dict) else {}
     executable = _command_text(safe_args)
@@ -412,6 +684,24 @@ def on_pre_tool_call(
             "action": "block",
             "message": f"DZ23 Guardrail blocked a destructive operation matching {label}.",
         }
+
+    if _is_privileged_operation(tool_name, safe_args):
+        try:
+            taint_decision = _taint_escalation_decision(tool_name, session_id)
+        except Exception:
+            # This plugin is a security boundary: uncertainty about the
+            # provenance state escalates instead of silently behaving as if
+            # no external content had entered the session.
+            return {
+                "action": "approve",
+                "message": (
+                    "Não foi possível validar a proveniência do contexto desta operação. "
+                    "Confirme explicitamente que é sua intenção executá-la."
+                ),
+                "rule_key": f"dz23-guardrail:tainted:{tool_name or 'unknown'}:tracking-failure",
+            }
+        if taint_decision is not None:
+            return taint_decision
 
     if tool_name in _WRITE_TOOLS or tool_name in {"terminal", "execute_code"}:
         outside = next(
@@ -461,6 +751,21 @@ def on_post_tool_call(
             exit_code = _verification_exit_code(result, status)
             _verified_by_session[key] = exit_code == 0
 
+        if _is_success(result, status):
+            source = _taint_source_for(tool_name, safe_args)
+            _window, configured_sources, _escalation = _taint_settings()
+            if source is not None and source in configured_sources:
+                mark = TaintMark(
+                    source=source,
+                    detail=_detail_from_args(safe_args),
+                    tool=tool_name or "unknown",
+                    turn=_turn_by_session.get(key, 0),
+                    at=datetime.now(timezone.utc).isoformat(),
+                )
+                _taint_by_session.setdefault(key, deque()).append(mark)
+                report["taint"].append(asdict(mark))
+                _sync_taint_status_file(session_id)
+
 
 def on_pre_verify(
     session_id: str = "",
@@ -495,11 +800,21 @@ def on_post_api_request(
     model: str = "",
     usage: Any = None,
     cost_usd: Any = None,
+    api_call_count: Any = None,
     **_: Any,
 ) -> None:
     usage_dict = usage if isinstance(usage, dict) else {}
     identity = f"{provider or 'unknown'}/{model or 'unknown'}"
     with _state_lock:
+        key = _session_key(session_id)
+        if isinstance(api_call_count, int) and not isinstance(api_call_count, bool):
+            if api_call_count == 1:
+                # The first model response follows a fresh user message. It
+                # establishes a new user intent and clears prior-turn taint
+                # before any proposed tool call is executed.
+                _taint_by_session[key] = deque()
+            _turn_by_session[key] = max(0, api_call_count)
+            _sync_taint_status_file(session_id)
         report = _report_state(session_id)
         aggregate = report["models"].setdefault(
             identity, {"input_tokens": 0, "output_tokens": 0}
@@ -540,6 +855,9 @@ def on_session_end(
     with _state_lock:
         state = _report_state_by_session.pop(key, None)
         _verified_by_session.pop(key, None)
+        _taint_by_session.pop(key, None)
+        _turn_by_session.pop(key, None)
+        _remove_taint_status_file(session_id)
     if state is None:
         return
     try:

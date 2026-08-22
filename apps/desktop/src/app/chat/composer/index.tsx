@@ -1,6 +1,15 @@
 import { ComposerPrimitive } from '@assistant-ui/react'
 import { useStore } from '@nanostores/react'
-import { type ClipboardEvent, type FormEvent, type KeyboardEvent, useCallback, useEffect, useMemo, useRef } from 'react'
+import {
+  type ClipboardEvent,
+  type FormEvent,
+  type KeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react'
 
 import { useHudComposerDrag } from '@/app/hud/composer-drag'
 import { composerFill, composerFloatingStrip, composerSurfaceGlass } from '@/components/chat/composer-dock'
@@ -38,6 +47,7 @@ import { COMPOSER_AREAS, runComposerMiddleware } from './contrib'
 import { ComposerControls } from './controls'
 import { ComposerDirectiveActions } from './directive-actions'
 import { COMPOSER_DROP_ACTIVE_CLASS, COMPOSER_DROP_FADE_CLASS } from './drop-affordance'
+import { ExternalContextIndicator, type ExternalContextStatus } from './external-context-indicator'
 import { markActiveComposer, onComposerAttachImagesRequest } from './focus'
 import { HelpHint } from './help-hint'
 import { useAtCompletions } from './hooks/use-at-completions'
@@ -168,6 +178,48 @@ export function ChatBar({
   // session id — gateway events and process.list both speak that id. Only the
   // queue uses the stored-session fallback key (prompts can queue pre-resume).
   const statusSessionId = sessionId ?? null
+
+  const [taintStatus, setTaintStatus] = useState<ExternalContextStatus>({
+    active: false,
+    detail: null,
+    source: null,
+    turnsAgo: null
+  })
+
+  useEffect(() => {
+    const getTaintStatus = window.hermesDesktop?.guardrail?.getTaintStatus
+
+    if (!statusSessionId || !getTaintStatus) {
+      setTaintStatus({ active: false, detail: null, source: null, turnsAgo: null })
+
+      return
+    }
+
+    let active = true
+
+    const refresh = async () => {
+      try {
+        const next = await getTaintStatus(statusSessionId)
+
+        if (active) {
+          setTaintStatus(next)
+        }
+      } catch {
+        if (active) {
+          setTaintStatus({ active: false, detail: null, source: null, turnsAgo: null })
+        }
+      }
+    }
+
+    void refresh()
+
+    const timer = window.setInterval(() => void refresh(), 1_500)
+
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [statusSessionId])
 
   // Coarse edge: re-renders ChatBar only when the stack shows/hides, NOT on
   // every per-item status mutation or other sessions' churn (see the hook).
@@ -1290,6 +1342,7 @@ export function ChatBar({
                     additions beside the "+" menu and before the controls.
                     All four render nothing until something contributes. */}
                   <ContribSlot area={COMPOSER_AREAS.top} />
+                  <ExternalContextIndicator status={taintStatus} />
                   <VoiceActivity state={voiceActivityState} />
                   <VoicePlaybackActivity />
                   {queueEdit && editingQueuedPrompt && (

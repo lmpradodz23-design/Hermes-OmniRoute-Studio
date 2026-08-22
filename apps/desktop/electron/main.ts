@@ -178,6 +178,7 @@ import {
 import { probeGatewayWebSocket } from './gateway-ws-probe'
 import { registerGitIpc } from './git-ipc'
 import { clearStaleGitLocks } from './gitlock'
+import { readGuardrailTaintStatus } from './guardrail-taint-status'
 import { readAndConsumeHandoffResult } from './handoff-result'
 import {
   ATTACHMENT_UPLOAD_DEFAULT_MAX_BYTES,
@@ -14601,6 +14602,9 @@ ipcMain.handle('hermes:omniroute:mcp:config', () => {
 })
 
 ipcMain.handle('hermes:omniroute:managed:status', () => omniRouteManagedComponentState)
+ipcMain.handle('hermes:guardrail:taint-status', (_event, sessionId) =>
+  readGuardrailTaintStatus(HERMES_HOME, sessionId)
+)
 
 // ── Find-in-page (Ctrl/Cmd+F) ─────────────────────────────────────────────
 // The desktop supports multiple BrowserWindows (one primary plus any

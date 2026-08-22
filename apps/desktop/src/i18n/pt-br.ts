@@ -416,6 +416,18 @@ export const ptBr = defineLocale(
     },
     composer: {
       message: 'Mensagem',
+      externalContextActive: turns => `Contexto externo ativo · ${turns} turno${turns === 1 ? '' : 's'}`,
+      externalContextDetails: (source, detail) => `${source}: ${detail}`,
+      externalContextShow: 'Ver origem do contexto externo',
+      externalContextHide: 'Ocultar origem do contexto externo',
+      externalContextUnavailable: 'detalhe da origem indisponível',
+      externalContextSources: {
+        'external-file': 'arquivo externo',
+        'installed-skill': 'habilidade instalada',
+        'mcp-external': 'serviço MCP externo',
+        memory: 'memória',
+        web: 'web'
+      },
       wakingProfile: profile => `Iniciando ${profile}…`,
       placeholderStarting: 'Iniciando Hermes…',
       placeholderReconnecting: 'Reconectando ao Hermes…',

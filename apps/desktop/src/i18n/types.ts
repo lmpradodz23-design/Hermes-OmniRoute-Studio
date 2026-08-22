@@ -1954,6 +1954,12 @@ export interface Translations {
 
   composer: {
     message: string
+    externalContextActive: (turns: number) => string
+    externalContextDetails: (source: string, detail: string) => string
+    externalContextShow: string
+    externalContextHide: string
+    externalContextUnavailable: string
+    externalContextSources: Record<'external-file' | 'installed-skill' | 'mcp-external' | 'memory' | 'web', string>
     wakingProfile: (profile: string) => string
     placeholderStarting: string
     placeholderReconnecting: string

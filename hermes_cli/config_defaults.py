@@ -669,6 +669,22 @@ DEFAULT_CONFIG = {
         "auto_reload_on_config_change": True,
     },
 
+    # Deterministic provenance tracking in the bundled DZ23 security plugin.
+    # External content is never copied into a policy/system prompt. Instead,
+    # privileged operations proposed shortly afterwards are escalated to the
+    # user's approval boundary with a redacted source reference.
+    "guardrail": {
+        "taint_window_turns": 3,
+        "taint_sources": [
+            "web",
+            "external-file",
+            "memory",
+            "mcp-external",
+            "installed-skill",
+        ],
+        "taint_escalation": "approve",
+    },
+
     # Tool-output truncation thresholds. When terminal output or a
     # single read_file page exceeds these limits, Hermes truncates the
     # payload sent to the model (keeping head + tail for terminal,

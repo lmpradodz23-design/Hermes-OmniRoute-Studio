@@ -245,6 +245,9 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   omniRouteManaged: {
     getStatus: () => ipcRenderer.invoke('hermes:omniroute:managed:status')
   },
+  guardrail: {
+    getTaintStatus: sessionId => ipcRenderer.invoke('hermes:guardrail:taint-status', sessionId)
+  },
   openPreviewInBrowser: url => ipcRenderer.invoke('hermes:openPreviewInBrowser', url),
   reachPreviewUrl: url => ipcRenderer.invoke('hermes:preview:reach', url),
   fetchLinkTitle: url => ipcRenderer.invoke('hermes:fetchLinkTitle', url),

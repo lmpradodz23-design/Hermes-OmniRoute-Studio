@@ -2345,6 +2345,18 @@ Deixe em branco para manter o ${mode} padr\u00E3o.`,
   },
   composer: {
     message: 'Mensagem',
+    externalContextActive: turns => `Contexto externo ativo · ${turns} turno${turns === 1 ? '' : 's'}`,
+    externalContextDetails: (source, detail) => `${source}: ${detail}`,
+    externalContextShow: 'Ver origem do contexto externo',
+    externalContextHide: 'Ocultar origem do contexto externo',
+    externalContextUnavailable: 'detalhe da origem indisponível',
+    externalContextSources: {
+      'external-file': 'arquivo externo',
+      'installed-skill': 'habilidade instalada',
+      'mcp-external': 'serviço MCP externo',
+      memory: 'memória',
+      web: 'web'
+    },
     wakingProfile: profile => `Acordando ${profile}…`,
     placeholderStarting: 'Come\u00E7ando Hermes...',
     placeholderReconnecting: 'Reconectando-se com Hermes\u2026',
