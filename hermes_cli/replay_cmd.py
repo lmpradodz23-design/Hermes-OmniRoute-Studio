@@ -3,11 +3,86 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
 from agent.session_recording import SessionReplay
+
+
+def _run_model_probe(
+    replay: SessionReplay, model: str
+) -> tuple[list[str], list[str], str]:
+    starts = [event for event in replay.events if event.get("t") == "turn_start"]
+    prompt = str(starts[0].get("user_message") or "") if starts else ""
+    if not prompt:
+        raise ValueError(
+            "recording has no redacted user_message; record a new opted-in session"
+        )
+
+    prior_approvals = replay.approvals
+    max_turns = max(2, min(len(replay.tools) + 2, 12))
+    with tempfile.TemporaryDirectory(prefix="hermes-replay-") as temporary:
+        capture = Path(temporary) / "decisions.jsonl"
+        env = os.environ.copy()
+        env["HERMES_REPLAY_DECISION_CAPTURE"] = str(capture)
+        env["HERMES_REPLAY_APPROVALS_JSON"] = json.dumps(prior_approvals)
+        command = [
+            sys.executable,
+            "-m",
+            "hermes_cli.main",
+            "chat",
+            "--query",
+            prompt,
+            "--model",
+            model,
+            "--max-turns",
+            str(max_turns),
+            "--run-budget",
+            "120",
+            "--quiet",
+        ]
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            env=env,
+            timeout=150,
+            check=False,
+        )
+        events = []
+        if capture.exists():
+            for line in capture.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    event = json.loads(line)
+                    if isinstance(event, dict):
+                        events.append(event)
+        if not events and completed.returncode != 0:
+            diagnostic = (completed.stderr or "model probe failed").strip().splitlines()
+            raise RuntimeError(diagnostic[-1] if diagnostic else "model probe failed")
+
+    return (
+        [str(event.get("tool") or "unknown") for event in events],
+        [str(event.get("approval") or "") for event in events],
+        model,
+    )
+
+
+def _decision_diff(recorded: list[str], current: list[str], *, label: str) -> list[str]:
+    width = max(len(recorded), len(current))
+    rows: list[str] = []
+    for index in range(width):
+        before = recorded[index] if index < len(recorded) else "<none>"
+        after = current[index] if index < len(current) else "<none>"
+        marker = "=" if before == after else "->"
+        rows.append(f"- {label}[{index + 1}]: {before} {marker} {after}")
+    return rows
 
 
 def _runtime_approval_verdicts(replay: SessionReplay) -> list[str]:
@@ -102,13 +177,22 @@ def cmd_replay(args: argparse.Namespace) -> int:
         print(f"Replay error: {exc}", file=sys.stderr)
         return 2
 
-    if getattr(args, "against_model", None):
-        print(
-            "Replay safety: this command does not execute recorded tools against a model. "
-            "Use --emit-test for a deterministic regression fixture.",
-            file=sys.stderr,
-        )
-        return 2
+    against_model = getattr(args, "against_model", None)
+    if against_model:
+        try:
+            tools, approvals, route = _run_model_probe(replay, against_model)
+        except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            print(f"Replay model probe failed: {exc}", file=sys.stderr)
+            return 2
+        tool_diff = _decision_diff(replay.tools, tools, label="tool")
+        approval_diff = _decision_diff(replay.approvals, approvals, label="approval")
+        print(f"Model decision diff: recorded -> {route}")
+        print("\n".join((*tool_diff, *approval_diff)))
+        if getattr(args, "assert_tools", False) and tools != replay.tools:
+            return 2
+        if getattr(args, "assert_approvals", False) and approvals != replay.approvals:
+            return 2
+        return 0
 
     errors = _validate_integrity(replay, args)
     if errors:

@@ -135,10 +135,10 @@ def test_replay_detects_current_guardrail_verdict_drift(
     assert "current=['blocked']" in error
 
 
-def test_replay_refuses_model_execution_until_a_safe_runner_is_available(
-    tmp_path, capsys
+def test_replay_against_model_uses_decision_only_probe_and_prints_diff(
+    tmp_path, capsys, monkeypatch
 ) -> None:
-    from hermes_cli.replay_cmd import cmd_replay
+    from hermes_cli import replay_cmd
 
     root = tmp_path / "session-recordings"
     root.mkdir()
@@ -152,5 +152,58 @@ def test_replay_refuses_model_execution_until_a_safe_runner_is_available(
         recordings_dir=str(root),
     )
 
-    assert cmd_replay(args) == 2
-    assert "does not execute recorded tools" in capsys.readouterr().err
+    monkeypatch.setattr(
+        replay_cmd,
+        "_run_model_probe",
+        lambda _replay, _model: (["write_file"], ["blocked"], "probe-model"),
+    )
+
+    assert replay_cmd.cmd_replay(args) == 0
+    output = capsys.readouterr().out
+    assert "Model decision diff" in output
+    assert "terminal -> write_file" in output
+    assert "automatic -> blocked" in output
+
+
+def test_model_probe_launches_bounded_capture_process(tmp_path, monkeypatch) -> None:
+    from agent.session_recording import SessionReplay
+    from hermes_cli import replay_cmd
+
+    replay = SessionReplay(
+        [
+            {"t": "turn_start", "user_message": "build a safe app"},
+            {
+                "t": "tool_call",
+                "tool": "terminal",
+                "approval": {"verdict": "approved"},
+            },
+        ],
+        tmp_path / "source.jsonl",
+    )
+    observed = {}
+
+    def _run(command, **kwargs):
+        observed["command"] = command
+        observed["env"] = kwargs["env"]
+        capture = kwargs["env"]["HERMES_REPLAY_DECISION_CAPTURE"]
+        with open(capture, "w", encoding="utf-8") as stream:
+            stream.write(
+                json.dumps({
+                    "tool": "terminal",
+                    "approval": "approved",
+                    "approval_path": "runtime",
+                })
+                + "\n"
+            )
+        return type("Completed", (), {"returncode": 0, "stderr": ""})()
+
+    monkeypatch.setattr(replay_cmd.subprocess, "run", _run)
+
+    tools, approvals, route = replay_cmd._run_model_probe(replay, "provider/model")
+
+    assert tools == ["terminal"]
+    assert approvals == ["approved"]
+    assert route == "provider/model"
+    assert "--max-turns" in observed["command"]
+    assert "--run-budget" in observed["command"]
+    assert observed["env"]["HERMES_REPLAY_APPROVALS_JSON"] == '["approved"]'

@@ -6371,11 +6371,22 @@ def _dispatch_pre_tool_call_hooks(
         tool_call_id=tool_call_id, turn_id=turn_id,
         api_request_id=api_request_id, middleware_trace=middleware_trace,
     )
-    block_msg = _resolve_block_from_details(
-        details, tool_name,
-        turn_id=turn_id, tool_call_id=tool_call_id, session_id=session_id,
-    )
-    if details.action == "approve":
+    from agent.replay_capture import capture_authorization
+
+    capture_block = capture_authorization(details, tool_name)
+    block_msg = capture_block
+    if capture_block is None:
+        block_msg = _resolve_block_from_details(
+            details,
+            tool_name,
+            turn_id=turn_id,
+            tool_call_id=tool_call_id,
+            session_id=session_id,
+        )
+    if capture_block is not None and details.action == "approve":
+        verdict = "confirmation_required"
+        approval_path = details.rule_key or "plugin-approval"
+    elif details.action == "approve":
         verdict = "denied" if block_msg is not None else "approved"
         approval_path = details.rule_key or "plugin-approval"
     elif details.action == "block":

@@ -1229,6 +1229,35 @@ class TestPreToolCallModify:
         assert block_msg == "no"
         assert observed[0]["verdict"] == "denied"
 
+    def test_replay_capture_never_prompts_or_executes_approval_gate(
+        self, tmp_path, monkeypatch
+    ):
+        from agent.replay_capture import reset_capture_state
+
+        capture = tmp_path / "decisions.jsonl"
+        monkeypatch.setenv("HERMES_REPLAY_DECISION_CAPTURE", str(capture))
+        monkeypatch.setenv("HERMES_REPLAY_APPROVALS_JSON", '["approved"]')
+        reset_capture_state()
+        monkeypatch.setattr(
+            "hermes_cli.plugins.invoke_hook",
+            lambda name, **_kwargs: (
+                [{"action": "approve", "message": "confirm"}]
+                if name == "pre_tool_call"
+                else []
+            ),
+        )
+        monkeypatch.setattr(
+            "tools.approval.request_tool_approval",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                AssertionError("human gate must not run during replay capture")
+            ),
+        )
+
+        block_msg, _ = _dispatch_pre_tool_call_hooks("terminal", {"command": "echo ok"})
+
+        assert block_msg is not None and "REPLAY_CAPTURE" in block_msg
+        assert '"approval": "approved"' in capture.read_text(encoding="utf-8")
+
     def test_modify_returns_merged_args(self, monkeypatch):
         """A single modify hook should return merged args."""
         monkeypatch.setattr(
