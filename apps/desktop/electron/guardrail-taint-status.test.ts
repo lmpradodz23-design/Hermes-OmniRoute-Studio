@@ -3,6 +3,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+
 import { afterEach, test } from 'vitest'
 
 import { readGuardrailTaintStatus } from './guardrail-taint-status'
@@ -10,7 +11,9 @@ import { readGuardrailTaintStatus } from './guardrail-taint-status'
 const roots: string[] = []
 
 afterEach(() => {
-  for (const root of roots.splice(0)) fs.rmSync(root, { force: true, recursive: true })
+  for (const root of roots.splice(0)) {
+    fs.rmSync(root, { force: true, recursive: true })
+  }
 })
 
 function fixture(sessionId: string, value: unknown): string {
@@ -20,6 +23,7 @@ function fixture(sessionId: string, value: unknown): string {
   const destination = path.join(root, 'runtime', 'guardrail-taint', `${digest}.json`)
   fs.mkdirSync(path.dirname(destination), { recursive: true })
   fs.writeFileSync(destination, JSON.stringify(value), 'utf8')
+
   return root
 }
 
