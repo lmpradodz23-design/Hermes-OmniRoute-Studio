@@ -2052,6 +2052,19 @@ DEFAULT_CONFIG = {
         },
     },
 
+    # Unified capability plane — one policy for Hermes-native and OmniRoute
+    # MCP implementations. Disabling a provider removes no code or data; it
+    # blocks that execution surface at the shared pre-tool authorization gate.
+    "capability_plane": {
+        "enabled": True,
+        "mutations_require_approval": True,
+        "providers": {
+            "memory": {"native": True, "mcp": True},
+            "skills": {"native": True, "mcp": True},
+            "plugins": {"native": True, "mcp": True},
+        },
+    },
+
     # Skills — external skill directories for sharing skills across tools/agents.
     # Each path is expanded (~, ${VAR}) and resolved.  Read-only — skill creation
     # always goes to ~/.hermes/skills/.

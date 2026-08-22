@@ -6143,9 +6143,15 @@ def _get_pre_tool_call_directive_details(
             message=fmt.format(tool_name=tool_name),
         )
 
+    from agent.capability_plane import get_capability_plane
     from hermes_cli.lifecycle import invoke_hook as invoke_lifecycle_hook
 
-    hook_results = invoke_lifecycle_hook(
+    capability_result = get_capability_plane().evaluate_tool(
+        tool_name,
+        args if isinstance(args, dict) else {},
+    )
+    hook_results = ([] if capability_result is None else [capability_result])
+    hook_results.extend(invoke_lifecycle_hook(
         "pre_tool_call",
         tool_name=tool_name,
         args=args if isinstance(args, dict) else {},
@@ -6155,7 +6161,7 @@ def _get_pre_tool_call_directive_details(
         turn_id=turn_id,
         api_request_id=api_request_id,
         middleware_trace=list(middleware_trace or []),
-    )
+    ))
 
     block_msg: Optional[str] = None
     modified_args: Optional[Dict[str, Any]] = None

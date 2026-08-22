@@ -435,6 +435,15 @@ export const FIELD_LABELS: Record<string, string> = defineFieldCopy({
     enabled: 'Session Recording',
     retentionDays: 'Recording Retention'
   },
+  capabilityPlane: {
+    enabled: 'Unified Capability Plane',
+    mutationsRequireApproval: 'Confirm Capability Changes',
+    providers: {
+      memory: { native: 'Native Memory', mcp: 'OmniRoute Memory' },
+      skills: { native: 'Native Skills', mcp: 'OmniRoute Skills' },
+      plugins: { native: 'Native Plugins', mcp: 'OmniRoute Plugins' }
+    }
+  },
   browser: {
     allowPrivateUrls: 'Browser Private URLs',
     autoLocalForPrivateUrls: 'Local Browser For Private URLs'
@@ -603,6 +612,24 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = defineFieldCopy({
       'Write a redacted, append-only audit trail for this device. Disabled by default because recordings may contain conversation context.',
     retentionDays: 'Automatically delete local session recordings after this many days.'
   },
+  capabilityPlane: {
+    enabled: 'Apply one permission, audit and conflict policy to native and OmniRoute capabilities.',
+    mutationsRequireApproval: 'Require confirmation before either provider changes memory, skills or plugins.',
+    providers: {
+      memory: {
+        native: 'Allow the built-in Hermes memory provider.',
+        mcp: 'Allow memory tools supplied through OmniRoute MCP.'
+      },
+      skills: {
+        native: 'Allow skills installed in Hermes and the current trusted workspace.',
+        mcp: 'Allow skill discovery and execution through OmniRoute MCP.'
+      },
+      plugins: {
+        native: 'Allow Hermes native plugin capabilities.',
+        mcp: 'Allow plugin operations through OmniRoute MCP.'
+      }
+    }
+  },
   checkpoints: {
     enabled: 'Create rollback snapshots before file edits.'
   },
@@ -709,6 +736,14 @@ export const SECTIONS: DesktopConfigSection[] = [
     label: 'Memory & Context',
     icon: Brain,
     keys: [
+      'capability_plane.enabled',
+      'capability_plane.mutations_require_approval',
+      'capability_plane.providers.memory.native',
+      'capability_plane.providers.memory.mcp',
+      'capability_plane.providers.skills.native',
+      'capability_plane.providers.skills.mcp',
+      'capability_plane.providers.plugins.native',
+      'capability_plane.providers.plugins.mcp',
       'memory.memory_enabled',
       'memory.user_profile_enabled',
       'memory.memory_char_limit',

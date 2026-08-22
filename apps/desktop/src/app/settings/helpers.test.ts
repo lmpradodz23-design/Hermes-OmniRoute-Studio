@@ -38,6 +38,17 @@ describe('settings helpers', () => {
     expect(SECTIONS.find(section => section.id === 'safety')?.keys).toEqual(
       expect.arrayContaining(['recording.enabled', 'recording.retention_days'])
     )
+    expect(SECTIONS.find(section => section.id === 'memory')?.keys).toEqual(
+      expect.arrayContaining([
+        'capability_plane.enabled',
+        'capability_plane.providers.memory.native',
+        'capability_plane.providers.skills.mcp',
+        'capability_plane.providers.plugins.mcp'
+      ])
+    )
+    expect(fieldCopyForSchemaKey(FIELD_LABELS, 'capability_plane.providers.skills.mcp')).toBe(
+      'OmniRoute Skills'
+    )
   })
 
   it('does not shadow the backend schema options for memory.provider', () => {

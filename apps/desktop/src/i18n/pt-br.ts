@@ -68,7 +68,15 @@ export const ptBr = defineLocale(
         'security.spendCeiling.warningRatio': 'Percentual de alerta de gastos',
         'security.spendCeiling.confirmationThresholdUsd': 'Limite para pedir confirmação (US$)',
         'recording.enabled': 'Gravação de sessão',
-        'recording.retentionDays': 'Retenção das gravações'
+        'recording.retentionDays': 'Retenção das gravações',
+        'capabilityPlane.enabled': 'Plano unificado de capacidades',
+        'capabilityPlane.mutationsRequireApproval': 'Confirmar mudanças de capacidades',
+        'capabilityPlane.providers.memory.native': 'Memória nativa do Hermes',
+        'capabilityPlane.providers.memory.mcp': 'Memória do OmniRoute',
+        'capabilityPlane.providers.skills.native': 'Skills nativas do Hermes',
+        'capabilityPlane.providers.skills.mcp': 'Skills do OmniRoute',
+        'capabilityPlane.providers.plugins.native': 'Plugins nativos do Hermes',
+        'capabilityPlane.providers.plugins.mcp': 'Plugins do OmniRoute'
       },
       credentials: {
         pasteKey: 'Cole a chave',
@@ -112,7 +120,17 @@ export const ptBr = defineLocale(
           'Pede sua confirmação uma vez antes de uma tarefa cuja estimativa máxima por chamada ultrapasse este valor. Use 0 para desativar.',
         'recording.enabled':
           'Cria uma trilha local redigida e somente anexável. Fica desativada por padrão porque pode conter contexto das conversas.',
-        'recording.retentionDays': 'Exclui automaticamente as gravações locais depois desta quantidade de dias.'
+        'recording.retentionDays': 'Exclui automaticamente as gravações locais depois desta quantidade de dias.',
+        'capabilityPlane.enabled':
+          'Aplica a mesma política de permissão, auditoria e conflitos às capacidades nativas e às do OmniRoute.',
+        'capabilityPlane.mutationsRequireApproval':
+          'Exige confirmação antes que qualquer provedor altere memória, skills ou plugins.',
+        'capabilityPlane.providers.memory.native': 'Permite a memória interna e persistente do Hermes.',
+        'capabilityPlane.providers.memory.mcp': 'Permite as ferramentas de memória fornecidas pelo OmniRoute MCP.',
+        'capabilityPlane.providers.skills.native': 'Permite skills instaladas no Hermes e no projeto confiável atual.',
+        'capabilityPlane.providers.skills.mcp': 'Permite descobrir e executar skills pelo OmniRoute MCP.',
+        'capabilityPlane.providers.plugins.native': 'Permite capacidades de plugins nativos do Hermes.',
+        'capabilityPlane.providers.plugins.mcp': 'Permite operações de plugins pelo OmniRoute MCP.'
       },
       config: {
         localOnlyDisableConfirm:

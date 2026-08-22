@@ -431,6 +431,10 @@ class MCPServersReplace(BaseModel):
 
 class MCPEnabledToggle(BaseModel):
     enabled: bool
+
+
+class CapabilityProviderToggle(BaseModel):
+    enabled: bool
     profile: Optional[str] = None
 
 

@@ -60,6 +60,8 @@ describe('Brazilian Portuguese locale', () => {
     expect(ptBr.settings.fieldDescriptions['security.spendCeiling.sessionUsd']).toContain('somente pela interface')
     expect(ptBr.settings.fieldLabels['recording.enabled']).toBe('Gravação de sessão')
     expect(ptBr.settings.fieldDescriptions['recording.enabled']).toContain('desativada por padrão')
+    expect(ptBr.settings.fieldLabels['capabilityPlane.providers.skills.mcp']).toBe('Skills do OmniRoute')
+    expect(ptBr.settings.fieldDescriptions['capabilityPlane.mutationsRequireApproval']).toContain('confirmação')
     expect(ptBr.settings.providers.groupDescriptions?.OpenRouter).toContain('centenas de modelos')
     expect(ptBr.settings.omniroute.openDashboard).toBe('Abrir painel completo do OmniRoute')
   })
