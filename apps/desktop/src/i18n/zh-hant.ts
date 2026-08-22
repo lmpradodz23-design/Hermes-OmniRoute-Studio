@@ -1816,6 +1816,7 @@ export const zhHant = defineLocale({
 
       sessionActions: '工作階段動作',
       sessionRunning: '工作階段執行中',
+      actionRequired: '需要處理',
       needsInput: '需要您的輸入',
       waitingForAnswer: '等待您的回答',
       finishedUnread: '已完成 — 未讀',

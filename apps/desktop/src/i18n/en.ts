@@ -2240,6 +2240,7 @@ export const en: Translations = {
       copyIdFailed: 'Could not copy session ID',
       sessionActions: 'Session actions',
       sessionRunning: 'Session running',
+      actionRequired: 'Action required',
       needsInput: 'Needs your input',
       waitingForAnswer: 'Waiting for your answer',
       finishedUnread: 'Finished — unread',

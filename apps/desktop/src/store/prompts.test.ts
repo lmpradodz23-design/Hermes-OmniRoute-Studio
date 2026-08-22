@@ -4,6 +4,7 @@ import { clearClarifyRequest, setClarifyRequest } from './clarify'
 import {
   $activeSessionAwaitingInput,
   $approvalRequest,
+  $blockingPromptSessionIds,
   $secretRequest,
   $sudoRequest,
   clearAllPrompts,
@@ -50,6 +51,14 @@ describe('approval prompt store', () => {
     // … but surfaces once the user switches to the session that raised it.
     $activeSessionId.set('s2')
     expect($approvalRequest.get()?.sessionId).toBe('s2')
+  })
+
+  it('publishes every background session that needs a blocking action', () => {
+    setApprovalRequest({ command: 'x', description: 'd', sessionId: 's2' })
+    setSudoRequest({ requestId: 'sudo', sessionId: 's3' })
+    setSecretRequest({ envVar: 'TOKEN', prompt: 'p', requestId: 'secret', sessionId: 's4' })
+
+    expect($blockingPromptSessionIds.get()).toEqual(['s2', 's3', 's4'])
   })
 
   it('clears the active session prompt', () => {

@@ -8,6 +8,7 @@ import { createClientSessionState } from '@/lib/chat-runtime'
 import type * as ChatRuntime from '@/lib/chat-runtime'
 import type * as Time from '@/lib/time'
 import type * as ComposerStatusStore from '@/store/composer-status'
+import { clearAllPrompts, setApprovalRequest } from '@/store/prompts'
 import type * as SessionStore from '@/store/session'
 import { clearAllSessionStates, publishSessionState } from '@/store/session-states'
 import type * as SessionStatesStore from '@/store/session-states'
@@ -15,7 +16,10 @@ import type * as WindowsStore from '@/store/windows'
 
 import { SidebarSessionRow } from './session-row'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  clearAllPrompts()
+})
 
 vi.mock('@/i18n', () => ({
   useI18n: () => ({
@@ -29,6 +33,7 @@ vi.mock('@/i18n', () => ({
           handoffOrigin: (platform: string) => `Started on ${platform}`,
           messageCount: (count: number) => `${count} messages`,
           needsInput: 'Needs input',
+          actionRequired: 'Action required',
           sessionActions: 'Session actions',
           sessionRunning: 'Running',
           waitingForAnswer: 'Waiting for answer'
@@ -224,6 +229,14 @@ describe('SidebarSessionRow running arc', () => {
 })
 
 describe('SidebarSessionRow', () => {
+  it('shows a visible action-required badge for a background approval', () => {
+    setApprovalRequest({ command: 'npm install', description: 'confirm', sessionId: 's1' })
+
+    renderRow(makeSession({ title: 'Background task' }))
+
+    expect(screen.getByText('Action required')).toBeTruthy()
+  })
+
   it('keeps an aria-label on the kebab without wrapping it in a Tip', () => {
     render(
       <SidebarSessionRow

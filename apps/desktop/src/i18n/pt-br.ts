@@ -429,7 +429,10 @@ export const ptBr = defineLocale(
       noWorkspace: 'Sem espaço de trabalho',
       projectEmpty: 'Nenhuma conversa ainda',
       noSessions: 'Nenhuma conversa ainda',
-      noFilterMatches: 'Nenhuma conversa corresponde aos filtros'
+      noFilterMatches: 'Nenhuma conversa corresponde aos filtros',
+      row: {
+        actionRequired: 'Ação necessária'
+      }
     },
     composer: {
       message: 'Mensagem',

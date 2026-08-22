@@ -2421,6 +2421,7 @@ export const zh: Translations = {
 
       sessionActions: '会话操作',
       sessionRunning: '会话运行中',
+      actionRequired: '需要处理',
       needsInput: '需要你输入',
       waitingForAnswer: '正在等待你的回答',
       finishedUnread: '已完成 — 未读',

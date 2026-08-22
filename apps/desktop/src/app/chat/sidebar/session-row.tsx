@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils'
 import { $sidebarRowMeta } from '@/store/layout'
 import { normalizeProfileKey } from '@/store/profile'
 import { $projects } from '@/store/projects'
+import { $blockingPromptSessionIds } from '@/store/prompts'
 import { $pullRequestsByBranch, sessionPrKey } from '@/store/pull-requests'
 import { $sessionDotStateById, hasLiveTurn, showsRunningArc } from '@/store/session-dot-state'
 import { $sessionListDensity } from '@/store/session-list-density'
@@ -279,6 +280,18 @@ function SidebarSessionRowImpl({
   // Live plan progress ("3/7"), far right of the footer. A selector keyed to
   // this row: only rows whose own fraction changes repaint on todo events.
   const todoProgress = useStoreSelector($todoProgressBySession, progress => (card ? progress[session.id] : undefined))
+  const actionRequired = useStoreSelector($blockingPromptSessionIds, sessionIds => sessionIds.includes(session.id))
+
+  const actionRequiredBadge = actionRequired ? (
+    <span
+      aria-label={r.actionRequired}
+      className="shrink-0 rounded-sm border border-amber-500/40 bg-amber-500/10 px-1 py-0.5 text-[0.56rem] leading-none font-semibold text-amber-700 dark:text-amber-300"
+      data-action-required
+      role="status"
+    >
+      {r.actionRequired}
+    </span>
+  ) : null
 
   // An archived session has no live status to paint, so the archive glyph takes
   // the lead slot the dot would occupy instead of adding a column of its own.
@@ -492,15 +505,20 @@ function SidebarSessionRowImpl({
                   {leadNode}
                   {handoffBadge}
                   <span className="min-w-0 flex-1 self-center">
-                    <OverflowTip label={title}>
-                      <SidebarRowLabel
-                        className="hover-marquee block font-normal group-hover:text-foreground group-data-[working=true]:text-foreground/90"
-                        onPointerEnter={armMarquee}
-                        onPointerLeave={disarmMarquee}
-                      >
-                        <span className="hover-marquee-inner">{title}</span>
-                      </SidebarRowLabel>
-                    </OverflowTip>
+                    <span className="flex min-w-0 items-center gap-1">
+                      <span className="min-w-0 flex-1">
+                        <OverflowTip label={title}>
+                          <SidebarRowLabel
+                            className="hover-marquee block font-normal group-hover:text-foreground group-data-[working=true]:text-foreground/90"
+                            onPointerEnter={armMarquee}
+                            onPointerLeave={disarmMarquee}
+                          >
+                            <span className="hover-marquee-inner">{title}</span>
+                          </SidebarRowLabel>
+                        </OverflowTip>
+                      </span>
+                      {actionRequiredBadge}
+                    </span>
                     {/* Session-list density (#68119): comfortable adds one
                         deterministic metadata line; detailed adds the initial
                         request preview. Compact keeps today's one-line row. */}
@@ -537,15 +555,20 @@ function SidebarSessionRowImpl({
                 {/* Title + preview: ONE grouped cell with its own tight
                     internal gap — it does not inherit the card's rhythm. */}
                 <div className="-mt-[0.2em] flex min-w-0 flex-col gap-[0.3rem]">
-                  <OverflowTip label={title}>
-                    <SidebarRowLabel
-                      className="hover-marquee text-[0.8125rem] leading-none font-medium text-(--ui-text-primary) group-data-[working=true]:text-foreground"
-                      onPointerEnter={armMarquee}
-                      onPointerLeave={disarmMarquee}
-                    >
-                      <span className="hover-marquee-inner">{title}</span>
-                    </SidebarRowLabel>
-                  </OverflowTip>
+                  <div className="flex min-w-0 items-center gap-1">
+                    <span className="min-w-0 flex-1">
+                      <OverflowTip label={title}>
+                        <SidebarRowLabel
+                          className="hover-marquee text-[0.8125rem] leading-none font-medium text-(--ui-text-primary) group-data-[working=true]:text-foreground"
+                          onPointerEnter={armMarquee}
+                          onPointerLeave={disarmMarquee}
+                        >
+                          <span className="hover-marquee-inner">{title}</span>
+                        </SidebarRowLabel>
+                      </OverflowTip>
+                    </span>
+                    {actionRequiredBadge}
+                  </div>
                   {session.preview && rowMeta.includes('preview') ? (
                     <span className="min-w-0 truncate text-[0.625rem] leading-none text-(--ui-text-quaternary)">
                       {session.preview}

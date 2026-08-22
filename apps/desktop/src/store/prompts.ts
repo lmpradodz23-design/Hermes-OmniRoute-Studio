@@ -107,6 +107,15 @@ const approval = keyedPromptStore<ApprovalRequest>()
 const sudo = keyedPromptStore<SudoRequest>()
 const secret = keyedPromptStore<SecretRequest>()
 
+/** Session ids that are blocked on an action the ordinary composer cannot
+ * satisfy. Sidebar rows subscribe to this compact index so a prompt raised by
+ * a background agent remains visible until the user handles it. */
+export const $blockingPromptSessionIds = computed([approval.$all, sudo.$all, secret.$all], (...promptMaps) =>
+  Array.from(new Set(promptMaps.flatMap(promptMap => Object.keys(promptMap))))
+    .filter(Boolean)
+    .sort()
+)
+
 // Inline approval anchors, keyed by session: a tile's inline bar mounting must
 // not suppress the PRIMARY session's floating fallback (and vice versa).
 const $approvalInlineAnchors = atom<Record<string, number>>({})

@@ -1914,6 +1914,7 @@ export interface Translations {
       copyIdFailed: string
       sessionActions: string
       sessionRunning: string
+      actionRequired: string
       needsInput: string
       waitingForAnswer: string
       finishedUnread: string

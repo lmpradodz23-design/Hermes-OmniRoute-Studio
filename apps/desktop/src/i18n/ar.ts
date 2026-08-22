@@ -1713,6 +1713,7 @@ export const ar = defineLocale({
 
       sessionActions: 'إجراءات الجلسة',
       sessionRunning: 'الجلسة تعمل',
+      actionRequired: 'إجراء مطلوب',
       needsInput: 'تحتاج إدخالا',
       waitingForAnswer: 'بانتظار إجابة',
       backgroundRunning: 'تعمل في الخلفية',

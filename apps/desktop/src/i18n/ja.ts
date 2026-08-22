@@ -1878,6 +1878,7 @@ export const ja = defineLocale({
 
       sessionActions: 'セッションアクション',
       sessionRunning: 'セッション実行中',
+      actionRequired: '対応が必要です',
       needsInput: '入力が必要です',
       waitingForAnswer: '回答を待っています',
       finishedUnread: '完了 — 未読',
