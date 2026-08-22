@@ -2990,32 +2990,31 @@ class CLICommandsMixin:
             _logging.getLogger(__name__).debug("goal draft failed: %s", exc)
             contract = None
 
-        try:
-            state = mgr.set(objective, contract=contract)
-        except ValueError as exc:
-            _cprint(f"  Invalid goal: {exc}")
+        # A decisão de pausar para revisão vive em `hermes_cli.goals.start_goal`,
+        # não aqui. Era duplicada entre este arquivo e
+        # `gateway/slash_commands.py`; este agora só RENDERIZA o resultado. Um
+        # contrato rascunhado é artefato de REVISÃO, não autorização para
+        # editar — o portão está lá, com o motivo escrito por extenso.
+        from hermes_cli.goals import start_goal
+
+        outcome = start_goal(mgr, objective, contract=contract, require_spec_review=True, drafted=True)
+        if outcome.error is not None:
+            _cprint(f"  Invalid goal: {outcome.error}")
             return
 
+        state = outcome.state
         _cprint(f"  ⊙ Goal set ({state.max_turns}-turn budget): {state.goal}")
-        if state.has_contract():
-            # A drafted contract is a review artifact, not authorization to
-            # edit. Pause it until the user explicitly resumes after reading
-            # the outcome, verification, constraints, boundaries, and stop
-            # condition. Plain `/goal <text>` keeps its immediate behavior.
-            from hermes_cli.goals import GoalPauseError, pause_goal_or_raise
-            try:
-                state = pause_goal_or_raise(mgr, reason="awaiting-spec-review")
-            except GoalPauseError as exc:
-                try:
-                    mgr.clear()
-                except Exception:
-                    pass
-                _cprint(
-                    f"  Goal pause failed: {exc}. The drafted goal was cleared so it cannot run without review."
-                )
-                return
+
+        if outcome.cleared_after_pause_failure:
+            _cprint(
+                f"  Goal pause failed: {outcome.pause_error}. "
+                f"The drafted goal was cleared so it cannot run without review."
+            )
+            return
+
+        if outcome.paused_for_review:
             _cprint(f"  {_DIM}Drafted completion contract:{_RST}")
-            for line in state.contract.render_block().splitlines():
+            for line in (outcome.contract_block or "").splitlines():
                 _cprint(f"    {line}")
             _cprint(
                 f"  {_DIM}Spec paused for review. Tighten any field by re-setting "
@@ -3023,15 +3022,18 @@ class CLICommandsMixin:
                 f"/goal show to review and /goal resume to build.{_RST}"
             )
             return
-        else:
+
+        if outcome.draft_unavailable:
             _cprint(
                 f"  {_DIM}Couldn't draft a contract (aux model unavailable) — "
                 f"running as a free-form goal. The per-turn judge still applies.{_RST}"
             )
-        try:
-            self._pending_input.put(state.goal)
-        except Exception:
-            pass
+
+        if outcome.should_kick_off:
+            try:
+                self._pending_input.put(state.goal)
+            except Exception:
+                pass
 
     def _handle_loop_command(self, cmd: str) -> None:
         """Dispatch /loop — recurring in-session wakeups (Claude Code parity).

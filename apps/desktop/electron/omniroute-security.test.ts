@@ -205,9 +205,18 @@ test('OmniRoute server.js byte drift is blocked by the capability lock', async (
   }
 })
 
-test('real MCP bridge exposes privileged tools but denies their missing write scopes', async () => {
+// This is a live integration test: it writes a scoped CLI token into the
+// real OmniRoute SQLite store and drives the actual bridge over stdio. A
+// machine without OmniRoute installed has nothing to integrate with, so it
+// declares a named skip instead of failing red for the wrong reason.
+const OMNIROUTE_STORAGE = path.join(os.homedir(), '.omniroute', 'storage.sqlite')
+const HAS_OMNIROUTE_STORAGE = fs.existsSync(OMNIROUTE_STORAGE)
+
+test.skipIf(!HAS_OMNIROUTE_STORAGE)(
+  'real MCP bridge exposes privileged tools but denies their missing write scopes (needs a local OmniRoute install)',
+  async () => {
   const { DatabaseSync } = await import('node:sqlite')
-  const databasePath = path.join(os.homedir(), '.omniroute', 'storage.sqlite')
+  const databasePath = OMNIROUTE_STORAGE
   const database = new DatabaseSync(databasePath)
   const keyId = `tok_${crypto.randomUUID()}`
   const key = `oma_live_${crypto.randomBytes(32).toString('base64url')}`
@@ -343,4 +352,6 @@ test('real MCP bridge exposes privileged tools but denies their missing write sc
     database.prepare('DELETE FROM cli_access_tokens WHERE id = ?').run(keyId)
     database.close()
   }
-}, 30_000)
+  },
+  30_000
+)

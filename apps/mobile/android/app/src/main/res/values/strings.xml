@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Hermes OmniRoute</string>
+    <string name="title_activity_main">Hermes OmniRoute</string>
+    <string name="package_name">com.dz23.hermesomniroute</string>
+    <string name="custom_url_scheme">com.dz23.hermesomniroute</string>
+</resources>

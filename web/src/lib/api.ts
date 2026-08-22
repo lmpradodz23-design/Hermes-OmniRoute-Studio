@@ -1,5 +1,7 @@
 import { buildHermesWebSocketUrl } from "@hermes/shared";
 
+import { gatewayOrigin } from "@/lib/gateway-origin";
+
 // The dashboard can be served either at the root of its host (e.g.
 // https://kanban.tilos.com/) or under a URL prefix when reverse-proxied
 // (e.g. https://mission-control.tilos.com/hermes/). The Python backend
@@ -17,7 +19,17 @@ function readBasePath(): string {
 }
 
 export const HERMES_BASE_PATH = readBasePath();
-const BASE = HERMES_BASE_PATH;
+
+// Prefixo de TODA requisição de API. Normalmente é só o base path, e as URLs
+// saem relativas exatamente como sempre saíram. Ganha uma origem absoluta
+// apenas quando o cliente não é servido pelo gateway — o caso do APK, onde o
+// WebView serve os assets de `https://localhost` e `/api/...` apontaria para o
+// próprio pacote. Ver `src/lib/gateway-origin.ts`.
+//
+// Lido uma vez, no load do módulo: trocar de gateway no meio da sessão
+// deixaria requisições em voo apontando para o antigo, então a troca recarrega
+// a página em vez de mudar isto por baixo.
+const BASE = `${gatewayOrigin()}${HERMES_BASE_PATH}`;
 
 import type { DashboardTheme } from "@/themes/types";
 import {

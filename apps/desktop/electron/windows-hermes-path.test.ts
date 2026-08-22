@@ -174,7 +174,11 @@ test('resolveVenvHermesCommand: is case-insensitive on hermes.exe and the Script
 // ── getVenvSitePackagesEntries ─────────────────────────────────────────────
 
 test('getVenvSitePackagesEntries: returns Lib/site-packages on Windows when it exists', () => {
-  const expected = path.join('C:\\venv', 'Lib', 'site-packages')
+  // The function under test builds this with path.win32.join, so the
+  // expectation must too — path.join is the HOST's flavour and disagrees
+  // on POSIX, which made this assert host-dependent instead of
+  // platform-independent.
+  const expected = path.win32.join('C:\\venv', 'Lib', 'site-packages')
 
   const result = getVenvSitePackagesEntries('C:\\venv', {
     isWindows: true,

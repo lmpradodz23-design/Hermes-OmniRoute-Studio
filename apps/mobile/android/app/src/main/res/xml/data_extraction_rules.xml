@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ substituiu `fullBackupContent` por estas regras. Elas dizem a
+  mesma coisa que `allowBackup="false"` diz para as versões anteriores: nada
+  deste app sai do aparelho. O motivo está no comentário do AndroidManifest —
+  o storage do WebView guarda o token de sessão do gateway.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

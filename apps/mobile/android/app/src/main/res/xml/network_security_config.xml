@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  POLÍTICA DE REDE DO APK.
+
+  O default é o mais restritivo que o Android oferece: nada de texto claro,
+  em lugar nenhum. Depois vem UMA exceção, e ela existe por um caso concreto:
+  o gateway do usuário quase sempre roda no PC dele, na LAN, em
+  `http://192.168.x.x:9119`, sem certificado — porque emitir um certificado
+  válido para um IP privado não é coisa que se peça a ninguém.
+
+  A exceção é limitada às faixas privadas da RFC 1918, mais loopback e a faixa
+  do emulador Android. Um gateway na internet pública continua obrigado a
+  HTTPS, que é o ponto: o usuário que quiser acesso remoto usa um túnel
+  (Tailscale, WireGuard, SSH) ou um certificado de verdade — nunca abrir uma
+  porta em texto claro.
+
+  `cleartextTrafficPermitted="false"` no base-config é o que garante que
+  qualquer domínio não listado aqui — incluindo um redirecionamento inesperado —
+  não consiga sair em texto claro.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Gateway na rede local. Sem isto, o caso de uso mais comum do produto
+         (celular falando com o PC de casa) não funciona. Com isto e nada mais,
+         ele funciona sem abrir a internet inteira. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <!-- Host da máquina que roda o emulador Android. -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

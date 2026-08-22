@@ -2855,31 +2855,33 @@ class GatewaySlashCommandsMixin:
             contract = parsed if not parsed.is_empty() else None
 
         # Otherwise — treat the remaining text as the new goal.
-        try:
-            state = mgr.set(args, contract=contract)
-        except ValueError as exc:
-            return t("gateway.goal.invalid", error=str(exc))
+        #
+        # A decisão de pausar para revisão de spec vive em `hermes_cli.goals.
+        # start_goal`, não aqui. Ela era duplicada entre este arquivo e
+        # `hermes_cli/cli_commands_mixin.py`, com mensagens diferentes e nada
+        # obrigando as duas a concordarem — e a UI do desktop está prestes a ser
+        # o terceiro consumidor. Este arquivo agora só RENDERIZA o resultado.
+        from hermes_cli.goals import start_goal
 
+        outcome = start_goal(mgr, args, contract=contract, require_spec_review=is_draft, drafted=is_draft)
+        if outcome.error is not None:
+            return t("gateway.goal.invalid", error=outcome.error)
+
+        state = outcome.state
         base = t("gateway.goal.set", budget=state.max_turns, goal=state.goal)
-        if is_draft and state.has_contract():
-            from hermes_cli.goals import GoalPauseError, pause_goal_or_raise
-            try:
-                state = pause_goal_or_raise(mgr, reason="awaiting-spec-review")
-            except GoalPauseError as exc:
-                try:
-                    mgr.clear()
-                except Exception:
-                    logger.exception("goal draft pause failed and clearing the unsafe active goal also failed")
-                return (
-                    f"{base}\nGoal pause failed: {exc}. "
-                    "The drafted goal was cleared so it cannot run without review."
-                )
+
+        if outcome.cleared_after_pause_failure:
+            return (
+                f"{base}\nGoal pause failed: {outcome.pause_error}. "
+                "The drafted goal was cleared so it cannot run without review."
+            )
+        if outcome.paused_for_review:
             return (
                 f"{base}\nSpec drafted and paused for review:\n"
-                f"{state.contract.render_block()}\n"
+                f"{outcome.contract_block}\n"
                 "Use /goal show to review and /goal resume to build."
             )
-        if is_draft:
+        if outcome.draft_unavailable:
             # Drafting was requested but the aux model couldn't produce one.
             draft_note = "\n(Couldn't draft a contract — running as a free-form goal.)"
         else:

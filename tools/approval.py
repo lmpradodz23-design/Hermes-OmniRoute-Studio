@@ -537,8 +537,28 @@ HARDLINE_PATTERNS = [
     # Raw block device overwrites (dd + redirection)
     (r'\bdd\b[^\n]*\bof=/dev/(sd|nvme|hd|mmcblk|vd|xvd)[a-z0-9]*', "dd to raw block device"),
     (r'>\s*/dev/(sd|nvme|hd|mmcblk|vd|xvd)[a-z0-9]*\b', "redirect to raw block device"),
-    # Fork bomb (classic shell form)
+    # Fork bomb.
+    #
+    # The literal `:()` spelling below is kept, but it is not sufficient on its
+    # own: a fork bomb is just a function that pipes itself into itself in the
+    # background, and the name `:` carries no meaning. Measured escapes from the
+    # narrow rule, all of which hang the machine exactly the same way:
+    #
+    #     : (){ :|:& };:              <- one space, and the rule stops matching
+    #     bomb(){ bomb|bomb& };bomb   <- any other name
+    #     f(){ f|f& };f
+    #
+    # The generalized rule below matches the SHAPE via a backreference: same
+    # identifier defined, piped into itself, backgrounded. Verified not to fire
+    # on ordinary shell functions (`build(){ npm run build; }; build`,
+    # `run(){ tail -f log | grep err & }`, `x(){ y|z& }`) because those either
+    # do not pipe the function into itself or use different names.
     (r':\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:', "fork bomb"),
+    (
+        r'(?P<forkfn>[:a-z_][\w:.-]*)\s*\(\s*\)\s*\{[^}]*?'
+        r'(?P=forkfn)\s*\|\s*(?P=forkfn)\s*&[^}]*\}',
+        "fork bomb",
+    ),
     # Kill every process on the system
     (r'\bkill\s+(-[^\s]+\s+)*-1\b', "kill all processes"),
     # System shutdown / reboot — anchor to command position (start of line,
@@ -1878,6 +1898,209 @@ def _execution_flag_findings(command: str):
                     yield (f"arbitrary program execution via {tool} {option}", payload)
 
 
+
+# =========================================================================
+# Package fetch / remote package execution (token-based)
+# =========================================================================
+#
+# The DANGEROUS_PATTERNS regexes above cover the mainstream installers, but a
+# flat regex cannot skip an option's *value* when the value is a separate
+# token. Measured evasion:
+#
+#     pip install --target . requests
+#
+# The option group consumes `--target`, the next token is `.`, the package
+# lookahead `(?!-|\.)` rejects it, and the whole rule misses. The token walk
+# below skips value-taking options properly and finds `requests`.
+#
+# It also closes a second, larger hole: the *runner* family — `npx`, `bunx`,
+# `uvx`, `pnpm dlx`, `yarn dlx`, `npm exec`, `pipx run`. These fetch a package
+# from a public registry and execute it in one step, with no lockfile and no
+# install record. For an agent that is `curl | sh` with extra steps, and
+# `curl | sh` is already a hardline finding here — so leaving the registry
+# equivalent unflagged was inconsistent. npm's own "Ok to proceed?" prompt does
+# not save us: with stdin not a TTY (every agent invocation) npm proceeds
+# automatically.
+#
+# This runs IN ADDITION to DANGEROUS_PATTERNS and never suppresses an existing
+# detection: it can only add findings, never remove one.
+
+# Options that take their value as the NEXT token. Skipping these is what makes
+# `pip install --target . requests` resolve to the operand `requests`.
+_PKG_VALUE_TAKING_FLAGS = {
+    "--abi", "--build", "--cache-dir", "--cert", "--client-cert", "--config",
+    "--config-settings", "--constraint", "--extra-index-url", "--find-links",
+    "--implementation", "--index", "--index-url", "--log", "--only-binary",
+    "--no-binary", "--platform", "--prefix", "--proxy", "--python",
+    "--python-version", "--registry", "--report", "--root", "--src",
+    "--target", "--trusted-host", "--upgrade-strategy", "--version",
+    "-c", "-f", "-i", "-t", "--channel", "--name", "-n", "-p", "--prefix",
+    "--from", "--spec", "--pin", "--python-preference",
+}
+
+# Bare runners: the executable itself fetches and runs a package.
+_PKG_RUNNERS_BARE = {"npx", "bunx", "uvx", "pnpx"}
+
+# (executable, subcommand) runners.
+_PKG_RUNNERS_SUB = {
+    ("pnpm", "dlx"),
+    ("yarn", "dlx"),
+    ("npm", "exec"),
+    ("pipx", "run"),
+    ("deno", "run"),
+}
+
+# npx/bunx forms that are guaranteed NOT to reach the network.
+_PKG_RUNNER_LOCAL_ONLY = {"--no-install", "--no"}
+
+# (executable, subcommand) installers not covered by the regexes above.
+_PKG_INSTALLERS_SUB = {
+    ("pipx", "install"): "new Python dependency installation requires explicit approval",
+    ("mamba", "install"): "new Python dependency installation requires explicit approval",
+    ("micromamba", "install"): "new Python dependency installation requires explicit approval",
+    ("conda", "create"): "new Python dependency installation requires explicit approval",
+    ("mamba", "create"): "new Python dependency installation requires explicit approval",
+    ("go", "get"): "new Go dependency installation requires explicit approval",
+    ("nuget", "install"): "new .NET dependency installation requires explicit approval",
+    ("composer", "require"): "new PHP dependency installation requires explicit approval",
+}
+# NOT included on purpose: apt / apt-get / dnf / yum / zypper / apk / brew /
+# choco / winget / scoop / snap. `tests/tools/test_approval.py::
+# TestDetectSudoStdin::test_interactive_or_unrelated_sudo_safe` asserts that
+# `apt install sudo` is NOT dangerous, and that is a deliberate scope line: this
+# guard is about mutating the *project's* dependency graph, where a package's
+# lifecycle hooks run as the agent on the next build. OS package installs are a
+# different trust decision, already covered by the sudo/root rules, and folding
+# them in here would fire on ordinary environment setup.
+
+# Three-word installers: (exe, sub1, sub2).
+_PKG_INSTALLERS_SUB2 = {
+    ("dotnet", "add", "package"): "new .NET dependency installation requires explicit approval",
+    ("uv", "tool", "install"): "new Python dependency installation requires explicit approval",
+}
+
+# Tokens that mean "restore what is already pinned", never "add something new".
+_PKG_RESTORE_MARKERS = {
+    "-r", "--requirement", "--frozen", "--locked", "--no-deps-update",
+    "--only-upgrade",
+}
+
+
+def _pkg_operands(tokens):
+    """Positional operands of a token list, with option values skipped."""
+    operands = []
+    skip_next = False
+    for token in tokens:
+        if skip_next:
+            skip_next = False
+            continue
+        if token.startswith("-"):
+            if "=" in token:
+                continue
+            if token.lower() in _PKG_VALUE_TAKING_FLAGS:
+                skip_next = True
+            continue
+        operands.append(token)
+    return operands
+
+
+def _pkg_has_restore_marker(tokens) -> bool:
+    for token in tokens:
+        low = token.lower()
+        if low in _PKG_RESTORE_MARKERS:
+            return True
+        if low.startswith("--requirement=") or low.startswith("-r="):
+            return True
+    return False
+
+
+def _package_fetch_findings(command: str):
+    """Yield (description, package) for package fetches the regexes miss."""
+    for segment in _iter_top_level_shell_segments(command):
+        for start, _, word in _iter_shell_command_word_spans(segment):
+            tokens = _shell_segment_tokens(segment, start)
+            if not tokens:
+                continue
+            executable = _deobfuscate_shell_word_for_detection(word)
+            name = os.path.basename(executable).lower()
+            if name.endswith(".exe"):
+                name = name[:-4]
+            rest = tokens[1:]
+            lowered = [t.lower() for t in rest]
+
+            # 1. Bare runners: npx / bunx / uvx.
+            if name in _PKG_RUNNERS_BARE:
+                if any(flag in lowered for flag in _PKG_RUNNER_LOCAL_ONLY):
+                    continue
+                operands = _pkg_operands(rest)
+                if operands:
+                    yield (
+                        "remote package execution requires explicit approval",
+                        operands[0],
+                    )
+                continue
+
+            if not rest:
+                continue
+            sub = lowered[0]
+
+            # 2. Two-word runners: pnpm dlx / yarn dlx / npm exec / pipx run.
+            if (name, sub) in _PKG_RUNNERS_SUB:
+                if any(flag in lowered for flag in _PKG_RUNNER_LOCAL_ONLY):
+                    continue
+                operands = _pkg_operands(rest[1:])
+                if operands:
+                    yield (
+                        "remote package execution requires explicit approval",
+                        operands[0],
+                    )
+                continue
+
+            # 3. Three-word installers.
+            if len(lowered) >= 2:
+                key2 = (name, sub, lowered[1])
+                if key2 in _PKG_INSTALLERS_SUB2:
+                    operands = _pkg_operands(rest[2:])
+                    if operands:
+                        yield (_PKG_INSTALLERS_SUB2[key2], operands[0])
+                    continue
+
+            # 4. Two-word installers the regexes do not reach.
+            key = (name, sub)
+            if key in _PKG_INSTALLERS_SUB:
+                if _pkg_has_restore_marker(rest):
+                    continue
+                operands = _pkg_operands(rest[1:])
+                if operands:
+                    yield (_PKG_INSTALLERS_SUB[key], operands[0])
+                continue
+
+            # 5. pip / uv pip: token walk that skips option VALUES, closing the
+            #    `pip install --target . requests` evasion.
+            pip_tokens = None
+            if name.startswith("pip") and sub == "install":
+                pip_tokens = rest[1:]
+            elif name == "uv" and sub == "pip" and len(lowered) >= 2 and lowered[1] == "install":
+                pip_tokens = rest[2:]
+            elif name in {"python", "python3", "py"} and sub == "-m":
+                idx = 1
+                if len(lowered) > idx and lowered[idx].startswith("pip"):
+                    if len(lowered) > idx + 1 and lowered[idx + 1] == "install":
+                        pip_tokens = rest[idx + 2:]
+            if pip_tokens is None:
+                continue
+            if _pkg_has_restore_marker(pip_tokens):
+                continue
+            for operand in _pkg_operands(pip_tokens):
+                if operand in {".", "..", "./", "../"} or operand.startswith("./") or operand.startswith("../"):
+                    continue
+                yield (
+                    "new Python dependency installation requires explicit approval",
+                    operand,
+                )
+                break
+
+
 def _skip_shell_whitespace(command: str, pos: int) -> int:
     while pos < len(command) and command[pos].isspace():
         pos += 1
@@ -2427,6 +2650,13 @@ def detect_dangerous_command(command: str) -> tuple:
     normalized = _normalize_command_for_detection(command)
     for description, _ in _execution_flag_findings(normalized):
         return (True, description, description)
+    # Token-based package fetch / remote package execution. Runs last so it can
+    # only ADD a finding the regex table missed, never mask one it already made.
+    for command_variant in _command_detection_variants(command):
+        for description, package in _package_fetch_findings(command_variant):
+            if package:
+                return (True, description, f"{description}: {package}")
+            return (True, description, description)
     return (False, None, None)
 
 

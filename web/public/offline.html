@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0b0d" />
+    <title>Hermes — sem conexão</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0b0d;
+        --fg: #e7e7ea;
+        --muted: #9a9aa4;
+        --line: #26262c;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: max(1.5rem, env(safe-area-inset-top)) 1.5rem max(1.5rem, env(safe-area-inset-bottom));
+        background: var(--bg);
+        color: var(--fg);
+        font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      main { max-width: 30rem; text-align: left; }
+      h1 { margin: 0 0 0.75rem; font-size: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
+      p { margin: 0 0 0.75rem; color: var(--muted); }
+      ul { margin: 0 0 1.25rem; padding-left: 1.1rem; color: var(--muted); }
+      li { margin: 0.35rem 0; }
+      code {
+        font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+        font-size: 0.9em;
+        color: var(--fg);
+      }
+      button {
+        appearance: none;
+        min-height: 44px;
+        padding: 0 1.1rem;
+        border: 1px solid var(--line);
+        border-radius: 0.5rem;
+        background: transparent;
+        color: var(--fg);
+        font: inherit;
+        cursor: pointer;
+      }
+      button:hover { border-color: #3a3a44; }
+      button:focus-visible { outline: 2px solid #6b6bff; outline-offset: 2px; }
+      .hint { margin-top: 1.25rem; font-size: 0.82rem; color: #6e6e78; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Sem conexão com o gateway</h1>
+      <p>
+        O Hermes é um cliente: a conversa, as sessões e as skills vivem no gateway que roda no seu
+        computador ou servidor. Sem alcançá-lo, não há o que mostrar aqui.
+      </p>
+      <ul>
+        <li>O gateway está rodando? <code>hermes dashboard</code></li>
+        <li>O celular está na mesma rede do computador?</li>
+        <li>O endereço ainda é o mesmo? IP de rede local costuma mudar.</li>
+      </ul>
+      <button type="button" onclick="location.reload()">Tentar de novo</button>
+      <p class="hint">
+        Esta página é a única coisa guardada no aparelho. Nenhuma resposta de API e nenhum token de
+        sessão ficam em cache — por isso o app não abre offline.
+      </p>
+    </main>
+  </body>
+</html>

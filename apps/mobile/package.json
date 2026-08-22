@@ -1,0 +1,22 @@
+{
+  "name": "@hermes/mobile",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Wrapper Capacitor do cliente web do Hermes. Nao contem interface propria — a interface e web/, empacotada.",
+  "scripts": {
+    "build:web": "npm --prefix ../../web run build",
+    "sync": "npm run build:web && cap sync android",
+    "open": "cap open android",
+    "add:android": "cap add android",
+    "apk:debug": "cd android && ./gradlew assembleDebug",
+    "aab:release": "cd android && ./gradlew bundleRelease"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "7.4.4"
+  },
+  "dependencies": {
+    "@capacitor/android": "7.4.4",
+    "@capacitor/core": "7.4.4"
+  }
+}

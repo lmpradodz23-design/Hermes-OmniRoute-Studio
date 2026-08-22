@@ -262,6 +262,11 @@ _EXECUTION_WRAPPER_PATTERNS = (
         r"\b(?:powershell|pwsh)(?:\.exe)?\b[^;&|\n]*?\s-(?:command|c)\s+(?:\"([^\"]*)\"|'([^']*)'|([^;&|\n]+))",
         re.IGNORECASE,
     ),
+    # Command substitution executes its payload, but the payload does not sit at
+    # a command boundary, so _COMMAND_START never anchors on it. Surface the
+    # inner command so the destructive patterns can inspect it.
+    re.compile(r"\$\(\s*([^()]+?)\s*\)"),
+    re.compile(r"`\s*([^`]+?)\s*`"),
 )
 _MAX_GUARDRAIL_VARIANTS = 64
 _MAX_GUARDRAIL_COMMAND_CHARS = 131_072
@@ -399,18 +404,45 @@ def _outside_workspace(path: Path) -> tuple[bool, Path]:
     return True, resolved
 
 
+# Shell tokens that vanish at execution time and therefore must not hide a
+# destructive verb from the patterns: ``r\\m`` and ``r''m`` both run ``rm``.
+_EMPTY_QUOTE_PAIR = re.compile(r"(?:''|\"\")")
+_INERT_BACKSLASH_ESCAPE = re.compile(r"\\(?=[^\s\\])")
+
+
+def _standalone_detection_variants(command: str) -> tuple[str, ...]:
+    """Normalize the shell tricks the shared parser would have removed.
+
+    Only ever ADDS variants — the raw command is always kept first, so a
+    Windows path (``C:\\Users\\me``) is still inspected verbatim even though
+    the unescaped form mangles it. ``_destructive_match`` blocks when ANY
+    variant matches, so widening the set can only tighten the gate.
+    """
+    raw = str(command or "")
+    variants = [raw]
+    for candidate in (
+        _EMPTY_QUOTE_PAIR.sub("", raw),
+        _INERT_BACKSLASH_ESCAPE.sub("", _EMPTY_QUOTE_PAIR.sub("", raw)),
+    ):
+        if candidate and candidate not in variants:
+            variants.append(candidate)
+    return tuple(variants)
+
+
 def _command_detection_variants(command: str) -> Iterable[str]:
     try:
         from tools.approval import _command_detection_variants as core_variants
 
         return core_variants(command)
     except Exception:
-        # Conservative standalone fallback: never skip inspection merely
-        # because the shared parser cannot be imported. The security-critical
-        # plugin manager still fails closed if this plugin itself raises; this
-        # raw variant preserves deterministic matching for ordinary commands
-        # when the core parser is temporarily unavailable.
-        return (str(command or ""),)
+        # Standalone fallback. The previous implementation returned the raw
+        # command only, which the fuzz corpus proves is NOT conservative:
+        # `r\\m -rf`, `r''m -rf`, `$(rm -rf ...)` and backtick substitution all
+        # escaped while this path was active. Normalize locally instead, so a
+        # missing shared parser degrades detection quality without opening a
+        # hole. The security-critical plugin manager still fails closed if this
+        # plugin raises.
+        return _standalone_detection_variants(command)
 
 
 def _guardrail_detection_variants(command: str) -> Iterable[str]:

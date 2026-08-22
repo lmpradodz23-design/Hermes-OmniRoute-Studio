@@ -1,3 +1,58 @@
+# ---------------------------------------------------------------------------
+# Regra padrao: TUDO que o git detectar como texto e normalizado para LF, no
+# indice e no working tree. As regras especificas abaixo continuam valendo
+# porque o git usa "ultima regra que casa" - elas vem depois desta.
+#
+# Motivo (medido, nao teorico): antes desta linha, `git check-attr text eol`
+# devolvia "unspecified" para todo arquivo sem extensao ou com extensao fora
+# da lista abaixo. Em um checkout Windows isso produzia CRLF em disco e um
+# diff fantasma permanente. Os casos funcionalmente perigosos encontrados:
+#   - ./hermes                      (script Python com shebang)
+#   - docker/s6-rc.d/*/run|finish   (servicos s6 executados pelo init)
+#   - docker/cont-init.d/*          (scripts de init do container)
+#   - scripts/hermes-gateway        (launcher POSIX)
+# Com CRLF, o loader POSIX le o shebang como "/usr/bin/env python3\r" e falha
+# com "no such file or directory" - exatamente o sintoma que o comentario de
+# *.sh mais abaixo ja documentava, mas que a regra dele nao cobria.
+* text=auto eol=lf
+
+# Binarios: nunca normalizar, nunca tentar diff textual.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.zip binary
+*.gz binary
+*.tgz binary
+*.bz2 binary
+*.xz binary
+*.7z binary
+*.tar binary
+*.exe binary
+*.dll binary
+*.node binary
+*.wasm binary
+*.so binary
+*.dylib binary
+*.sqlite binary
+*.db binary
+*.onnx binary
+*.safetensors binary
+*.bin binary
+*.mp3 binary
+*.wav binary
+*.mp4 binary
+*.webm binary
+
 # Auto-generated files — collapse diffs and exclude from language stats
 web/package-lock.json linguist-generated=true
 
@@ -32,3 +87,20 @@ docker/entrypoint.sh text eol=lf
 *.html  text eol=lf
 *.svg   text eol=lf
 *.ps1   text eol=crlf
+
+# --- Extensoes que estavam FORA da normalizacao e por isso acumulavam CRLF ---
+# Evidencia: `git check-attr text eol` retornava "unspecified" para os arquivos
+# que viviam sujos no worktree (.gitignore, *.txt, entitlements .plist e
+# preview-reach.e2e.mts), enquanto main.ts retornava "text: set / eol: lf".
+# Sem entrada aqui, um editor Windows reescreve o arquivo em CRLF e ele passa a
+# divergir do indice para sempre, poluindo todo commit.
+*.mts   text eol=lf
+*.cts   text eol=lf
+*.txt   text eol=lf
+*.plist text eol=lf
+.gitignore     text eol=lf
+.gitattributes text eol=lf
+
+# Scripts de shell do Windows esperam CRLF, como o *.ps1 acima.
+*.bat text eol=crlf
+*.cmd text eol=crlf

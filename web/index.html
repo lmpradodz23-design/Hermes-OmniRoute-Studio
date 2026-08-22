@@ -8,6 +8,20 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <title>Hermes Agent - Dashboard</title>
+
+    <!-- PWA. O service worker e a politica de cache dele estao em
+         public/sw.js e public/sw-policy.js; leia o cabecalho do segundo antes
+         de mexer, porque este index.html recebe um token de sessao de uso
+         unico injetado pelo servidor Python e por isso NUNCA pode ser
+         precacheado. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0b0b0d" />
+    <meta name="color-scheme" content="dark light" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Hermes" />
+    <meta name="mobile-web-app-capable" content="yes" />
   </head>
   <body>
     <div id="root"></div>

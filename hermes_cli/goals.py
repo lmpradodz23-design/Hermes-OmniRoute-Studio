@@ -61,6 +61,121 @@ def pause_goal_or_raise(manager: "GoalManager", *, reason: str) -> "GoalState":
     return state
 
 
+SPEC_REVIEW_PAUSE_REASON = "awaiting-spec-review"
+
+
+@dataclass
+class GoalStartOutcome:
+    """O que aconteceu ao iniciar um objetivo — sem texto de interface dentro.
+
+    Quem chama decide como renderizar. O gateway escreve numa mensagem de chat,
+    a CLI escreve no terminal e a UI desenha um cartão; os três precisam da
+    MESMA decisão, não do mesmo texto.
+    """
+
+    #: Estado final do objetivo. ``None`` só quando ``error`` está preenchido.
+    state: Optional["GoalState"] = None
+    #: Erro de validação vindo de ``GoalManager.set`` — nada foi iniciado.
+    error: Optional[str] = None
+    #: ``True`` quando o objetivo está pausado esperando revisão humana.
+    #: Quem chama NÃO deve enfileirar o primeiro turno neste caso.
+    paused_for_review: bool = False
+    #: ``True`` quando a pausa falhou e o objetivo foi apagado por segurança.
+    #: Um objetivo que deveria estar pausado e não está rodaria sem revisão.
+    cleared_after_pause_failure: bool = False
+    #: Mensagem da falha de pausa, para exibir junto do aviso.
+    pause_error: Optional[str] = None
+    #: ``True`` quando pediram rascunho e o modelo auxiliar não produziu um.
+    draft_unavailable: bool = False
+
+    @property
+    def should_kick_off(self) -> bool:
+        """Se o primeiro turno pode ser enfileirado agora."""
+        return (
+            self.state is not None
+            and self.error is None
+            and not self.paused_for_review
+            and not self.cleared_after_pause_failure
+        )
+
+    @property
+    def contract_block(self) -> Optional[str]:
+        """O contrato renderizado, quando existe."""
+        if self.state is None or not self.state.has_contract():
+            return None
+        return self.state.contract.render_block()
+
+
+def start_goal(
+    manager: "GoalManager",
+    goal: str,
+    *,
+    contract: Optional["GoalContract"] = None,
+    require_spec_review: bool = False,
+    drafted: bool = False,
+) -> GoalStartOutcome:
+    """Inicia um objetivo, aplicando o portão de revisão de spec em UM lugar só.
+
+    ── Por que esta função existe ──────────────────────────────────────────────
+
+    A mesma decisão vivia duplicada em ``gateway/slash_commands.py`` e em
+    ``hermes_cli/cli_commands_mixin.py``, com mensagens diferentes e sem nada
+    que obrigasse as duas a concordarem. Elas concordam hoje; concordavam por
+    coincidência, não por construção. E a interface do desktop está prestes a
+    virar o terceiro consumidor — o toggle "Spec", que
+    ``audit/HERMES_DESIGN_SYSTEM.md`` §3.3 chama de item de maior alavancagem da
+    U1. Uma terceira cópia é como a divergência volta.
+
+    ── O que o portão protege ──────────────────────────────────────────────────
+
+    Um contrato rascunhado por um modelo é um artefato de REVISÃO, não uma
+    autorização para editar. Entre "o Hermes propôs um plano" e "o Hermes
+    começou a executar o plano" tem que existir um humano. É por isso que,
+    quando ``require_spec_review`` está ligado e há contrato, o objetivo nasce
+    pausado e ``should_kick_off`` volta ``False``.
+
+    ── Por que a falha de pausa apaga o objetivo ───────────────────────────────
+
+    Se a pausa não persiste, o objetivo fica ATIVO — e um objetivo ativo é
+    justamente o que dispara o trabalho autônomo. Falhar aqui e seguir em frente
+    significaria executar sem revisão exatamente no caminho que existe para
+    exigir revisão. Então o objetivo é apagado e quem chama recebe
+    ``cleared_after_pause_failure``. Fecha, não abre.
+
+    :param require_spec_review: liga o portão. O chamador decide quando —
+        ``/goal draft`` liga, ``/goal <texto>`` livre não liga.
+    :param drafted: apenas informativo: houve tentativa de rascunho. Serve para
+        quem chama dizer "não consegui rascunhar, seguindo livre".
+    """
+    try:
+        state = manager.set(goal, contract=contract)
+    except ValueError as exc:
+        return GoalStartOutcome(error=str(exc))
+
+    outcome = GoalStartOutcome(
+        state=state,
+        draft_unavailable=bool(drafted and not state.has_contract()),
+    )
+
+    if not (require_spec_review and state.has_contract()):
+        return outcome
+
+    try:
+        outcome.state = pause_goal_or_raise(manager, reason=SPEC_REVIEW_PAUSE_REASON)
+        outcome.paused_for_review = True
+    except GoalPauseError as exc:
+        outcome.pause_error = str(exc)
+        outcome.cleared_after_pause_failure = True
+        try:
+            manager.clear()
+        except Exception:
+            logger.exception(
+                "spec review pause failed and clearing the unsafe active goal also failed"
+            )
+
+    return outcome
+
+
 # ──────────────────────────────────────────────────────────────────────
 # Constants & defaults
 # ──────────────────────────────────────────────────────────────────────

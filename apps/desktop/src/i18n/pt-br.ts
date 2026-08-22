@@ -557,6 +557,12 @@ export const ptBr = defineLocale(
     },
     preview: {
       tab: 'Visualização',
+      // Rótulos das abas do painel de visualização. Vinham do inglês porque a
+      // string gerada era idêntica ao original ('SOURCE' / 'PREVIEW') e o
+      // gerador só emite override quando o texto muda. 'DIFF' fica: é o termo
+      // que o próprio git usa e que qualquer pessoa que lê um diff reconhece.
+      source: 'FONTE',
+      renderedPreview: 'PRÉVIA',
       closePane: 'Fechar painel de visualização',
       loading: 'Carregando visualização',
       unavailable: 'Visualização indisponível',

@@ -1,5 +1,37 @@
 # Hermes Agent Security Policy
 
+> ## ⚠️ Este repositório é um fork — leia antes de reportar
+>
+> **Hermes OmniRoute Studio** é uma obra derivada de
+> [Hermes Agent](https://github.com/NousResearch/hermes-agent) (Nous Research,
+> MIT). O texto abaixo é a política de segurança **do upstream** e continua
+> valendo para o modelo de confiança, que é o mesmo.
+>
+> **Onde reportar depende de onde está a falha:**
+>
+> | A falha está em… | Reporte para |
+> |---|---|
+> | código herdado do Hermes Agent upstream | o canal do upstream, descrito no §1 abaixo |
+> | código específico do Studio — `apps/desktop/`, `plugins/dz23-guardrail/`, `integrations/omniroute-*`, o instalador NSIS, o bridge do OmniRoute | **<<PREENCHER: canal de segurança do Studio>>** |
+> | você não tem certeza | o canal do Studio; nós encaminhamos |
+>
+> O marcador `<<PREENCHER>>` é deliberado. Não coloquei um endereço inventado,
+> porque um canal de denúncia que não chega a ninguém é pior do que nenhum — o
+> pesquisador acredita que reportou e espera 90 dias. **Preencha antes de tornar
+> o repositório público.**
+>
+> Enquanto o marcador existir, **não** direcione relatos deste fork para
+> security@nousresearch.com: a Nous Research não mantém este fork e não pode
+> corrigi-lo.
+>
+> Escopo específico do Studio, em adição ao §3.1: o gate de aprovação do
+> `dz23-guardrail`, o confinamento de `resolveAllowedFsIpcPath`, a CSP do
+> Electron, a política de escopos do MCP OmniRoute e o caminho de instalação
+> NSIS. Vale a mesma regra do §3.2: bypass de heurística in-process não é
+> vulnerabilidade sob esta política — mas continua bem-vindo como issue.
+
+---
+
 This document describes Hermes Agent's trust model, names the one
 security boundary the project treats as load-bearing, and defines the
 scope for vulnerability reports.
