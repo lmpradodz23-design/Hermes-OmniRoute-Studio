@@ -11598,7 +11598,7 @@ def _build_provider_choices() -> list[str]:
 # to parse.
 _BUILTIN_SUBCOMMANDS = frozenset(
     {
-        "acp", "approvals", "auth", "backup", "bundles", "checkpoints", "claw", "completion",
+        "acp", "approvals", "auth", "backup", "bundles", "capabilities", "checkpoints", "claw", "completion",
         "computer-use",
         "config", "console", "cron", "curator", "dashboard", "serve", "debug", "doctor",
         "dump", "egress", "fallback", "gateway", "hooks", "import", "import-agent", "insights",
@@ -11607,7 +11607,7 @@ _BUILTIN_SUBCOMMANDS = frozenset(
         "model", "monitoring", "pairing", "pause", "peer", "pets", "plugins", "portal", "profile",
         "project", "proxy",
         "prompt-size",
-        "resume",
+        "replay", "resume",
         "send", "sessions", "setup",
         "skin", "skills", "slack", "status", "sync", "tools", "uninstall", "update",
         "webhook", "whatsapp", "whatsapp-cloud", "worktree", "chat", "secrets", "security",
@@ -12781,6 +12781,13 @@ def main():
     from hermes_cli.replay_cmd import build_replay_parser
 
     build_replay_parser(subparsers)
+
+    # =========================================================================
+    # capabilities command — fail-closed skill/plugin/MCP integrity lock
+    # =========================================================================
+    from hermes_cli.capabilities_cmd import build_capabilities_parser
+
+    build_capabilities_parser(subparsers)
 
     # =========================================================================
     # doctor command  (parser built in hermes_cli/subcommands/doctor.py)

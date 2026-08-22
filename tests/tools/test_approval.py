@@ -83,6 +83,30 @@ class TestSmartApproval:
         assert is_approved(session_key, pattern_key) is False
 
 
+class TestCapabilityTrustUpdate:
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "hermes capabilities update",
+            "hermes capabilities update --yes",
+            "python -m hermes_cli.main capabilities update --yes",
+            "py -m hermes_cli.main capabilities update",
+        ],
+    )
+    def test_capability_lock_update_requires_outer_approval(self, command):
+        dangerous, _, description = detect_dangerous_command(command)
+
+        assert dangerous is True
+        assert "trust lock" in description
+
+    def test_capability_verification_is_read_only(self):
+        assert detect_dangerous_command("hermes capabilities verify") == (
+            False,
+            None,
+            None,
+        )
+
+
 class TestDetectDangerousRm:
     def test_rm_flags_after_operands_detected(self):
         # GNU rm permutes options: `rm build/ -rf` == `rm -rf build/`.

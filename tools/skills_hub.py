@@ -3431,9 +3431,22 @@ class OptionalSkillSource(SkillSource):
                 and "__pycache__" not in f.parts
                 and f.suffix != ".pyc"
             ):
-                rel_path = str(f.relative_to(skill_dir))
+                # SkillBundle keys are transport identifiers, not native OS
+                # paths. Keep them POSIX-normalized so binary/text assets have
+                # the same address on Windows, macOS and Linux.
+                rel_path = f.relative_to(skill_dir).as_posix()
                 try:
-                    files[rel_path] = f.read_bytes()
+                    payload = f.read_bytes()
+                    # Git-hosted skill text is LF-normalized. A Windows source
+                    # checkout may materialize CRLF, so restore transport form
+                    # for text while keeping binary assets byte-for-byte.
+                    if b"\x00" not in payload:
+                        try:
+                            payload.decode("utf-8")
+                            payload = payload.replace(b"\r\n", b"\n")
+                        except UnicodeDecodeError:
+                            pass
+                    files[rel_path] = payload
                 except OSError:
                     continue
 
@@ -4058,6 +4071,13 @@ def install_from_quarantine(
         scan_provenance=scan_provenance or getattr(scan_result, "scan_provenance", None),
     )
 
+    # The trust/confirmation gate has already completed above. Persist the
+    # exact installed bytes in the global capability lock before returning so
+    # a subsequent prompt load cannot observe an unapproved/unlocked skill.
+    from hermes_cli.capabilities_lock import refresh_skill_records
+
+    refresh_skill_records()
+
     append_audit_log(
         "INSTALL", safe_skill_name, bundle.source,
         bundle.trust_level, scan_result.verdict,
@@ -4103,6 +4123,9 @@ def uninstall_skill(skill_name: str) -> Tuple[bool, str]:
         shutil.rmtree(install_path)
 
     lock.record_uninstall(skill_name)
+    from hermes_cli.capabilities_lock import refresh_skill_records
+
+    refresh_skill_records()
     append_audit_log("UNINSTALL", skill_name, entry["source"], entry["trust_level"], "n/a", "user_request")
 
     return True, f"Uninstalled '{skill_name}' from {entry['install_path']}"
@@ -4133,7 +4156,13 @@ def bundle_content_hash(bundle: SkillBundle) -> str:
         if isinstance(content, bytes):
             h.update(content)
         else:
-            h.update(content.encode("utf-8"))
+            # quarantine_bundle writes text through Path.write_text(), whose
+            # newline=None contract translates every LF to os.linesep on
+            # Windows. Hash the exact bytes that will land on disk so the
+            # pre-install bundle digest and post-install integrity digest are
+            # symmetric on every supported OS.
+            installed_text = content.replace("\n", os.linesep)
+            h.update(installed_text.encode("utf-8"))
     return f"sha256:{h.hexdigest()[:16]}"
 
 

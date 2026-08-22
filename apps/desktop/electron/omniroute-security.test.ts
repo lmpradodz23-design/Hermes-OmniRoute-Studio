@@ -140,12 +140,65 @@ test('OmniRoute bridge rejects an environment-controlled package root outside it
     }
 
     await assert.rejects(
-      resolveTrustedOmniRouteRoot({ requestedRoot: attacker, allowedRoots: [allowed] }),
+      resolveTrustedOmniRouteRoot({
+        requestedRoot: attacker,
+        allowedRoots: [allowed],
+        capabilitiesLockPath: path.join(temp, 'missing.lock')
+      }),
       /not in the trusted install roots/i
     )
     assert.equal(
-      await resolveTrustedOmniRouteRoot({ requestedRoot: allowed, allowedRoots: [allowed] }),
+      await resolveTrustedOmniRouteRoot({
+        requestedRoot: allowed,
+        allowedRoots: [allowed],
+        capabilitiesLockPath: path.join(temp, 'missing.lock')
+      }),
       await fs.promises.realpath(allowed)
+    )
+  } finally {
+    fs.rmSync(temp, { recursive: true, force: true })
+  }
+})
+
+test('OmniRoute server.js byte drift is blocked by the capability lock', async () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-omniroute-lock-'))
+  const root = path.join(temp, 'trusted')
+  const server = path.join(root, 'dist', 'open-sse', 'mcp-server', 'server.js')
+  const lockPath = path.join(temp, 'capabilities.lock')
+  try {
+    fs.mkdirSync(path.dirname(server), { recursive: true })
+    fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ name: 'omniroute', version: '3.8.49' }), 'utf8')
+    fs.writeFileSync(server, 'export {}', 'utf8')
+    const serverHash = crypto
+      .createHash('sha256')
+      .update(fs.readFileSync(server))
+      .digest('hex')
+    fs.writeFileSync(
+      lockPath,
+      JSON.stringify({
+        version: 1,
+        skills: [],
+        plugins: [],
+        mcp_servers: [{ id: 'omniroute', version: '3.8.49', server_sha256: serverHash }]
+      }),
+      'utf8'
+    )
+    assert.equal(
+      await resolveTrustedOmniRouteRoot({
+        requestedRoot: root,
+        allowedRoots: [root],
+        capabilitiesLockPath: lockPath
+      }),
+      await fs.promises.realpath(root)
+    )
+    fs.appendFileSync(server, 'x', 'utf8')
+    await assert.rejects(
+      resolveTrustedOmniRouteRoot({
+        requestedRoot: root,
+        allowedRoots: [root],
+        capabilitiesLockPath: lockPath
+      }),
+      /server\.js hash mismatch/i
     )
   } finally {
     fs.rmSync(temp, { recursive: true, force: true })

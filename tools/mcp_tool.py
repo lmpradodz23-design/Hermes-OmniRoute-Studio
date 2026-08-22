@@ -5511,6 +5511,14 @@ def _load_mcp_config() -> Dict[str, dict]:
         servers = config.get("mcp_servers")
         if not isinstance(servers, dict):
             servers = {}
+        # Verify stdio binaries/scripts and transport descriptors before any
+        # server process can be spawned.
+        from hermes_cli.capabilities_lock import verify_capabilities_lock
+
+        verify_capabilities_lock(
+            categories={"mcp_servers"},
+            mcp_servers=servers,
+        )
         # Ensure .env vars are available for interpolation
         try:
             from hermes_cli.env_loader import load_hermes_dotenv
@@ -5540,6 +5548,10 @@ def _load_mcp_config() -> Dict[str, dict]:
             logger.debug("Failed to load portable MCP servers", exc_info=True)
         return safe_servers
     except Exception as exc:
+        from hermes_cli.capabilities_lock import CapabilityIntegrityError
+
+        if isinstance(exc, CapabilityIntegrityError):
+            raise
         logger.debug("Failed to load MCP config: %s", exc)
         return {}
 

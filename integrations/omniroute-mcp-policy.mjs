@@ -1,9 +1,56 @@
 import fs from 'node:fs'
+import crypto from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
 
 export const MINIMUM_OMNIROUTE_VERSION = '3.8.49'
 export const MAXIMUM_OMNIROUTE_MAJOR = 3
+
+async function sha256File(filePath) {
+  const bytes = await fs.promises.readFile(filePath)
+  return crypto.createHash('sha256').update(bytes).digest('hex')
+}
+
+function defaultCapabilitiesLockPath() {
+  const configured = String(process.env.HERMES_HOME || '').trim()
+  if (configured) return path.join(configured, 'capabilities.lock')
+  if (process.platform === 'win32') {
+    const localAppData = String(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'))
+    return path.join(localAppData, 'hermes', 'capabilities.lock')
+  }
+  return path.join(os.homedir(), '.hermes', 'capabilities.lock')
+}
+
+export async function verifyLockedOmniRouteServer(serverPath, packageVersion, lockFile = defaultCapabilitiesLockPath()) {
+  let raw
+  try {
+    raw = await fs.promises.readFile(lockFile, 'utf8')
+  } catch (error) {
+    if (error?.code === 'ENOENT') return
+    throw new Error(`Unable to read Hermes capability lock: ${error.message}`)
+  }
+  let lock
+  try {
+    lock = JSON.parse(raw)
+  } catch (error) {
+    throw new Error(`Invalid Hermes capability lock: ${error.message}`)
+  }
+  if (lock?.version !== 1 || !Array.isArray(lock?.mcp_servers)) {
+    throw new Error('Invalid Hermes capability lock schema')
+  }
+  const record = lock.mcp_servers.find(entry => entry?.id === 'omniroute')
+  if (!record) throw new Error('OmniRoute is not approved by the Hermes capability lock')
+  if (record.version !== packageVersion) {
+    throw new Error(`OmniRoute capability version mismatch; expected ${record.version}, received ${packageVersion}`)
+  }
+  if (typeof record.server_sha256 !== 'string' || !record.server_sha256) {
+    throw new Error('OmniRoute capability lock has no server.js hash')
+  }
+  const actual = await sha256File(serverPath)
+  if (actual !== record.server_sha256) {
+    throw new Error('OmniRoute server.js hash mismatch; run hermes capabilities update after review')
+  }
+}
 
 function normalizePathForComparison(value) {
   const resolved = path.resolve(value)
@@ -44,7 +91,8 @@ export function defaultTrustedOmniRouteRoots() {
 
 export async function resolveTrustedOmniRouteRoot({
   requestedRoot,
-  allowedRoots = defaultTrustedOmniRouteRoots()
+  allowedRoots = defaultTrustedOmniRouteRoots(),
+  capabilitiesLockPath
 } = {}) {
   const existingAllowedRoots = []
   for (const candidate of allowedRoots) {
@@ -104,6 +152,8 @@ export async function resolveTrustedOmniRouteRoot({
   if (relative.startsWith('..') || path.isAbsolute(relative)) {
     throw new Error('Compiled OmniRoute MCP server escapes the trusted package root')
   }
+
+  await verifyLockedOmniRouteServer(canonicalServer, packageJson.version, capabilitiesLockPath)
 
   return selected
 }

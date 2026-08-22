@@ -772,6 +772,15 @@ def _sudo_stdin_block_result(description: str) -> dict:
 # =========================================================================
 
 DANGEROUS_PATTERNS = [
+    # Trust-boundary mutation: the agent may propose this command, but the
+    # terminal approval layer must obtain a real user decision before the CLI
+    # can replace hashes. The CLI's --yes skips only its second prompt; it does
+    # not bypass this outer authorization gate.
+    (
+        r"\b(?:(?:python(?:\d+(?:\.\d+)?)?|py)\s+-m\s+hermes_cli\.main\s+|"
+        r"hermes\s+)capabilities\s+update\b",
+        "capability trust lock update requires explicit user approval",
+    ),
     # Supply-chain boundary: restoring dependencies already pinned by a
     # lockfile is routine, but naming a new package mutates the dependency
     # graph and may immediately execute untrusted lifecycle hooks. Keep this

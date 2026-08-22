@@ -193,6 +193,10 @@ _install_plugin_debug_handler()
 VALID_HOOKS: Set[str] = {
     "pre_tool_call",
     "post_tool_call",
+    # Authorization verdict observer. Fired after the core approval/guardrail
+    # decision has been made and before evidence is persisted. This is an
+    # observer-only hook: callbacks cannot change the verdict.
+    "post_tool_authorization",
     "transform_terminal_output",
     "transform_tool_result",
     # Transform LLM output before it's returned to the user.
@@ -3834,6 +3838,14 @@ class PluginManager:
                 logger.info("HERMES_SAFE_MODE=1 — plugin discovery skipped")
                 self._discovered = True
                 return
+            # User/Studio plugins are executable Python. Refuse discovery when
+            # their bytes no longer match the user's reviewed capability lock.
+            from hermes_cli.capabilities_lock import verify_capabilities_lock
+
+            verify_capabilities_lock(
+                home=self.home_path,
+                categories={"plugins"},
+            )
             # Set the flag up front as a re-entrancy guard (a plugin's register()
             # can transitively trigger discovery again), but reset it if the sweep
             # raises so a failed scan is NOT cached as "discovered with an empty

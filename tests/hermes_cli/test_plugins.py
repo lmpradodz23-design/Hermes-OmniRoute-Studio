@@ -34,6 +34,11 @@ from hermes_cli.middleware import (
 )
 
 
+def test_post_tool_authorization_is_a_supported_hook() -> None:
+    """The evidence hook must be loadable instead of silently downgraded."""
+    assert "post_tool_authorization" in VALID_HOOKS
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────
 
 

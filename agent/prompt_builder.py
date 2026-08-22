@@ -1865,6 +1865,15 @@ def build_skills_system_prompt(
         skills_dir = get_skills_dir()
         _home_token = None
     try:
+        # Integrity verification intentionally precedes both cache layers: a
+        # changed skill must never stay trusted because its old prompt index
+        # was already cached in memory or on disk.
+        from hermes_cli.capabilities_lock import verify_capabilities_lock
+
+        verify_capabilities_lock(
+            home=skills_dir.parent,
+            categories={"skills"},
+        )
         external_dirs = get_all_skills_dirs()[1:]  # skip local (index 0)
         # Trusted project-local dirs (./.hermes/skills, ./.agents/skills at
         # the git root) — highest-precedence tier, scanned before local.
