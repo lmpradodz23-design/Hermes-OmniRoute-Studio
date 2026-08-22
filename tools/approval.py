@@ -2379,9 +2379,21 @@ def _is_verification_artifact_cleanup(command: str) -> bool:
         return False
 
     operand = argv[2]
+    # Compare the lexical absolute path with the canonical temp directory.
+    # ``abspath`` is important on Windows: an MSYS-style ``/tmp/file`` maps to
+    # the current drive, while ``ntpath.join`` uses backslashes.  Comparing the
+    # raw strings made that safe cleanup look dangerous even though both paths
+    # name the same file.  Do not resolve the operand here: a symlink alias for
+    # the temp directory must not gain the exemption merely because it points
+    # at the canonical directory.
+    operand_parts = operand.replace("\\", "/").split("/")
+    if any(part in {".", ".."} for part in operand_parts):
+        return False
     temp_dir = os.path.realpath(tempfile.gettempdir())
     basename = os.path.basename(operand)
-    if operand != os.path.join(temp_dir, basename):
+    expected = os.path.join(temp_dir, basename)
+    operand_absolute = os.path.abspath(os.path.normpath(operand))
+    if os.path.normcase(operand_absolute) != os.path.normcase(expected):
         return False
 
     target = os.path.realpath(operand)

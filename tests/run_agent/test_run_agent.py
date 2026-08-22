@@ -1692,9 +1692,16 @@ class TestExecuteToolCalls:
         agent._memory_manager = FakeMemoryManager()
         agent._memory_store = object()
 
-        with patch("tools.memory_tool.memory_tool", return_value=json.dumps({"success": True})):
+        with (
+            patch("tools.memory_tool.memory_tool", return_value=json.dumps({"success": True})),
+            patch(
+                "tools.approval.request_tool_approval",
+                return_value={"approved": True, "message": None},
+            ) as approval_gate,
+        ):
             agent._execute_tool_calls_sequential(mock_msg, messages, "task-1")
 
+        approval_gate.assert_called_once()
         assert len(calls) == 1
         action, target, content, metadata = calls[0]
         assert (action, target, content) == ("remove", "memory", "")

@@ -136,7 +136,10 @@ class TestDetectDangerousRm:
         real_temp = tmp_path / "real-temp"
         real_temp.mkdir()
         linked_temp = tmp_path / "linked-temp"
-        linked_temp.symlink_to(real_temp, target_is_directory=True)
+        try:
+            linked_temp.symlink_to(real_temp, target_is_directory=True)
+        except OSError as exc:
+            pytest.skip(f"directory symlinks are unavailable in this environment: {exc}")
         basename = "hermes-verify-example.py"
 
         with mock_patch("tempfile.gettempdir", return_value=str(linked_temp)):
@@ -1340,7 +1343,13 @@ class TestApprovalTimeoutIsNotConsent:
 
         self._force_short_timeout(monkeypatch, seconds=2)
         notified = []
-        mod.register_gateway_notify(self.SESSION_KEY, lambda data: notified.append(data))
+        notified_event = threading.Event()
+
+        def _notify(data):
+            notified.append(data)
+            notified_event.set()
+
+        mod.register_gateway_notify(self.SESSION_KEY, _notify)
         result_holder = {}
 
         thread = threading.Thread(
@@ -1349,10 +1358,7 @@ class TestApprovalTimeoutIsNotConsent:
             )
         )
         thread.start()
-        for _ in range(200):
-            if notified:
-                break
-            time.sleep(0.005)
+        assert notified_event.wait(timeout=10), "gateway approval was not presented"
 
         request_id = notified[0]["request_id"]
         assert request_id
@@ -1369,7 +1375,13 @@ class TestApprovalTimeoutIsNotConsent:
 
         self._force_short_timeout(monkeypatch, seconds=2)
         notified = []
-        mod.register_gateway_notify(self.SESSION_KEY, lambda data: notified.append(data))
+        notified_event = threading.Event()
+
+        def _notify(data):
+            notified.append(data)
+            notified_event.set()
+
+        mod.register_gateway_notify(self.SESSION_KEY, _notify)
         result_holder = {}
         thread = threading.Thread(
             target=lambda: result_holder.setdefault(
@@ -1377,10 +1389,7 @@ class TestApprovalTimeoutIsNotConsent:
             )
         )
         thread.start()
-        for _ in range(200):
-            if notified:
-                break
-            time.sleep(0.005)
+        assert notified_event.wait(timeout=10), "gateway approval was not presented"
 
         request_id = notified[0]["request_id"]
         assert mod.resolve_gateway_approval(
