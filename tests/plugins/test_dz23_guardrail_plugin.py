@@ -40,7 +40,9 @@ def test_guardrail_loads_through_real_plugin_manager(tmp_path, monkeypatch) -> N
     assert loaded.enabled is True
     assert set(loaded.hooks_registered) == {
         "on_session_start",
+        "pre_api_request",
         "pre_tool_call",
+        "post_tool_authorization",
         "post_tool_call",
         "pre_verify",
         "post_api_request",
@@ -49,7 +51,103 @@ def test_guardrail_loads_through_real_plugin_manager(tmp_path, monkeypatch) -> N
     }
 
 
-def test_security_critical_plugin_load_failure_aborts_startup(tmp_path, monkeypatch) -> None:
+def test_session_recording_is_disabled_by_default(tmp_path, monkeypatch) -> None:
+    plugin = load_plugin()
+    monkeypatch.setattr(plugin, "_recording_root", lambda: tmp_path / "recordings")
+    monkeypatch.setattr(plugin, "_recording_config", lambda: {"enabled": False})
+
+    plugin.on_session_start(session_id="disabled")
+    plugin.on_pre_api_request(
+        session_id="disabled", api_call_count=1, user_message="secret request"
+    )
+    plugin.on_session_end(session_id="disabled", completed=True)
+
+    assert list(tmp_path.rglob("*.jsonl")) == []
+
+
+def test_session_recording_captures_redacted_runtime_evidence(
+    tmp_path, monkeypatch
+) -> None:
+    plugin = load_plugin()
+    recordings = tmp_path / "recordings"
+    monkeypatch.setattr(plugin, "_recording_root", lambda: recordings)
+    monkeypatch.setattr(
+        plugin,
+        "_recording_config",
+        lambda: {"enabled": True, "retention_days": 30},
+    )
+    monkeypatch.setattr(plugin, "_write_task_report", lambda *_args, **_kwargs: None)
+    session = "recorded-session"
+
+    plugin.on_session_start(session_id=session)
+    plugin.on_pre_api_request(
+        session_id=session,
+        turn_id="turn-1",
+        api_call_count=1,
+        provider="omniroute",
+        model="auto/coding",
+        user_message="use TOKEN=super-secret",
+    )
+    decision = plugin.on_pre_tool_call(
+        tool_name="terminal",
+        args={"command": "rm -rf /tmp/test", "TOKEN": "super-secret"},
+        session_id=session,
+        turn_id="turn-1",
+        tool_call_id="tool-1",
+    )
+    plugin.on_post_tool_authorization(
+        tool_name="terminal",
+        args={"command": "rm -rf /tmp/test", "TOKEN": "super-secret"},
+        session_id=session,
+        turn_id="turn-1",
+        tool_call_id="tool-1",
+        verdict="blocked",
+        approval_path="plugin-block",
+    )
+    plugin.on_post_tool_call(
+        tool_name="terminal",
+        args={"command": "pytest -q", "TOKEN": "super-secret"},
+        result={"exit_code": 0, "stdout": "API_KEY=super-secret"},
+        status="success",
+        duration_ms=42,
+        session_id=session,
+        turn_id="turn-1",
+        tool_call_id="tool-2",
+    )
+    plugin.on_post_api_request(
+        session_id=session,
+        turn_id="turn-1",
+        provider="omniroute",
+        model="auto/coding",
+        usage={"input_tokens": 120, "output_tokens": 30},
+        cost_usd=0.125,
+        api_call_count=1,
+    )
+    plugin.on_session_end(session_id=session, completed=True)
+
+    assert decision is not None and decision["action"] == "block"
+    raw = (recordings / f"{session}.jsonl").read_text(encoding="utf-8")
+    events = [json.loads(line) for line in raw.splitlines()]
+    assert [event["t"] for event in events] == [
+        "turn_start",
+        "tool_call",
+        "tool_result",
+        "api_request",
+        "turn_end",
+    ]
+    assert events[1]["approval"]["verdict"] == "blocked"
+    assert events[2]["exit_code"] == 0
+    assert events[2]["duration_ms"] == 42
+    assert events[3]["usage"] == {"input_tokens": 120, "output_tokens": 30}
+    assert events[3]["cost_usd"] == 0.125
+    assert "args_sha256" in events[1]
+    assert "result_sha256" in events[2]
+    assert "super-secret" not in raw
+
+
+def test_security_critical_plugin_load_failure_aborts_startup(
+    tmp_path, monkeypatch
+) -> None:
     """A broken security boundary cannot degrade to a warning."""
     from hermes_cli import plugins as plugins_module
     from hermes_cli.plugins import PluginManager
@@ -73,7 +171,9 @@ def test_security_critical_plugin_load_failure_aborts_startup(tmp_path, monkeypa
     manager = PluginManager()
     monkeypatch.setattr(manager, "_scan_entry_points", lambda: [])
 
-    with pytest.raises(RuntimeError, match="security-critical plugin.*critical.*critical boom"):
+    with pytest.raises(
+        RuntimeError, match="security-critical plugin.*critical.*critical boom"
+    ):
         manager.discover_and_load()
 
 
@@ -91,13 +191,11 @@ def test_pre_tool_hook_failure_is_fail_closed_only_for_security_plugins(
     plugin_dir = bundled / "hook-failure"
     plugin_dir.mkdir(parents=True)
     (plugin_dir / "plugin.yaml").write_text(
-        "\n".join(
-            [
-                "name: hook-failure",
-                "kind: backend",
-                f"security_critical: {str(security_critical).lower()}",
-            ]
-        ),
+        "\n".join([
+            "name: hook-failure",
+            "kind: backend",
+            f"security_critical: {str(security_critical).lower()}",
+        ]),
         encoding="utf-8",
     )
     (plugin_dir / "__init__.py").write_text(
@@ -116,7 +214,9 @@ def test_pre_tool_hook_failure_is_fail_closed_only_for_security_plugins(
     monkeypatch.setattr(manager, "_scan_entry_points", lambda: [])
     manager.discover_and_load()
 
-    results = manager.invoke_hook("pre_tool_call", tool_name="terminal", args={"command": "echo ok"})
+    results = manager.invoke_hook(
+        "pre_tool_call", tool_name="terminal", args={"command": "echo ok"}
+    )
     assert bool(results) is blocked
     if blocked:
         assert results[0]["action"] == "block"
@@ -132,7 +232,9 @@ def test_destructive_commands_are_blocked_by_hook() -> None:
         assert "DZ23 Guardrail" in result["message"]
 
 
-def test_guardrail_uses_raw_conservative_variant_when_core_parser_import_fails(monkeypatch) -> None:
+def test_guardrail_uses_raw_conservative_variant_when_core_parser_import_fails(
+    monkeypatch,
+) -> None:
     plugin = load_plugin()
     original_import = builtins.__import__
 
@@ -182,7 +284,9 @@ def test_destructive_denylist_covers_windows(command: str) -> None:
         "SELECT 'DROP TABLE is documented'",
     ],
 )
-def test_destructive_denylist_avoids_documentation_false_positives(command: str) -> None:
+def test_destructive_denylist_avoids_documentation_false_positives(
+    command: str,
+) -> None:
     plugin = load_plugin()
 
     assert plugin.on_pre_tool_call("terminal", {"command": command}) is None
@@ -216,11 +320,7 @@ def test_guardrail_does_not_block_file_content(tmp_path, monkeypatch) -> None:
         ),
         (
             "terminal",
-            {
-                "command": (
-                    "hermes config set security.spend_ceiling.session_usd 999"
-                )
-            },
+            {"command": ("hermes config set security.spend_ceiling.session_usd 999")},
         ),
     ],
 )
@@ -290,7 +390,9 @@ def test_workspace_gate_ignores_process_cwd(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("HERMES_GUARDRAIL_WORKSPACE_ROOTS", raising=False)
     monkeypatch.chdir(tmp_path)
 
-    result = plugin.on_pre_tool_call("write_file", {"path": str(tmp_path / "outside.txt")})
+    result = plugin.on_pre_tool_call(
+        "write_file", {"path": str(tmp_path / "outside.txt")}
+    )
 
     assert result is not None
     assert result["action"] == "approve"
@@ -343,7 +445,12 @@ def test_failed_check_does_not_satisfy_verification_gate() -> None:
 @pytest.mark.parametrize(
     ("command", "result", "status", "verified"),
     [
-        ("npm test", {"exit_code": 1, "stdout": "all output looked fine"}, "success", False),
+        (
+            "npm test",
+            {"exit_code": 1, "stdout": "all output looked fine"},
+            "success",
+            False,
+        ),
         ("echo npm test", {"exit_code": 0}, "success", False),
         ("pytest", {"exit_code": 0}, "success", True),
         ("tox", {"exit_code": 0}, "success", True),
@@ -360,9 +467,7 @@ def test_verification_requires_real_exit_code(
         "write_file", {"path": "src/app.ts"}, {"ok": True}, "success", session
     )
 
-    plugin.on_post_tool_call(
-        "terminal", {"command": command}, result, status, session
-    )
+    plugin.on_post_tool_call("terminal", {"command": command}, result, status, session)
 
     decision = plugin.on_pre_verify(
         session_id=session, coding=True, changed_paths=["src/app.ts"]
@@ -390,6 +495,24 @@ def test_task_report_tracks_evidence_without_logging_tool_payloads(
         session,
     )
     plugin.on_pre_verify(session_id=session, coding=True, changed_paths=["src/app.ts"])
+    plugin.on_post_tool_call(
+        "terminal",
+        {"command": "npm test -- --run src/app.test.ts"},
+        {"exit_code": 0, "stdout": "1 passed"},
+        "success",
+        session,
+        duration_ms=712,
+    )
+    screenshot = tmp_path / "preview.png"
+    screenshot.write_bytes(b"\x89PNG\r\n\x1a\nreal-browser-evidence")
+    plugin.on_post_tool_call(
+        "browser_screenshot",
+        {"url": "http://127.0.0.1:3000"},
+        {"path": str(screenshot), "status": "success"},
+        "success",
+        session,
+        duration_ms=85,
+    )
     plugin.on_post_api_request(
         session_id=session,
         provider="omniroute",
@@ -414,7 +537,43 @@ def test_task_report_tracks_evidence_without_logging_tool_payloads(
     assert "Provider-reported cost captured: $0.125000 USD" in report
     assert "Testing Agent: completed (250 ms)" in report
     assert "Auto-commit/push: disabled" in report
+    assert "## Evidence" in report
+    assert "npm test -- --run src/app.test.ts" in report
+    assert "exit_code=0" in report
+    assert "duration_ms=712" in report
+    assert "![Preview evidence]" in report
+    asset_files = list((reports / "assets" / session).glob("*.png"))
+    assert len(asset_files) == 1
+    assert asset_files[0].read_bytes() == screenshot.read_bytes()
     assert "do-not-log-this" not in report
+
+
+def test_task_report_without_ui_has_no_screenshot_section(
+    tmp_path, monkeypatch
+) -> None:
+    plugin = load_plugin()
+    reports = tmp_path / "reports"
+    monkeypatch.setattr(plugin, "_report_root", lambda: reports)
+    monkeypatch.setattr(plugin, "_recording_config", lambda: {"enabled": False})
+    session = "backend-only"
+
+    plugin.on_session_start(session_id=session)
+    plugin.on_post_tool_call(
+        "write_file", {"path": "service.py"}, {"ok": True}, "success", session
+    )
+    plugin.on_post_tool_call(
+        "terminal",
+        {"command": "pytest -q"},
+        {"exit_code": 0},
+        "success",
+        session,
+    )
+    plugin.on_session_end(session_id=session, completed=True)
+
+    report = next(reports.glob("report-*.md")).read_text(encoding="utf-8")
+    assert "exit_code=0" in report
+    assert "## Visual evidence" not in report
+    assert (reports / "assets" / session).exists() is False
 
 
 def test_task_report_failure_never_breaks_session_teardown(monkeypatch) -> None:
@@ -431,6 +590,29 @@ def test_task_report_failure_never_breaks_session_teardown(monkeypatch) -> None:
     )
 
     plugin.on_session_end(session_id=session, completed=True)
+
+
+def test_report_redactor_failure_never_writes_raw_command_or_breaks_tool_hook(
+    monkeypatch,
+) -> None:
+    plugin = load_plugin()
+    session = "report-redactor-failure"
+    plugin.on_session_start(session_id=session)
+    monkeypatch.setattr(
+        plugin,
+        "_redact",
+        lambda _value: (_ for _ in ()).throw(RuntimeError("redactor unavailable")),
+    )
+
+    plugin.on_post_tool_call(
+        "terminal",
+        {"command": "pytest -q TOKEN=must-not-be-recorded"},
+        {"exit_code": 0},
+        "success",
+        session,
+    )
+
+    assert plugin._report_state(session)["verification"] == []
 
 
 def _start_taint_session(plugin, session: str, monkeypatch, tmp_path: Path) -> None:
@@ -592,7 +774,9 @@ def test_taint_tracking_exception_escalates_fail_closed(monkeypatch) -> None:
     assert decision["rule_key"].endswith(":tracking-failure")
 
 
-def test_tainted_result_content_never_enters_approval_decision(monkeypatch, tmp_path) -> None:
+def test_tainted_result_content_never_enters_approval_decision(
+    monkeypatch, tmp_path
+) -> None:
     plugin = load_plugin()
     session = "taint-isolation"
     _start_taint_session(plugin, session, monkeypatch, tmp_path)

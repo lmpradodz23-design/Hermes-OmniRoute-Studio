@@ -1177,6 +1177,58 @@ class TestResolvePreToolBlock:
 class TestPreToolCallModify:
     """Tests for the modify action — transforming tool args before dispatch."""
 
+    def test_dispatch_emits_final_approved_verdict(self, monkeypatch):
+        observed = []
+
+        def _hook(name, **kwargs):
+            if name == "pre_tool_call":
+                return [{
+                    "action": "approve",
+                    "message": "confirm",
+                    "rule_key": "write:outside",
+                }]
+            if name == "post_tool_authorization":
+                observed.append(kwargs)
+            return []
+
+        monkeypatch.setattr("hermes_cli.plugins.invoke_hook", _hook)
+        monkeypatch.setattr(
+            "tools.approval.request_tool_approval",
+            lambda *_args, **_kwargs: {"approved": True},
+        )
+
+        block_msg, _ = _dispatch_pre_tool_call_hooks(
+            "write_file",
+            {"path": "outside.txt"},
+            session_id="session-a",
+            tool_call_id="tool-a",
+        )
+
+        assert block_msg is None
+        assert observed[0]["verdict"] == "approved"
+        assert observed[0]["approval_path"] == "unattributed:write:outside"
+
+    def test_dispatch_emits_final_denied_verdict(self, monkeypatch):
+        observed = []
+
+        def _hook(name, **kwargs):
+            if name == "pre_tool_call":
+                return [{"action": "approve", "message": "confirm"}]
+            if name == "post_tool_authorization":
+                observed.append(kwargs)
+            return []
+
+        monkeypatch.setattr("hermes_cli.plugins.invoke_hook", _hook)
+        monkeypatch.setattr(
+            "tools.approval.request_tool_approval",
+            lambda *_args, **_kwargs: {"approved": False, "message": "no"},
+        )
+
+        block_msg, _ = _dispatch_pre_tool_call_hooks("terminal", {})
+
+        assert block_msg == "no"
+        assert observed[0]["verdict"] == "denied"
+
     def test_modify_returns_merged_args(self, monkeypatch):
         """A single modify hook should return merged args."""
         monkeypatch.setattr(

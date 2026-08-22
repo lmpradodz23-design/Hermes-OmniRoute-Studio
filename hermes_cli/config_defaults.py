@@ -42,6 +42,13 @@ DEFAULT_CONFIG = {
         # behavior everywhere.
         "terminal_continue": True,
     },
+    # Privacy-preserving, append-only runtime evidence. Opt-in: recordings can
+    # contain redacted user/tool content and therefore are never enabled by
+    # installation or migration without an explicit user choice.
+    "recording": {
+        "enabled": False,
+        "retention_days": 30,
+    },
     "agent": {
         # Unlimited by default. The agent turn cap caused more problems than
         # it solved (silent mid-task truncation). null = unlimited; set a

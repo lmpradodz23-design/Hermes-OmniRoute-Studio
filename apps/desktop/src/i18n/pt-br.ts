@@ -65,7 +65,9 @@ export const ptBr = defineLocale(
         'security.spendCeiling.sessionUsd': 'Teto por sessão (US$)',
         'security.spendCeiling.dailyUsd': 'Teto diário (US$)',
         'security.spendCeiling.warningRatio': 'Percentual de alerta de gastos',
-        'security.spendCeiling.confirmationThresholdUsd': 'Limite para pedir confirmação (US$)'
+        'security.spendCeiling.confirmationThresholdUsd': 'Limite para pedir confirmação (US$)',
+        'recording.enabled': 'Gravação de sessão',
+        'recording.retentionDays': 'Retenção das gravações'
       },
       credentials: {
         pasteKey: 'Cole a chave',
@@ -104,7 +106,10 @@ export const ptBr = defineLocale(
         'security.spendCeiling.dailyUsd': 'Gasto máximo diário, somando todas as sessões. Use 0 para desativar.',
         'security.spendCeiling.warningRatio': 'Mostra um alerta quando esta fração do teto for atingida, entre 0 e 1.',
         'security.spendCeiling.confirmationThresholdUsd':
-          'Pede sua confirmação uma vez antes de uma tarefa cuja estimativa máxima por chamada ultrapasse este valor. Use 0 para desativar.'
+          'Pede sua confirmação uma vez antes de uma tarefa cuja estimativa máxima por chamada ultrapasse este valor. Use 0 para desativar.',
+        'recording.enabled':
+          'Cria uma trilha local redigida e somente anexável. Fica desativada por padrão porque pode conter contexto das conversas.',
+        'recording.retentionDays': 'Exclui automaticamente as gravações locais depois desta quantidade de dias.'
       },
       omniroute: {
         title: 'OmniRoute nativo',

@@ -31,6 +31,11 @@ describe('settings helpers', () => {
     expect(fieldCopyForSchemaKey(FIELD_DESCRIPTIONS, 'desktop.repo_scan_exclude_paths')).toBeTruthy()
     expect(fieldCopyForSchemaKey(FIELD_LABELS, 'security.spend_ceiling.session_usd')).toBeTruthy()
     expect(SECTIONS.find(section => section.id === 'safety')?.keys).toContain('security.spend_ceiling.session_usd')
+    expect(fieldCopyForSchemaKey(FIELD_LABELS, 'recording.enabled')).toBe('Session Recording')
+    expect(fieldCopyForSchemaKey(FIELD_DESCRIPTIONS, 'recording.retention_days')).toContain('days')
+    expect(SECTIONS.find(section => section.id === 'safety')?.keys).toEqual(
+      expect.arrayContaining(['recording.enabled', 'recording.retention_days'])
+    )
   })
 
   it('does not shadow the backend schema options for memory.provider', () => {

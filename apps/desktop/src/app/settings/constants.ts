@@ -430,6 +430,10 @@ export const FIELD_LABELS: Record<string, string> = defineFieldCopy({
       confirmationThresholdUsd: 'Confirmation Threshold (USD)'
     }
   },
+  recording: {
+    enabled: 'Session Recording',
+    retentionDays: 'Recording Retention'
+  },
   browser: {
     allowPrivateUrls: 'Browser Private URLs',
     autoLocalForPrivateUrls: 'Local Browser For Private URLs'
@@ -591,6 +595,11 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = defineFieldCopy({
         'Ask you once before a task whose worst-case request estimate exceeds this amount. Set 0 to disable.'
     }
   },
+  recording: {
+    enabled:
+      'Write a redacted, append-only audit trail for this device. Disabled by default because recordings may contain conversation context.',
+    retentionDays: 'Automatically delete local session recordings after this many days.'
+  },
   checkpoints: {
     enabled: 'Create rollback snapshots before file edits.'
   },
@@ -684,6 +693,8 @@ export const SECTIONS: DesktopConfigSection[] = [
       'security.spend_ceiling.daily_usd',
       'security.spend_ceiling.warning_ratio',
       'security.spend_ceiling.confirmation_threshold_usd',
+      'recording.enabled',
+      'recording.retention_days',
       'browser.allow_private_urls',
       'browser.auto_local_for_private_urls',
       'checkpoints.enabled'

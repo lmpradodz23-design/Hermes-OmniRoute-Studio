@@ -6375,6 +6375,33 @@ def _dispatch_pre_tool_call_hooks(
         details, tool_name,
         turn_id=turn_id, tool_call_id=tool_call_id, session_id=session_id,
     )
+    if details.action == "approve":
+        verdict = "denied" if block_msg is not None else "approved"
+        approval_path = details.rule_key or "plugin-approval"
+    elif details.action == "block":
+        verdict = "blocked"
+        approval_path = "plugin-block"
+    else:
+        verdict = "automatic"
+        approval_path = "runtime"
+    try:
+        invoke_hook(
+            "post_tool_authorization",
+            tool_name=tool_name,
+            args=args if isinstance(args, dict) else {},
+            task_id=task_id,
+            session_id=session_id,
+            tool_call_id=tool_call_id,
+            turn_id=turn_id,
+            api_request_id=api_request_id,
+            verdict=verdict,
+            approval_path=approval_path,
+            middleware_trace=list(middleware_trace or []),
+        )
+    except Exception:
+        # Authorization already completed; optional observer failures do not
+        # retroactively change or bypass its result.
+        logger.debug("post_tool_authorization hook failed", exc_info=True)
     return (block_msg, details.modified_args)
 
 

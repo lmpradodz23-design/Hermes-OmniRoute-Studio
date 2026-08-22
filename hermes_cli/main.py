@@ -12776,6 +12776,13 @@ def main():
     build_hooks_parser(subparsers, cmd_hooks=cmd_hooks)
 
     # =========================================================================
+    # replay command — validate opt-in append-only session evidence
+    # =========================================================================
+    from hermes_cli.replay_cmd import build_replay_parser
+
+    build_replay_parser(subparsers)
+
+    # =========================================================================
     # doctor command  (parser built in hermes_cli/subcommands/doctor.py)
     # =========================================================================
     build_doctor_parser(subparsers, cmd_doctor=cmd_doctor)

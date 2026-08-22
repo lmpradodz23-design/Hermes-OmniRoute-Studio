@@ -1,12 +1,14 @@
 name: dz23-guardrail
-version: "0.3.0"
-description: "Deterministic safety gates, provenance tracking, verification evidence, and redacted local task reports for Hermes OmniRoute Studio."
+version: "0.4.0"
+description: "Deterministic safety gates, provenance tracking, opt-in redacted session recording, verification evidence, and local task reports for Hermes OmniRoute Studio."
 author: "DZ23, Hermes Agent"
 kind: backend
 security_critical: true
 provides_hooks:
   - on_session_start
+  - pre_api_request
   - pre_tool_call
+  - post_tool_authorization
   - post_tool_call
   - pre_verify
   - post_api_request

@@ -57,6 +57,8 @@ describe('Brazilian Portuguese locale', () => {
     expect(ptBr.settings.fieldDescriptions.model).toContain('novas conversas')
     expect(ptBr.settings.fieldLabels['security.spendCeiling.sessionUsd']).toBe('Teto por sessão (US$)')
     expect(ptBr.settings.fieldDescriptions['security.spendCeiling.sessionUsd']).toContain('somente pela interface')
+    expect(ptBr.settings.fieldLabels['recording.enabled']).toBe('Gravação de sessão')
+    expect(ptBr.settings.fieldDescriptions['recording.enabled']).toContain('desativada por padrão')
     expect(ptBr.settings.providers.groupDescriptions?.OpenRouter).toContain('centenas de modelos')
     expect(ptBr.settings.omniroute.openDashboard).toBe('Abrir painel completo do OmniRoute')
   })
