@@ -114,7 +114,10 @@ export function formatMoney(value?: null | number | string): string {
     return EMPTY_BILLING_VALUE
   }
 
-  return new Intl.NumberFormat(undefined, {
+  // Billing payloads and plan copy use USD display strings (for example,
+  // "$25"). Pin the formatter so validation and settlement messages stay
+  // consistent across the host OS locale and across test/build machines.
+  return new Intl.NumberFormat('en-US', {
     currency: 'USD',
     maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
     minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
