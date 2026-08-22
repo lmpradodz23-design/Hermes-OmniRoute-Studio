@@ -31,6 +31,9 @@ _DESTRUCTIVE_PATTERNS = (
     (re.compile(_COMMAND_START + r"(?:format-volume|clear-disk|takeown|vssadmin\s+delete\s+shadows|cipher\s+/w)\b", re.IGNORECASE), "destructive Windows administration"),
     (re.compile(_COMMAND_START + r"(?:reg(?:\.exe)?\s+delete|icacls\b" + _COMMAND_TAIL + r"/reset\b)", re.IGNORECASE), "destructive Windows security change"),
     (re.compile(r"\bshutil\.rmtree\s*\(", re.IGNORECASE), "shutil.rmtree"),
+    (re.compile(_COMMAND_START + r"(?:powershell|pwsh)(?:\.exe)?\b" + _COMMAND_TAIL + r"\s-(?:encodedcommand|enc|e)\b", re.IGNORECASE), "encoded PowerShell command"),
+    (re.compile(r"\b(?:base64|base32|base16)\s+(?:-[dD]|--decode)\b[^|]*\|\s*(?:bash|sh|zsh|ksh|dash)\b", re.IGNORECASE), "encoded command piped to a shell"),
+    (re.compile(_COMMAND_START + r"(?:invoke-expression|iex)\b", re.IGNORECASE), "PowerShell dynamic command execution"),
 )
 _WRITE_TOOLS = {"apply_patch", "edit_file", "file_write", "patch", "write_file"}
 _VERIFY_PATTERN = re.compile(
@@ -124,6 +127,27 @@ _REMOTE_COMMAND_PATTERN = re.compile(
     r"(?:^|\s)(?:ssh|scp|sftp|rsync)\b|\bgit\s+(?:push|remote\s+add)\b",
     re.IGNORECASE,
 )
+_PREFIX_WRAPPER_PATTERN = re.compile(
+    r"(?P<boundary>^|(?:&&|\|\||[;&|\n]))\s*"
+    r"(?:(?:sudo(?:\s+--?[^\s;&|]+)*|env(?:\s+(?:--?[^\s;&|]+|[A-Za-z_][A-Za-z0-9_]*=[^\s;&|]+))*|[A-Za-z_][A-Za-z0-9_]*=[^\s;&|]+)\s+)+",
+    re.IGNORECASE,
+)
+_EXECUTION_WRAPPER_PATTERNS = (
+    re.compile(
+        r"\b(?:bash|sh|zsh|ksh|dash)\b[^;&|\n]*?\s-(?:c|lc)\s+(?:\"([^\"]*)\"|'([^']*)'|([^;&|\n]+))",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\bcmd(?:\.exe)?\b(?:\s+/[^\s;&|]+)*\s+/(?:c|k)\s+(?:\"([^\"]*)\"|'([^']*)'|([^;&|\n]+))",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\b(?:powershell|pwsh)(?:\.exe)?\b[^;&|\n]*?\s-(?:command|c)\s+(?:\"([^\"]*)\"|'([^']*)'|([^;&|\n]+))",
+        re.IGNORECASE,
+    ),
+)
+_MAX_GUARDRAIL_VARIANTS = 64
+_MAX_GUARDRAIL_COMMAND_CHARS = 131_072
 
 
 def _serialized(args: Any) -> str:
@@ -244,8 +268,44 @@ def _command_detection_variants(command: str) -> Iterable[str]:
         return (str(command or ""),)
 
 
+def _guardrail_detection_variants(command: str) -> Iterable[str]:
+    """Yield bounded core variants plus executable payloads from common wrappers."""
+    raw = str(command or "")
+    if len(raw) > _MAX_GUARDRAIL_COMMAND_CHARS:
+        # Oversized executable text is not safe to parse optimistically. The
+        # sentinel is matched below and keeps the hook deterministic.
+        yield "guardrail-oversized-command"
+        return
+
+    pending = deque(_command_detection_variants(raw))
+    seen = set()
+
+    while pending and len(seen) < _MAX_GUARDRAIL_VARIANTS:
+        variant = str(pending.popleft()).strip()
+        if not variant or variant in seen:
+            continue
+        seen.add(variant)
+        yield variant
+
+        without_prefix_wrappers = _PREFIX_WRAPPER_PATTERN.sub(
+            lambda match: match.group("boundary") + " ", variant
+        ).strip()
+        if without_prefix_wrappers and without_prefix_wrappers not in seen:
+            pending.append(without_prefix_wrappers)
+
+        for pattern in _EXECUTION_WRAPPER_PATTERNS:
+            for match in pattern.finditer(variant):
+                payload = next(
+                    (group for group in match.groups() if group is not None), ""
+                ).strip()
+                if payload and payload not in seen:
+                    pending.append(payload)
+
+
 def _destructive_match(command: str) -> Optional[str]:
-    for variant in _command_detection_variants(command):
+    for variant in _guardrail_detection_variants(command):
+        if variant == "guardrail-oversized-command":
+            return "oversized executable text"
         for pattern, label in _DESTRUCTIVE_PATTERNS:
             match = pattern.search(variant)
             if not match:
@@ -254,6 +314,14 @@ def _destructive_match(command: str) -> Optional[str]:
                 r"\bgit\s+clean\b[^;&|\n]*(?:--dry-run|-[a-z]*n)",
                 match.group(0),
                 re.IGNORECASE,
+            ):
+                continue
+            if label in {"Docker prune", "Docker image prune --all"} and re.search(
+                r"(?:^|\s)--help(?:\s|$)", variant, re.IGNORECASE
+            ):
+                continue
+            if label == "recursive forced Remove-Item" and re.search(
+                r"(?:^|\s)-(?:whatif|wi)(?:\s|$)", variant, re.IGNORECASE
             ):
                 continue
             return label
