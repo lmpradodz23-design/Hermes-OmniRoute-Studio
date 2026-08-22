@@ -23,6 +23,9 @@ import {
   stopSafeVenvBlockers
 } from './venv-blocker-scan'
 
+const VENV_SCRIPTS_DIR = process.platform === 'win32' ? 'Scripts' : 'bin'
+const VENV_PYTHON_NAME = process.platform === 'win32' ? 'python.exe' : 'python3'
+
 // ---------------------------------------------------------------------------
 // resolveVenvPython
 // ---------------------------------------------------------------------------
@@ -32,11 +35,9 @@ describe('resolveVenvPython', () => {
     const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-vt-'))
 
     try {
-      const scriptsDir = process.platform === 'win32' ? 'Scripts' : 'bin'
-      const pythonName = process.platform === 'win32' ? 'python.exe' : 'python3'
-      const dir = path.join(sandbox, 'venv', scriptsDir)
+      const dir = path.join(sandbox, 'venv', VENV_SCRIPTS_DIR)
       fs.mkdirSync(dir, { recursive: true })
-      const pyPath = path.join(dir, pythonName)
+      const pyPath = path.join(dir, VENV_PYTHON_NAME)
       fs.writeFileSync(pyPath, '', { mode: 0o755 })
       assert.equal(resolveVenvPython(sandbox), pyPath)
     } finally {

@@ -16,6 +16,8 @@ import {
   switchBranch
 } from './git-worktree-ops'
 
+const IS_WINDOWS = process.platform === 'win32'
+
 function removeTemporaryDirectory(directory: string) {
   try {
     fs.rmSync(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
@@ -23,7 +25,7 @@ function removeTemporaryDirectory(directory: string) {
     // Git for Windows can release its cwd handle just after execFile's close
     // callback. Cleanup must not turn a successful non-repo probe into a
     // product failure; the OS temp directory will reclaim this empty folder.
-    if (process.platform !== 'win32' || error?.code !== 'EPERM') {
+    if (!IS_WINDOWS || error?.code !== 'EPERM') {
       throw error
     }
   }

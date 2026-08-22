@@ -14,6 +14,9 @@ import {
 } from '../scripts/stage-native-deps.mjs'
 
 const { join } = path
+const HOST_PLATFORM = process.platform
+const HOST_ARCH = process.arch
+const FOREIGN_PLATFORM = HOST_PLATFORM === 'linux' ? 'darwin' : 'linux'
 
 // ─── fixtures ──────────────────────────────────────────────────────
 //
@@ -186,10 +189,10 @@ test('cross-target: host build/Release is NOT staged for a foreign platform', ()
     // Create a node-pty tree with ONLY a host build/Release (no prebuild).
     makeFakeNodePty(srcRoot)
     const buildReleaseDir = join(srcRoot, 'build', 'Release')
-    makeFakeNode(join(buildReleaseDir, 'pty.node'), process.platform)
+    makeFakeNode(join(buildReleaseDir, 'pty.node'), HOST_PLATFORM)
 
     // Request a foreign platform (different from the host).
-    const foreignPlatform = process.platform === 'linux' ? 'darwin' : 'linux'
+    const foreignPlatform = FOREIGN_PLATFORM
 
     assert.throws(
       () => stageNodePtyInto(srcRoot, destRoot, { platform: foreignPlatform, arch: 'x64' }),
@@ -214,11 +217,11 @@ test('cross-target: matching prebuild IS staged for a foreign target', () => {
     const destRoot = join(tmp, 'dest')
 
     // Host is (say) darwin. Request linux-x64, which has a prebuild.
-    const foreignPlatform = process.platform === 'linux' ? 'darwin' : 'linux'
+    const foreignPlatform = FOREIGN_PLATFORM
     makeFakeNodePty(srcRoot, { prebuildPlatform: foreignPlatform, prebuildArch: 'x64' })
 
     // Also create a host build/Release that should NOT be staged.
-    makeFakeNode(join(srcRoot, 'build', 'Release', 'pty.node'), process.platform)
+    makeFakeNode(join(srcRoot, 'build', 'Release', 'pty.node'), HOST_PLATFORM)
 
     stageNodePtyInto(srcRoot, destRoot, { platform: foreignPlatform, arch: 'x64' })
 
@@ -245,9 +248,9 @@ test('cross-target: foreign target with no prebuild throws (fail closed)', () =>
 
     // Create a tree with a host build/Release but no foreign prebuild.
     makeFakeNodePty(srcRoot)
-    makeFakeNode(join(srcRoot, 'build', 'Release', 'pty.node'), process.platform)
+    makeFakeNode(join(srcRoot, 'build', 'Release', 'pty.node'), HOST_PLATFORM)
 
-    const foreignPlatform = process.platform === 'linux' ? 'darwin' : 'linux'
+    const foreignPlatform = FOREIGN_PLATFORM
 
     assert.throws(
       () => stageNodePtyInto(srcRoot, destRoot, { platform: foreignPlatform, arch: 'x64' }),
@@ -265,9 +268,9 @@ test('host-target: host build/Release IS staged for a matching target', () => {
     const destRoot = join(tmp, 'dest')
 
     makeFakeNodePty(srcRoot)
-    makeFakeNode(join(srcRoot, 'build', 'Release', 'pty.node'), process.platform)
+    makeFakeNode(join(srcRoot, 'build', 'Release', 'pty.node'), HOST_PLATFORM)
 
-    stageNodePtyInto(srcRoot, destRoot, { platform: process.platform, arch: process.arch })
+    stageNodePtyInto(srcRoot, destRoot, { platform: HOST_PLATFORM, arch: HOST_ARCH })
 
     assert.equal(
       existsSync(join(destRoot, 'build', 'Release', 'pty.node')),
@@ -279,28 +282,28 @@ test('host-target: host build/Release IS staged for a matching target', () => {
   }
 })
 
-test.skipIf(process.platform === 'win32')(
-  'host-target: staged node-pty resolves an already-unpacked helper and preserves executable helpers',
+test.skipIf(HOST_PLATFORM === 'win32')(
+  'POSIX node-pty resolves and preserves spawn-helper executables (Windows uses the native ConPTY binding)',
   async () => {
     const tmp = fs.mkdtempSync(join(os.tmpdir(), 'hermes-stage-'))
     try {
       const srcRoot = join(tmp, 'node-pty')
       const destRoot = join(tmp, 'dest')
-      const prebuildDir = join(srcRoot, 'prebuilds', `${process.platform}-${process.arch}`)
+      const prebuildDir = join(srcRoot, 'prebuilds', `${HOST_PLATFORM}-${HOST_ARCH}`)
       const buildReleaseDir = join(srcRoot, 'build', 'Release')
 
       makeFakeNodePty(srcRoot, {
-        prebuildPlatform: process.platform,
-        prebuildArch: process.arch
+        prebuildPlatform: HOST_PLATFORM,
+        prebuildArch: HOST_ARCH
       })
       makeFakeUnixTerminal(srcRoot)
-      makeFakeNode(join(buildReleaseDir, 'pty.node'), process.platform)
+      makeFakeNode(join(buildReleaseDir, 'pty.node'), HOST_PLATFORM)
       fs.writeFileSync(join(prebuildDir, 'spawn-helper'), 'prebuild helper')
       fs.writeFileSync(join(buildReleaseDir, 'spawn-helper'), 'build helper')
       fs.chmodSync(join(prebuildDir, 'spawn-helper'), 0o644)
       fs.chmodSync(join(buildReleaseDir, 'spawn-helper'), 0o644)
 
-      stageNodePtyInto(srcRoot, destRoot, { platform: process.platform, arch: process.arch })
+      stageNodePtyInto(srcRoot, destRoot, { platform: HOST_PLATFORM, arch: HOST_ARCH })
 
       const stagedUnixTerminalUrl = pathToFileURL(join(destRoot, 'lib', 'unixTerminal.js'))
       stagedUnixTerminalUrl.searchParams.set('t', String(Date.now()))
@@ -315,7 +318,7 @@ test.skipIf(process.platform === 'win32')(
         'node_modules',
         'node-pty',
         'prebuilds',
-        `${process.platform}-${process.arch}`,
+        `${HOST_PLATFORM}-${HOST_ARCH}`,
         'spawn-helper'
       )
       const nodeModulesUnpackedHelper = unpackedHelper.replace(
@@ -326,10 +329,36 @@ test.skipIf(process.platform === 'win32')(
       assert.equal(stagedUnixTerminal.resolveHelper(unpackedHelper), unpackedHelper)
       assert.equal(stagedUnixTerminal.resolveHelper(nodeModulesUnpackedHelper), nodeModulesUnpackedHelper)
       assert.equal(
-        fs.statSync(join(destRoot, 'prebuilds', `${process.platform}-${process.arch}`, 'spawn-helper')).mode & 0o777,
+        fs.statSync(join(destRoot, 'prebuilds', `${HOST_PLATFORM}-${HOST_ARCH}`, 'spawn-helper')).mode & 0o777,
         0o755
       )
       assert.equal(fs.statSync(join(destRoot, 'build', 'Release', 'spawn-helper')).mode & 0o777, 0o755)
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true })
+    }
+  }
+)
+
+test.skipIf(HOST_PLATFORM !== 'win32')(
+  'Windows node-pty stages its native PE binding without a POSIX spawn-helper',
+  () => {
+    const tmp = fs.mkdtempSync(join(os.tmpdir(), 'hermes-stage-win32-'))
+
+    try {
+      const srcRoot = join(tmp, 'node-pty')
+      const destRoot = join(tmp, 'dest')
+
+      makeFakeNodePty(srcRoot, { prebuildPlatform: 'win32', prebuildArch: HOST_ARCH })
+      stageNodePtyInto(srcRoot, destRoot, { platform: 'win32', arch: HOST_ARCH })
+
+      const nativeBinding = join(destRoot, 'prebuilds', `win32-${HOST_ARCH}`, 'pty.node')
+      assert.equal(existsSync(nativeBinding), true, 'the Windows ConPTY native binding is staged')
+      assert.equal(classifyNativeBinary(nativeBinding), 'win32')
+      assert.equal(
+        existsSync(join(destRoot, 'prebuilds', `win32-${HOST_ARCH}`, 'spawn-helper')),
+        false,
+        'Windows does not depend on the POSIX spawn-helper executable'
+      )
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true })
     }
@@ -581,7 +610,7 @@ test('darwin staging ships the Swift helper executable and the rewritten windows
   }
 })
 
-test.skipIf(process.platform === 'win32')('darwin staging marks the Swift helper executable on POSIX', () => {
+test.skipIf(HOST_PLATFORM === 'win32')('darwin staging marks the Swift helper executable on POSIX', () => {
   const tmp = fs.mkdtempSync(join(os.tmpdir(), 'hermes-stage-'))
   try {
     const srcRoot = join(tmp, 'get-windows')

@@ -5,6 +5,8 @@ import { test } from 'vitest'
 import { stopBackendChild, stopBackendTreesForUpdate } from './backend-child'
 import { hiddenWindowsChildOptions } from './windows-child-options'
 
+const IS_WINDOWS = process.platform === 'win32'
+
 test('hiddenWindowsChildOptions adds windowsHide:true on Windows when unset', () => {
   assert.deepEqual(hiddenWindowsChildOptions({}, true), { windowsHide: true })
 })
@@ -30,11 +32,10 @@ test('hiddenWindowsChildOptions merges windowsHide alongside other options on Wi
   })
 })
 
-test('hiddenWindowsChildOptions defaults isWindows from process.platform when omitted', () => {
+test('hiddenWindowsChildOptions defaults isWindows from the host platform when omitted', () => {
   const result = hiddenWindowsChildOptions({})
-  const expectedHide = process.platform === 'win32'
 
-  assert.equal(Boolean(result.windowsHide), expectedHide)
+  assert.equal(Boolean(result.windowsHide), IS_WINDOWS)
 })
 
 function makeChild(overrides: Partial<{ pid: number | null; killed: boolean }> = {}) {

@@ -28,7 +28,9 @@ import {
   writeSecretFileAtomic
 } from './hardening'
 
-const posixTest = process.platform === 'win32' ? test.skip : test
+const IS_WINDOWS = process.platform === 'win32'
+const DIRECTORY_LINK_TYPE: fs.symlink.Type = IS_WINDOWS ? 'junction' : 'dir'
+const posixTest = IS_WINDOWS ? test.skip : test
 
 /**
  * Real temp dir per test: the property under test IS the on-disk mode after a
@@ -953,7 +955,7 @@ test('resolveDirectoryForIpc accepts directory symlinks or junctions', async () 
     fs.mkdirSync(directory)
 
     try {
-      fs.symlinkSync(directory, linkPath, process.platform === 'win32' ? 'junction' : 'dir')
+      fs.symlinkSync(directory, linkPath, DIRECTORY_LINK_TYPE)
     } catch (error) {
       if (error?.code === 'EPERM' || error?.code === 'EACCES') {
         // directory symlink creation is not permitted on this platform — skip

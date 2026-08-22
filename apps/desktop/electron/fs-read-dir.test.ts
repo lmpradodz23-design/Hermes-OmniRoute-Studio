@@ -8,6 +8,8 @@ import { test } from 'vitest'
 
 import { readDirForIpc } from './fs-read-dir'
 
+const DIRECTORY_LINK_TYPE: fs.symlink.Type = process.platform === 'win32' ? 'junction' : 'dir'
+
 function mkTmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-fs-read-dir-'))
 }
@@ -223,7 +225,7 @@ test('readDirForIpc allows expanding symlink or junction directories outside the
     const linkPath = path.join(root, 'outside-link')
 
     try {
-      fs.symlinkSync(outside, linkPath, process.platform === 'win32' ? 'junction' : 'dir')
+      fs.symlinkSync(outside, linkPath, DIRECTORY_LINK_TYPE)
     } catch (error) {
       if (error?.code === 'EPERM' || error?.code === 'EACCES') {
         t.skip(`directory symlink creation is not permitted on this platform (${error.code})`)

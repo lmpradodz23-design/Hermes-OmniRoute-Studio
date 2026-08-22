@@ -1,0 +1,123 @@
+name: Windows primary contracts
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-primary-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-primary:
+    name: Windows primary product tests
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install npm 12
+        shell: pwsh
+        run: |
+          if (-not ((npm --version) -match '^12\.')) { npm install --global npm@12 }
+
+      - name: Install JavaScript dependencies
+        uses: ./.github/actions/retry
+        with:
+          command: npm ci
+
+      - name: Enforce platform-test guards and print named skips
+        run: npm run --prefix apps/desktop test:platform-guards
+
+      - name: Type-check desktop contracts
+        run: npm run --prefix apps/desktop typecheck
+
+      - name: Run desktop Electron contracts on Windows
+        run: npm run --prefix apps/desktop test:desktop:platforms
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # 8.2.0
+        with:
+          version: '0.9.28'
+
+      - name: Run deterministic guardrail corpus on Windows
+        run: uvx --from pytest==9.1.1 pytest tests/plugins/test_dz23_guardrail_fuzz.py -q --tb=short
+
+  posix-secondary:
+    name: POSIX secondary guardrail and live OpenSSH
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install JavaScript dependencies
+        uses: ./.github/actions/retry
+        with:
+          command: npm ci
+
+      - name: Enforce platform-test guards and print named skips
+        run: npm run --prefix apps/desktop test:platform-guards
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # 8.2.0
+        with:
+          version: '0.9.28'
+
+      - name: Run deterministic guardrail corpus on POSIX
+        run: uvx --from pytest==9.1.1 pytest tests/plugins/test_dz23_guardrail_fuzz.py -q --tb=short
+
+      - name: Start ephemeral OpenSSH container
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh-keygen -q -t ed25519 -N '' -f "$RUNNER_TEMP/hermes-ci-key"
+          docker run --detach --name hermes-openssh --publish 127.0.0.1:2222:22 \
+            --volume "$RUNNER_TEMP/hermes-ci-key.pub:/tmp/hermes-ci-key.pub:ro" \
+            ubuntu:24.04 bash -lc '
+              apt-get update -qq && apt-get install -y -qq openssh-server &&
+              useradd --create-home --shell /bin/bash hermes &&
+              install -d -m 700 -o hermes -g hermes /home/hermes/.ssh &&
+              install -m 600 -o hermes -g hermes /tmp/hermes-ci-key.pub /home/hermes/.ssh/authorized_keys &&
+              ssh-keygen -A && install -d /run/sshd &&
+              exec /usr/sbin/sshd -D -e -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no -o PermitRootLogin=no -o AllowUsers=hermes'
+          for attempt in $(seq 1 60); do
+            if ssh -i "$RUNNER_TEMP/hermes-ci-key" -p 2222 \
+              -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=2 \
+              hermes@127.0.0.1 'exit 0' 2>/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs hermes-openssh
+          exit 1
+
+      - name: Exercise real OpenSSH with and without multiplexing
+        env:
+          HERMES_LIVE_SSH_HOST: 127.0.0.1
+          HERMES_LIVE_SSH_KEY: ${{ runner.temp }}/hermes-ci-key
+          HERMES_LIVE_SSH_PORT: '2222'
+          HERMES_LIVE_SSH_USER: hermes
+        run: npm exec --workspace apps/desktop vitest run -- --project electron electron/ssh-connection-live.test.ts --pool=threads --maxWorkers=1 --no-file-parallelism
+
+      - name: Collect and stop OpenSSH container
+        if: always()
+        shell: bash
+        run: |
+          docker logs hermes-openssh || true
+          docker rm --force hermes-openssh || true

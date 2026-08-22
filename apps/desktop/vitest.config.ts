@@ -21,7 +21,12 @@ const electronNative: TestProjectConfiguration = {
     name: 'electron',
     environment: 'node',
     include: ['electron/**/*.test.ts', 'scripts/**.test.{ts,mjs}'],
-    exclude: ['scripts/run-short-session-hang-repro.test.mjs']
+    exclude: ['scripts/run-short-session-hang-repro.test.mjs'],
+    // Git for Windows, PowerShell startup, and real ACL reads regularly need
+    // more than Vitest's 5s default on a cold or loaded desktop. Keep a finite
+    // ceiling so hangs still fail, while functional integration tests do not
+    // become timing tests by accident.
+    testTimeout: 30_000
   }
 }
 

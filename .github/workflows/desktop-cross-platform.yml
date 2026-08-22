@@ -92,7 +92,7 @@ jobs:
             apps/desktop/release/*.rpm
 
   ssh-live:
-    name: Live OpenSSH no-mux contract
+    name: Live OpenSSH mux and no-mux contracts
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -135,7 +135,7 @@ jobs:
           docker logs hermes-openssh
           exit 1
 
-      - name: Exercise real no-mux SSH lifecycle
+      - name: Exercise real SSH lifecycle with and without multiplexing
         env:
           HERMES_LIVE_SSH_HOST: 127.0.0.1
           HERMES_LIVE_SSH_KEY: ${{ runner.temp }}/hermes-ci-key

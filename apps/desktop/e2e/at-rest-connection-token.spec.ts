@@ -116,6 +116,7 @@
  */
 
 import * as fs from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import * as http from 'node:http'
 import type { AddressInfo } from 'node:net'
 import * as path from 'node:path'
@@ -145,6 +146,7 @@ const MAX_SCAN_BYTES = 16 * 1024 * 1024
  * single-instance lock keys off userData, which is per-sandbox.
  */
 const STABLE_APP_NAME = 'HermesE2EAtRestStorage'
+const IS_WINDOWS = process.platform === 'win32'
 
 // ─── Fake gateway ───────────────────────────────────────────────────────
 
@@ -335,17 +337,35 @@ function storedTokenEncoding(connectionFile: string): string {
  * that nobody else can reach the file, and pinning the exact bits would make
  * this a change-detector against a future 0400 or a setgid-dir umask.
  *
- * POSIX only. `tightenSecretFileMode` no-ops on Windows deliberately (Node maps
- * chmod to the read-only bit there, and userData is already ACL'd to the user
- * profile — see the docstring in electron/hardening.ts, and PR #77527 for the
- * one place ACLs are being handled). Mode bits are advisory on Windows, so
- * asserting them would go red for behaviour the fix never claimed. The suite
- * runs ubuntu-latest today (.github/workflows/e2e-desktop.yml); nothing else in
- * this spec is platform-specific, and this assertion should not be what
- * changes that.
+ * POSIX verifies mode bits. Windows verifies the real ACL emitted by icacls:
+ * the current user and LocalSystem must be present, while broad principals
+ * (Everyone, Authenticated Users, Builtin Users) must be absent. This keeps the
+ * assertion meaningful on both host families instead of silently returning on
+ * Windows, where POSIX mode bits are only advisory.
  */
 function expectOwnerOnlyMode(filePath: string, why: string): void {
-  if (process.platform === 'win32') {
+  if (IS_WINDOWS) {
+    const ownerSid = String(
+      execFileSync('whoami.exe', ['/user', '/fo', 'csv', '/nh'], { encoding: 'utf8', windowsHide: true }),
+    ).match(/S-\d-(?:\d+-)+\d+/i)?.[0]
+
+    expect(ownerSid, `${why} (could not resolve the current Windows user SID)`).toBeTruthy()
+
+    const aclFile = `${filePath}.acl-${process.pid}`
+
+    try {
+      execFileSync('icacls.exe', [filePath, '/save', aclFile], { encoding: 'utf8', windowsHide: true })
+      const sddl = fs.readFileSync(aclFile, 'utf16le')
+
+      expect(sddl, `${why} (the owner SID has no explicit ACE)`).toMatch(
+        new RegExp(`;;;${String(ownerSid).replaceAll('-', '\\-')}\\)`),
+      )
+      expect(sddl, `${why} (LocalSystem has no explicit ACE)`).toMatch(/;;;SY\)/)
+      expect(sddl, `${why} (a broad Windows principal can access the file)`).not.toMatch(/;;;(?:WD|AU|BU)\)/)
+    } finally {
+      fs.rmSync(aclFile, { force: true })
+    }
+
     return
   }
 

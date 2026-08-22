@@ -30,6 +30,8 @@
  * Prerequisite: `npm run build` must have been run so dist/ exists.
  */
 
+const NEW_CHAT_SHORTCUT = process.platform === 'darwin' ? 'Meta+N' : 'Control+N'
+
 import { expect, test } from './test'
 
 import {
@@ -284,7 +286,7 @@ async function waitForActiveTranscriptWithoutText(
 
 /** Replace the primary surface with a draft while retaining its warm cache. */
 async function openFreshDraft(page: import('@playwright/test').Page, priorText: string): Promise<void> {
-  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+N' : 'Control+N')
+  await page.keyboard.press(NEW_CHAT_SHORTCUT)
   await waitForActiveTranscriptWithoutText(page, priorText)
 }
 
