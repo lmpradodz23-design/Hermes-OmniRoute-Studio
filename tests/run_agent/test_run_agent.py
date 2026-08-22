@@ -88,6 +88,10 @@ def test_persist_user_message_override_rewrites_text_turns(agent):
     assert messages == [{"role": "user", "content": "hello"}]
 
 
+def test_agent_owns_an_immutable_spend_policy_snapshot(agent):
+    assert agent._spend_ceiling_policy.config.enabled is False
+
+
 
 
 
@@ -3082,9 +3086,17 @@ class TestRunConversation:
 
     def test_request_scoped_api_hooks_fire_for_each_api_call(self, agent):
         self._setup_agent(agent)
+        agent.model = "gpt-5.6-luna"
+        agent.provider = "openai"
+        agent.base_url = "https://api.openai.com/v1"
         tc = _mock_tool_call(name="web_search", arguments="{}", call_id="c1")
-        resp1 = _mock_response(content="", finish_reason="tool_calls", tool_calls=[tc])
-        resp2 = _mock_response(content="Done searching", finish_reason="stop")
+        usage = {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
+        resp1 = _mock_response(
+            content="", finish_reason="tool_calls", tool_calls=[tc], usage=usage
+        )
+        resp2 = _mock_response(
+            content="Done searching", finish_reason="stop", usage=usage
+        )
         agent.client.chat.completions.create.side_effect = [resp1, resp2]
 
         hook_calls = []
@@ -3123,7 +3135,79 @@ class TestRunConversation:
         assert all("request" in c and "messages" in c["request"]["body"] for c in pre_request_calls)
         assert any(msg.get("role") == "user" and msg.get("content") == "search something" for msg in pre_request_calls[0]["request_messages"])
         assert all("usage" in c and "response" in c for c in post_request_calls)
+        observed_costs = [c["cost_usd"] for c in post_request_calls]
+        assert all(
+            isinstance(cost, float) and cost > 0 for cost in observed_costs
+        ), (
+            observed_costs,
+            agent.session_estimated_cost_usd,
+            agent.session_cost_status,
+            agent.session_cost_source,
+        )
         assert all("assistant_message" in c["response"] for c in post_request_calls)
+
+    def test_spend_ceiling_blocks_before_provider_call(self, agent, tmp_path):
+        from agent.spend_ceiling import SpendCeilingConfig, SpendCeilingPolicy
+
+        self._setup_agent(agent)
+        agent.model = "gpt-5.6-luna"
+        agent.provider = "openai"
+        agent.base_url = "https://api.openai.com/v1"
+        agent.max_tokens = 1_000_000
+        agent._spend_ceiling_policy = SpendCeilingPolicy(
+            SpendCeilingConfig.from_mapping(
+                {"session_usd": "0.01", "daily_usd": "1.00"}
+            ),
+            tmp_path / "ledger.sqlite3",
+        )
+
+        with (
+            patch.object(agent, "_persist_session"),
+            patch.object(agent, "_save_trajectory"),
+            patch.object(agent, "_cleanup_task_resources"),
+        ):
+            result = agent.run_conversation("hello")
+
+        assert result["failed"] is True
+        assert result["api_calls"] == 0
+        assert result["final_response"].startswith("BLOCKED: session spend ceiling")
+        assert agent.client.chat.completions.create.call_count == 0
+
+    def test_spend_confirmation_is_requested_once_per_task(self, agent, tmp_path):
+        from agent.spend_ceiling import SpendCeilingConfig, SpendCeilingPolicy
+
+        self._setup_agent(agent)
+        agent.model = "gpt-5.6-luna"
+        agent.provider = "openai"
+        agent.base_url = "https://api.openai.com/v1"
+        agent.max_tokens = 1
+        agent.client.chat.completions.create.return_value = _mock_response(
+            content="Approved work", finish_reason="stop"
+        )
+        agent._spend_ceiling_policy = SpendCeilingPolicy(
+            SpendCeilingConfig.from_mapping(
+                {
+                    "session_usd": "10.00",
+                    "daily_usd": "20.00",
+                    "confirmation_threshold_usd": "0.000001",
+                }
+            ),
+            tmp_path / "ledger.sqlite3",
+        )
+        confirmations = []
+        agent.clarify_callback = lambda question, choices, **kwargs: (
+            confirmations.append(question) or choices[0]
+        )
+
+        with (
+            patch.object(agent, "_persist_session"),
+            patch.object(agent, "_save_trajectory"),
+            patch.object(agent, "_cleanup_task_resources"),
+        ):
+            result = agent.run_conversation("hello")
+
+        assert result["final_response"] == "Approved work"
+        assert len(confirmations) == 1
 
     def test_terminal_task_closes_logical_calls_before_metrics_scope(self, agent):
         from agent import relay_runtime

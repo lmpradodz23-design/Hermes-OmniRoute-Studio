@@ -52,7 +52,13 @@ export const PT_BR_FIELD_LABELS: Record<string, string> = defineFieldCopy({
   commandAllowlist: 'Lista de permiss\u00F5es de comandos',
   security: {
     redactSecrets: 'Redigir segredos',
-    allowPrivateUrls: 'Permitir URLs privados'
+    allowPrivateUrls: 'Permitir URLs privados',
+    spendCeiling: {
+      sessionUsd: 'Teto de gastos da sess\u00E3o (USD)',
+      dailyUsd: 'Teto de gastos di\u00E1rios (USD)',
+      warningRatio: 'Propor\u00E7\u00E3o de alerta de gastos',
+      confirmationThresholdUsd: 'Limite de confirma\u00E7\u00E3o (USD)'
+    }
   },
   browser: {
     allowPrivateUrls: 'URLs privados do navegador',
@@ -206,7 +212,16 @@ export const PT_BR_FIELD_DESCRIPTIONS: Record<string, string> = defineFieldCopy(
     timeout: 'Quanto tempo os prompts de aprova\u00E7\u00E3o aguardam antes de expirarem.'
   },
   security: {
-    redactSecrets: 'Oculte os segredos detectados do conte\u00FAdo vis\u00EDvel do modelo quando poss\u00EDvel.'
+    redactSecrets: 'Oculte os segredos detectados do conte\u00FAdo vis\u00EDvel do modelo quando poss\u00EDvel.',
+    spendCeiling: {
+      sessionUsd:
+        'Gasto m\u00E1ximo do provedor por sess\u00E3o. Defina 0 para desativar. Somente o usu\u00E1rio pode alterar isso nas Configura\u00E7\u00F5es.',
+      dailyUsd:
+        'Gasto m\u00E1ximo do provedor compartilhado por todas as sess\u00F5es todos os dias. Defina 0 para desativar.',
+      warningRatio: 'Avisar quando esta fra\u00E7\u00E3o de qualquer teto for atingida, de 0 a 1.',
+      confirmationThresholdUsd:
+        'Pergunte uma vez antes de uma tarefa cuja estimativa de solicita\u00E7\u00E3o de pior caso exceda esse valor. Defina 0 para desativar.'
+    }
   },
   checkpoints: {
     enabled: 'Crie instant\u00E2neos de revers\u00E3o antes das edi\u00E7\u00F5es do arquivo.'

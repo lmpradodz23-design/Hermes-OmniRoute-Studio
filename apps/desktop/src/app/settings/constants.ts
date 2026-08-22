@@ -422,7 +422,13 @@ export const FIELD_LABELS: Record<string, string> = defineFieldCopy({
   commandAllowlist: 'Command Allowlist',
   security: {
     redactSecrets: 'Redact Secrets',
-    allowPrivateUrls: 'Allow Private URLs'
+    allowPrivateUrls: 'Allow Private URLs',
+    spendCeiling: {
+      sessionUsd: 'Session Spend Ceiling (USD)',
+      dailyUsd: 'Daily Spend Ceiling (USD)',
+      warningRatio: 'Spend Warning Ratio',
+      confirmationThresholdUsd: 'Confirmation Threshold (USD)'
+    }
   },
   browser: {
     allowPrivateUrls: 'Browser Private URLs',
@@ -576,7 +582,14 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = defineFieldCopy({
     timeout: 'How long approval prompts wait before timing out.'
   },
   security: {
-    redactSecrets: 'Hide detected secrets from model-visible content when possible.'
+    redactSecrets: 'Hide detected secrets from model-visible content when possible.',
+    spendCeiling: {
+      sessionUsd: 'Maximum provider spend per session. Set 0 to disable. Only the user can change this in Settings.',
+      dailyUsd: 'Maximum provider spend shared by all sessions each day. Set 0 to disable.',
+      warningRatio: 'Warn when this fraction of either ceiling is reached, from 0 to 1.',
+      confirmationThresholdUsd:
+        'Ask you once before a task whose worst-case request estimate exceeds this amount. Set 0 to disable.'
+    }
   },
   checkpoints: {
     enabled: 'Create rollback snapshots before file edits.'
@@ -667,6 +680,10 @@ export const SECTIONS: DesktopConfigSection[] = [
       'command_allowlist',
       'security.redact_secrets',
       'security.allow_private_urls',
+      'security.spend_ceiling.session_usd',
+      'security.spend_ceiling.daily_usd',
+      'security.spend_ceiling.warning_ratio',
+      'security.spend_ceiling.confirmation_threshold_usd',
       'browser.allow_private_urls',
       'browser.auto_local_for_private_urls',
       'checkpoints.enabled'

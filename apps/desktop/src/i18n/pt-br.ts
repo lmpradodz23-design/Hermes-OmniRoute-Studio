@@ -61,6 +61,12 @@ export const ptBr = defineLocale(
       resetConfirm: 'Restaurar todas as configurações padrão do Hermes?',
       exportFailed: 'Falha ao exportar',
       resetFailed: 'Falha ao restaurar',
+      fieldLabels: {
+        'security.spendCeiling.sessionUsd': 'Teto por sessão (US$)',
+        'security.spendCeiling.dailyUsd': 'Teto diário (US$)',
+        'security.spendCeiling.warningRatio': 'Percentual de alerta de gastos',
+        'security.spendCeiling.confirmationThresholdUsd': 'Limite para pedir confirmação (US$)'
+      },
       credentials: {
         pasteKey: 'Cole a chave',
         pasteLabelKey: label => `Cole a chave da ${label}`,
@@ -92,7 +98,13 @@ export const ptBr = defineLocale(
         plugins: 'Plugins'
       },
       fieldDescriptions: {
-        model: 'Usado em novas conversas, salvo quando você escolher outro modelo no compositor.'
+        model: 'Usado em novas conversas, salvo quando você escolher outro modelo no compositor.',
+        'security.spendCeiling.sessionUsd':
+          'Gasto máximo com provedores por sessão. Use 0 para desativar. Este valor muda somente pela interface de configurações e vale para novas sessões.',
+        'security.spendCeiling.dailyUsd': 'Gasto máximo diário, somando todas as sessões. Use 0 para desativar.',
+        'security.spendCeiling.warningRatio': 'Mostra um alerta quando esta fração do teto for atingida, entre 0 e 1.',
+        'security.spendCeiling.confirmationThresholdUsd':
+          'Pede sua confirmação uma vez antes de uma tarefa cuja estimativa máxima por chamada ultrapasse este valor. Use 0 para desativar.'
       },
       omniroute: {
         title: 'OmniRoute nativo',

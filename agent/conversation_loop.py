@@ -93,6 +93,11 @@ from agent.trajectory import has_incomplete_scratchpad
 # finalizer at turn end.
 from agent.turn_finalizer import finalize_turn
 from agent.usage_pricing import estimate_usage_cost, normalize_usage
+from agent.spend_ceiling import (
+    SpendCeilingBlocked,
+    estimate_request_spend,
+    request_spend_confirmation,
+)
 from agent import empty_response_guard as _empty_guard
 from hermes_constants import PARTIAL_STREAM_STUB_ID
 from hermes_logging import set_session_context
@@ -2831,6 +2836,7 @@ def run_conversation(
         api_kwargs = None  # Guard against UnboundLocalError in except handler
         api_request_id = f"{turn_id}:api:{api_call_count}"
         agent._current_api_request_id = api_request_id
+        _api_request_cost_usd = None
 
         while retry_count < max_retries:
             # ── Nous Portal rate limit guard ──────────────────────
@@ -2963,6 +2969,73 @@ def run_conversation(
                 except Exception:
                     _original_api_kwargs = dict(api_kwargs)
                     _llm_middleware_trace = []
+
+                # Core spend authorization happens after the final route and
+                # request size are known, but before any plugin or provider can
+                # observe/execute the request. It is deliberately not an MCP
+                # tool and never honors YOLO or model-generated approvals.
+                _spend_policy = agent._spend_ceiling_policy
+                if _spend_policy.config.enabled:
+                    try:
+                        if agent._spend_ceiling_runtime_error:
+                            raise SpendCeilingBlocked(
+                                "BLOCKED: local spend ledger is unavailable; "
+                                "the ceiling cannot be enforced safely"
+                            )
+                        _spend_estimate = estimate_request_spend(
+                            model=agent.model,
+                            provider=agent.provider,
+                            base_url=agent.base_url,
+                            api_key=getattr(agent, "api_key", ""),
+                            input_tokens=approx_tokens,
+                            max_output_tokens=agent.max_tokens,
+                        )
+                        if _spend_estimate is None:
+                            raise SpendCeilingBlocked(
+                                "BLOCKED: spend ceiling is enabled but this "
+                                "route has no trustworthy pricing data"
+                            )
+                        _spend_session_id = agent.session_id or f"ephemeral:{id(agent)}"
+                        _spend_decision = _spend_policy.authorize(
+                            session_id=_spend_session_id,
+                            task_id=effective_task_id,
+                            request_id=api_request_id,
+                            estimated_cost_usd=_spend_estimate,
+                        )
+                        if _spend_decision.requires_confirmation:
+                            _confirmed = request_spend_confirmation(
+                                agent.clarify_callback, _spend_estimate
+                            )
+                            if not _confirmed:
+                                raise SpendCeilingBlocked(
+                                    "BLOCKED: the user did not authorize this "
+                                    "request's estimated spend"
+                                )
+                            _spend_decision = _spend_policy.authorize(
+                                session_id=_spend_session_id,
+                                task_id=effective_task_id,
+                                request_id=api_request_id,
+                                estimated_cost_usd=_spend_estimate,
+                                confirmed=True,
+                            )
+                        if _spend_decision.warning:
+                            agent._spend_ceiling_warning = _spend_decision.warning
+                            agent._buffer_status(f"⚠️ {_spend_decision.warning}")
+                    except SpendCeilingBlocked as exc:
+                        final_response = str(exc)
+                        failed = True
+                        _turn_exit_reason = "spend_ceiling_blocked"
+                        append_message(
+                            messages,
+                            {"role": "assistant", "content": final_response},
+                        )
+                        agent._emit_status(f"⛔ {final_response}")
+                        api_call_count -= 1
+                        agent._api_call_count = api_call_count
+                        break
+
+                if failed and _turn_exit_reason == "spend_ceiling_blocked":
+                    break
 
                 try:
                     from hermes_cli.lifecycle import (
@@ -4064,7 +4137,11 @@ def run_conversation(
                     # usage, so without this the entire advisor spend — usually
                     # the bulk of a MoA turn — is invisible in token counts.
                     _moa_ref_cost = None
-                    _moa_client = getattr(agent, "client", None)
+                    _moa_client = (
+                        getattr(agent, "client", None)
+                        if agent.provider == "moa"
+                        else None
+                    )
                     if _moa_client is not None and hasattr(_moa_client, "consume_reference_usage"):
                         try:
                             _ref_usage, _moa_ref_cost = _moa_client.consume_reference_usage()
@@ -4230,13 +4307,36 @@ def run_conversation(
                     )
                     if cost_result.amount_usd is not None:
                         agent.session_estimated_cost_usd += float(cost_result.amount_usd)
+                    _cost_delta = cost_result.amount_usd
                     # Add MoA advisor cost (already priced per-advisor at each
                     # advisor's own model rate) on top of the aggregator cost.
                     if _moa_ref_cost is not None:
                         try:
                             agent.session_estimated_cost_usd += float(_moa_ref_cost)
+                            from decimal import Decimal
+
+                            _cost_delta = (_cost_delta or Decimal("0")) + Decimal(
+                                str(_moa_ref_cost)
+                            )
                         except (TypeError, ValueError):  # pragma: no cover - defensive
                             pass
+                    _api_request_cost_usd = _cost_delta
+                    if _spend_policy.config.enabled and _api_request_cost_usd is not None:
+                        try:
+                            _spend_status = _spend_policy.settle(
+                                request_id=api_request_id,
+                                actual_cost_usd=_api_request_cost_usd,
+                            )
+                            if _spend_status.warning:
+                                agent._spend_ceiling_warning = _spend_status.warning
+                                agent._buffer_status(f"⚠️ {_spend_status.warning}")
+                        except Exception as exc:
+                            agent._spend_ceiling_runtime_error = str(exc)
+                            logger.error(
+                                "Spend ledger settlement failed closed for request %s: %s",
+                                api_request_id,
+                                exc,
+                            )
                     agent.session_cost_status = cost_result.status
                     agent.session_cost_source = cost_result.source
 
@@ -4261,14 +4361,9 @@ def run_conversation(
                             # advisor cost (each priced at its own rate). Folded
                             # here so state.db's estimated_cost_usd includes the
                             # full MoA spend, matching the folded token counts.
-                            _cost_delta = None
-                            if cost_result.amount_usd is not None:
-                                _cost_delta = float(cost_result.amount_usd)
-                            if _moa_ref_cost is not None:
-                                try:
-                                    _cost_delta = (_cost_delta or 0.0) + float(_moa_ref_cost)
-                                except (TypeError, ValueError):  # pragma: no cover
-                                    pass
+                            _cost_delta_for_db = (
+                                float(_cost_delta) if _cost_delta is not None else None
+                            )
                             # Enqueued, not written: the background writer
                             # applies the delta off the turn thread (a cold
                             # state.db UPDATE here stalled the tool loop for
@@ -4281,7 +4376,7 @@ def run_conversation(
                                 cache_read_tokens=canonical_usage.cache_read_tokens,
                                 cache_write_tokens=canonical_usage.cache_write_tokens,
                                 reasoning_tokens=canonical_usage.reasoning_tokens,
-                                estimated_cost_usd=_cost_delta,
+                                estimated_cost_usd=_cost_delta_for_db,
                                 cost_status=cost_result.status,
                                 cost_source=cost_result.source,
                                 billing_provider=agent.provider,
@@ -6645,6 +6740,12 @@ def run_conversation(
             agent._ephemeral_max_output_tokens = min(_boost, _boost_cap)
             continue
 
+        # A core spend-policy denial is a deliberate terminal result, not a
+        # provider retry failure. Preserve the exact BLOCKED evidence assembled
+        # above and let the outer turn finalizer report it.
+        if failed and _turn_exit_reason == "spend_ceiling_blocked":
+            break
+
         # Guard: if all retries exhausted without a successful response
         # (e.g. repeated context-length errors that exhausted retry_count),
         # the `response` variable is still None. Break out cleanly.
@@ -6719,6 +6820,11 @@ def run_conversation(
                             finish_reason=finish_reason,
                         ),
                         usage=agent._usage_summary_for_api_request_hook(response),
+                        cost_usd=(
+                            float(_api_request_cost_usd)
+                            if _api_request_cost_usd is not None
+                            else None
+                        ),
                         assistant_message=assistant_message,
                         assistant_content_chars=len(_assistant_text),
                         assistant_tool_call_count=len(_assistant_tool_calls),

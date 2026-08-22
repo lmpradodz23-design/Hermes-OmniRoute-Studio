@@ -1749,6 +1749,24 @@ def init_agent(
     except Exception:
         _agent_cfg = {}
 
+    # Snapshot the user-owned spend policy once per agent. Keeping the policy
+    # outside the tool/plugin layer means neither an OmniRoute MCP call nor a
+    # model-authored config mutation can raise the effective ceiling mid-run.
+    from agent.spend_ceiling import SpendCeilingConfig, SpendCeilingPolicy
+
+    _security_cfg = _agent_cfg.get("security", {})
+    if not isinstance(_security_cfg, dict):
+        raise ValueError("security config must be a mapping")
+    _spend_cfg = _security_cfg.get("spend_ceiling", {})
+    if not isinstance(_spend_cfg, dict):
+        raise ValueError("security.spend_ceiling must be a mapping")
+    agent._spend_ceiling_policy = SpendCeilingPolicy(
+        SpendCeilingConfig.from_mapping(_spend_cfg),
+        hermes_home / "runtime" / "security" / "spend-ledger.sqlite3",
+    )
+    agent._spend_ceiling_runtime_error = None
+    agent._spend_ceiling_warning = None
+
     # Codex commentary visibility (display.show_commentary, default true).
     # When true, completed Codex phase=commentary messages are delivered as
     # visible mid-turn updates through the interim message path. When false,

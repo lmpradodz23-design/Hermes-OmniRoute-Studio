@@ -148,6 +148,10 @@ _EXECUTION_WRAPPER_PATTERNS = (
 )
 _MAX_GUARDRAIL_VARIANTS = 64
 _MAX_GUARDRAIL_COMMAND_CHARS = 131_072
+_SPEND_CEILING_REFERENCE = re.compile(
+    r"(?:security[.:'\"/\\-]*spend_ceiling|\bspend_ceiling\b)",
+    re.IGNORECASE,
+)
 
 
 def _serialized(args: Any) -> str:
@@ -163,6 +167,26 @@ def _command_text(args: Dict[str, Any]) -> str:
         value
         for key in ("command", "code", "script")
         if isinstance((value := args.get(key)), str)
+    )
+
+
+def _mutates_user_spend_ceiling(tool_name: str, args: Dict[str, Any]) -> bool:
+    """Detect model-authored mutations of the owner-only local cost policy."""
+    serialized = _serialized(args)
+    if not _SPEND_CEILING_REFERENCE.search(serialized):
+        return False
+    if tool_name in {"terminal", "execute_code"}:
+        executable = _command_text(args)
+        return bool(
+            re.search(r"\bhermes\s+config\s+(?:set|unset|edit)\b", executable, re.I)
+            or re.search(r"(?:^|[\\/])\.hermes[\\/]config\.ya?ml\b", executable, re.I)
+        )
+    if tool_name not in _WRITE_TOOLS:
+        return False
+    return any(
+        path.name.casefold() in {"config.yaml", "config.yml"}
+        and ".hermes" in {part.casefold() for part in path.parts}
+        for path in _candidate_paths(tool_name, args)
     )
 
 
@@ -745,6 +769,15 @@ def on_pre_tool_call(
 ) -> Optional[Dict[str, str]]:
     safe_args = args if isinstance(args, dict) else {}
     executable = _command_text(safe_args)
+
+    if _mutates_user_spend_ceiling(tool_name, safe_args):
+        return {
+            "action": "block",
+            "message": (
+                "O teto local de gastos pertence ao usuário e só pode ser "
+                "alterado pela interface de configurações."
+            ),
+        }
 
     label = _destructive_match(executable) if executable else None
     if label:

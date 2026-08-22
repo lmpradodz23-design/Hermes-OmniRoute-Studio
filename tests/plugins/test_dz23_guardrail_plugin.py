@@ -204,6 +204,36 @@ def test_guardrail_does_not_block_file_content(tmp_path, monkeypatch) -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("tool_name", "args"),
+    [
+        (
+            "write_file",
+            {
+                "path": "~/.hermes/config.yaml",
+                "content": "security:\n  spend_ceiling:\n    session_usd: 999\n",
+            },
+        ),
+        (
+            "terminal",
+            {
+                "command": (
+                    "hermes config set security.spend_ceiling.session_usd 999"
+                )
+            },
+        ),
+    ],
+)
+def test_agent_cannot_mutate_the_user_owned_spend_ceiling(tool_name, args) -> None:
+    plugin = load_plugin()
+
+    decision = plugin.on_pre_tool_call(tool_name, args)
+
+    assert decision is not None
+    assert decision["action"] == "block"
+    assert "interface" in decision["message"].casefold()
+
+
 def test_outside_workspace_write_requires_approval(tmp_path, monkeypatch) -> None:
     plugin = load_plugin()
     workspace = tmp_path / "workspace"
@@ -365,6 +395,7 @@ def test_task_report_tracks_evidence_without_logging_tool_payloads(
         provider="omniroute",
         model="auto/coding",
         usage={"input_tokens": 120, "output_tokens": 30},
+        cost_usd=0.125,
     )
     plugin.on_subagent_stop(
         parent_session_id=session,
@@ -380,6 +411,7 @@ def test_task_report_tracks_evidence_without_logging_tool_payloads(
     assert "src/app.ts" in report
     assert "`write_file`" in report
     assert "omniroute/auto/coding: input=120, output=30 tokens" in report
+    assert "Provider-reported cost captured: $0.125000 USD" in report
     assert "Testing Agent: completed (250 ms)" in report
     assert "Auto-commit/push: disabled" in report
     assert "do-not-log-this" not in report

@@ -2439,6 +2439,15 @@ DEFAULT_CONFIG = {
     "security": {
         "allow_private_urls": False,  # Allow requests to private/internal IPs (for OpenWrt, proxies, VPNs)
         "redact_secrets": True,
+        # Core-enforced cost limits. These are snapshotted when the agent is
+        # created, persisted in a local transactional ledger, and cannot be
+        # raised by an LLM tool call. A value of "0" disables that limit.
+        "spend_ceiling": {
+            "session_usd": "0",
+            "daily_usd": "0",
+            "warning_ratio": "0.80",
+            "confirmation_threshold_usd": "0",
+        },
         # Persisted acknowledgement for unattended model overrides whose tier
         # lets the vendor train on prompts/completions. The startup guard still
         # prints the full warning on every run and never bypasses cost guards.

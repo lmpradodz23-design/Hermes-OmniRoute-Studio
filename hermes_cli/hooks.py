@@ -209,6 +209,7 @@ _DEFAULT_PAYLOADS = {
         "message_count": 4,
         "response_model": "claude-sonnet-4-6",
         "usage": {"input_tokens": 2048, "output_tokens": 512},
+        "cost_usd": 0.03125,
         "assistant_content_chars": 1200,
         "assistant_tool_call_count": 0,
         # Per-advisor metrics on a MoA turn, None otherwise. MoA returns only

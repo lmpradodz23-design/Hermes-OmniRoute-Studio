@@ -150,6 +150,7 @@ function parseConfiguredScopes() {
 }
 
 const BUILTIN_TOOL_SCOPES = new Map([
+  ['omniroute_set_budget_guard', ['write:budget']],
   ['plugin_list', ['read:plugins']],
   ['plugin_install', ['write:plugins']],
   ['plugin_activate', ['write:plugins']],

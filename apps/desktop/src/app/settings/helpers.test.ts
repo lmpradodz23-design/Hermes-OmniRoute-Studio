@@ -29,6 +29,8 @@ describe('settings helpers', () => {
     )
     expect(fieldCopyForSchemaKey(FIELD_LABELS, 'desktop.repo_scan_enabled')).toBeTruthy()
     expect(fieldCopyForSchemaKey(FIELD_DESCRIPTIONS, 'desktop.repo_scan_exclude_paths')).toBeTruthy()
+    expect(fieldCopyForSchemaKey(FIELD_LABELS, 'security.spend_ceiling.session_usd')).toBeTruthy()
+    expect(SECTIONS.find(section => section.id === 'safety')?.keys).toContain('security.spend_ceiling.session_usd')
   })
 
   it('does not shadow the backend schema options for memory.provider', () => {
