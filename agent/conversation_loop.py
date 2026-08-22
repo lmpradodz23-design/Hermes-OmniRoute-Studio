@@ -2970,6 +2970,31 @@ def run_conversation(
                     _original_api_kwargs = dict(api_kwargs)
                     _llm_middleware_trace = []
 
+                # The privacy boundary is evaluated after middleware has
+                # produced the final request route, but before plugins or the
+                # provider can observe any workspace content.
+                _local_only_policy = getattr(agent, "_local_only_policy", None)
+                if _local_only_policy is not None:
+                    _local_only_decision = _local_only_policy.authorize_route(
+                        provider=agent.provider,
+                        base_url=agent.base_url,
+                    )
+                    if not _local_only_decision.allowed:
+                        final_response = _local_only_decision.message
+                        failed = True
+                        _turn_exit_reason = "local_only_blocked"
+                        append_message(
+                            messages,
+                            {"role": "assistant", "content": final_response},
+                        )
+                        agent._emit_status(f"⛔ {final_response}")
+                        api_call_count -= 1
+                        agent._api_call_count = api_call_count
+                        break
+
+                if failed and _turn_exit_reason == "local_only_blocked":
+                    break
+
                 # Core spend authorization happens after the final route and
                 # request size are known, but before any plugin or provider can
                 # observe/execute the request. It is deliberately not an MCP
@@ -3034,7 +3059,7 @@ def run_conversation(
                         agent._api_call_count = api_call_count
                         break
 
-                if failed and _turn_exit_reason == "spend_ceiling_blocked":
+                if failed and _turn_exit_reason in {"local_only_blocked", "spend_ceiling_blocked"}:
                     break
 
                 try:

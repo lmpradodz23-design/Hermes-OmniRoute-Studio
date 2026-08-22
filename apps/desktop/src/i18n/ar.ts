@@ -2195,6 +2195,8 @@ export const ar = defineLocale({
       gatewayOffline: 'البوابة غير متصلة',
       gatewayRestarting: 'جار إعادة التشغيل...',
       gatewayTitle: 'البوابة',
+      localOnly: 'محلي فقط',
+      localOnlyTitle: 'وضع الخصوصية المحلي فقط نشط. تم حظر المزودين البعيدين وأدوات الشبكة.',
       agents: 'الوكلاء',
       closeAgents: 'إغلاق الوكلاء',
       openAgents: 'فتح الوكلاء',

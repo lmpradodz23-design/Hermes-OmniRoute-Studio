@@ -90,12 +90,16 @@ export function getHermesConfigSchema(profile?: null | string): Promise<ConfigSc
   })
 }
 
-export function saveHermesConfig(config: HermesConfigRecord, profile?: null | string): Promise<{ ok: boolean }> {
+export function saveHermesConfig(
+  config: HermesConfigRecord,
+  profile?: null | string,
+  options?: { confirmLocalOnlyDisable?: boolean }
+): Promise<{ ok: boolean }> {
   return hermesApi<{ ok: boolean }>({
     ...profileScoped(profile),
     path: '/api/config',
     method: 'PUT',
-    body: { config }
+    body: { config, confirm_local_only_disable: options?.confirmLocalOnlyDisable === true }
   })
 }
 

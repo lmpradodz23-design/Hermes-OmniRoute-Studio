@@ -2458,6 +2458,9 @@ export const ja = defineLocale({
       gatewayOffline: 'オフライン',
       gatewayRestarting: '再起動中…',
       gatewayTitle: 'ゲートウェイ',
+      localOnly: 'ローカルのみ',
+      localOnlyTitle:
+        'ローカル専用プライバシーモードが有効です。リモートプロバイダーとネットワークツールはブロックされています。',
       agents: 'エージェント',
       closeAgents: 'エージェントを閉じる',
       openAgents: 'エージェントを開く',

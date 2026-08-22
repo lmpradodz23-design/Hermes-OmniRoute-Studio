@@ -1767,6 +1767,13 @@ def init_agent(
     agent._spend_ceiling_runtime_error = None
     agent._spend_ceiling_warning = None
 
+    # Snapshot the privacy boundary beside the spend boundary. This is a core
+    # policy rather than a prompt/plugin hint, so remote routing remains denied
+    # even if an agent attempts to change config during its own run.
+    from agent.local_only import LocalOnlyConfig, LocalOnlyPolicy
+
+    agent._local_only_policy = LocalOnlyPolicy(LocalOnlyConfig.from_mapping(_security_cfg))
+
     # Codex commentary visibility (display.show_commentary, default true).
     # When true, completed Codex phase=commentary messages are delivered as
     # visible mid-turn updates through the interim message path. When false,

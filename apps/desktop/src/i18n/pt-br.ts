@@ -62,6 +62,7 @@ export const ptBr = defineLocale(
       exportFailed: 'Falha ao exportar',
       resetFailed: 'Falha ao restaurar',
       fieldLabels: {
+        'security.localOnly': 'Modo somente local',
         'security.spendCeiling.sessionUsd': 'Teto por sessão (US$)',
         'security.spendCeiling.dailyUsd': 'Teto diário (US$)',
         'security.spendCeiling.warningRatio': 'Percentual de alerta de gastos',
@@ -101,6 +102,8 @@ export const ptBr = defineLocale(
       },
       fieldDescriptions: {
         model: 'Usado em novas conversas, salvo quando você escolher outro modelo no compositor.',
+        'security.localOnly':
+          'Mantém o conteúdo do projeto neste computador: aceita apenas modelos em loopback e bloqueia ferramentas com acesso à rede.',
         'security.spendCeiling.sessionUsd':
           'Gasto máximo com provedores por sessão. Use 0 para desativar. Este valor muda somente pela interface de configurações e vale para novas sessões.',
         'security.spendCeiling.dailyUsd': 'Gasto máximo diário, somando todas as sessões. Use 0 para desativar.',
@@ -110,6 +113,10 @@ export const ptBr = defineLocale(
         'recording.enabled':
           'Cria uma trilha local redigida e somente anexável. Fica desativada por padrão porque pode conter contexto das conversas.',
         'recording.retentionDays': 'Exclui automaticamente as gravações locais depois desta quantidade de dias.'
+      },
+      config: {
+        localOnlyDisableConfirm:
+          'Desativar o modo somente local? Novas conversas poderão enviar conteúdo do projeto para provedores remotos e ferramentas de rede.'
       },
       omniroute: {
         title: 'OmniRoute nativo',
@@ -523,6 +530,11 @@ export const ptBr = defineLocale(
         smartDescription: 'Executar ações seguras e perguntar somente quando houver risco',
         off: 'Ignorar todas as aprovações',
         offDescription: 'Executar sem perguntas; bloqueios críticos de segurança continuam ativos'
+      },
+      statusbar: {
+        localOnly: 'Somente local',
+        localOnlyTitle:
+          'Modo de privacidade somente local ativo. Provedores remotos e ferramentas de rede estão bloqueados.'
       }
     },
     preview: {

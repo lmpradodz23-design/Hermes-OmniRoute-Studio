@@ -423,6 +423,7 @@ export const FIELD_LABELS: Record<string, string> = defineFieldCopy({
   security: {
     redactSecrets: 'Redact Secrets',
     allowPrivateUrls: 'Allow Private URLs',
+    localOnly: 'Local-only mode',
     spendCeiling: {
       sessionUsd: 'Session Spend Ceiling (USD)',
       dailyUsd: 'Daily Spend Ceiling (USD)',
@@ -587,6 +588,8 @@ export const FIELD_DESCRIPTIONS: Record<string, string> = defineFieldCopy({
   },
   security: {
     redactSecrets: 'Hide detected secrets from model-visible content when possible.',
+    localOnly:
+      'Keep workspace content on this computer by allowing only loopback model providers and blocking network-capable tools.',
     spendCeiling: {
       sessionUsd: 'Maximum provider spend per session. Set 0 to disable. Only the user can change this in Settings.',
       dailyUsd: 'Maximum provider spend shared by all sessions each day. Set 0 to disable.',
@@ -689,6 +692,7 @@ export const SECTIONS: DesktopConfigSection[] = [
       'command_allowlist',
       'security.redact_secrets',
       'security.allow_private_urls',
+      'security.local_only',
       'security.spend_ceiling.session_usd',
       'security.spend_ceiling.daily_usd',
       'security.spend_ceiling.warning_ratio',

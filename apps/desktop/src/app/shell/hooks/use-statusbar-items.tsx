@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 
 import { ConnectionSwitcher } from '@/app/chat/sidebar/connection-switcher'
 import type { CommandCenterSection } from '@/app/command-center'
+import { useHermesConfigRecord } from '@/app/hooks/use-config-record'
 import { useApprovalModeStatusbarItem } from '@/app/shell/approval-mode-menu'
 import { ContextUsagePanel } from '@/app/shell/context-usage-panel'
 import { GatewayMenuPanel } from '@/app/shell/gateway-menu-panel'
@@ -86,6 +87,7 @@ export function useStatusbarItems({
   toggleCommandCenter
 }: StatusbarItemsOptions) {
   const { t } = useI18n()
+  const navigate = useNavigate()
   const copy = t.shell.statusbar
   const fileMenu = t.fileMenu
   const primaryActiveSessionId = useStore($activeSessionId)
@@ -125,6 +127,14 @@ export function useStatusbarItems({
   const backendUpdateApply = useStore($backendUpdateApply)
   const desktopVersion = useStore($desktopVersion)
   const connection = useStore($connection)
+
+  const { data: hermesConfig } = useHermesConfigRecord()
+  const securityConfig = hermesConfig?.security
+
+  const localOnly =
+    typeof securityConfig === 'object' && securityConfig !== null
+      ? (securityConfig as Record<string, unknown>).local_only === true
+      : false
 
   // The FOCUSED session (interacted tile, else the primary — the same
   // derivation the titlebar title follows): every session-scoped readout
@@ -220,7 +230,12 @@ export function useStatusbarItems({
   // a second per-session copy of the same fact. Re-derives whenever the cwd or
   // the tree changes; null (no named project) falls back to the cwd leaf below.
   const projectTree = useStore($projectTree)
-  const projectName = useMemo(() => projectNameForCwd(currentCwd), [currentCwd, projectTree])
+
+  const projectName = useMemo(() => {
+    void projectTree
+
+    return projectNameForCwd(currentCwd)
+  }, [currentCwd, projectTree])
 
   const sessionStartedAt = primaryFocused
     ? primarySessionStartedAt
@@ -431,6 +446,17 @@ export function useStatusbarItems({
         variant: 'menu'
       },
       {
+        className: 'bg-amber-500/12 text-amber-700 hover:text-amber-800 dark:text-amber-300',
+        hidden: !localOnly,
+        icon: <Codicon name="lock" size="0.75rem" />,
+        id: 'local-only',
+        label: copy.localOnly,
+        lockedVisible: true,
+        onSelect: () => navigate(`${SETTINGS_ROUTE}?tab=safety&field=security.local_only`),
+        title: copy.localOnlyTitle,
+        variant: 'action'
+      },
+      {
         hidden: !currentCwd,
         icon: <FolderOpen className="size-3" />,
         id: 'workspace-cwd',
@@ -522,6 +548,8 @@ export function useStatusbarItems({
       gatewayRestarting,
       inferenceReady,
       inferenceStatus?.reason,
+      localOnly,
+      navigate,
       openAgents,
       projectName,
       sessionsShowing,

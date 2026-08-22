@@ -2374,6 +2374,8 @@ export const zhHant = defineLocale({
       gatewayOffline: '離線',
       gatewayRestarting: '重新啟動中…',
       gatewayTitle: '閘道',
+      localOnly: '僅限本機',
+      localOnlyTitle: '僅限本機隱私模式已啟用。遠端供應商與網路工具已被封鎖。',
       agents: '代理',
       closeAgents: '關閉代理',
       openAgents: '開啟代理',

@@ -18,6 +18,10 @@ from pydantic import BaseModel, SecretStr, field_validator
 class ConfigUpdate(BaseModel):
     config: dict
     profile: Optional[str] = None
+    # Required only for the privacy-reducing true -> false transition. The
+    # desktop sets this after an explicit confirmation dialog; ordinary saves
+    # and enabling local-only mode leave it false.
+    confirm_local_only_disable: bool = False
 
 
 class EnvVarUpdate(BaseModel):
@@ -738,4 +742,3 @@ class _PluginProvidersPutBody(BaseModel):
 
 class _PluginVisibilityBody(BaseModel):
     hidden: bool
-

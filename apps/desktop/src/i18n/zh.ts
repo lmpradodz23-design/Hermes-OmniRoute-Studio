@@ -873,6 +873,7 @@ export const zh: Translations = {
       invalidJson: '配置 JSON 无效',
       toolsetsWipeConfirm:
         '确定移除所有已启用的工具集吗？这将禁用记忆、终端、网络搜索、委派以及大多数其他工具，直到你重新启用它们。',
+      localOnlyDisableConfirm: '关闭仅本地模式？新会话可能会将工作区内容发送给远程模型提供商和网络工具。',
       keepAwakeTitle: '保持电脑唤醒',
       keepAwakeDesc: '阻止本机休眠，让长时间或通宵运行继续进行。屏幕仍可变暗。',
       disableF12Title: '禁用 F12 开发者工具',
@@ -3032,6 +3033,8 @@ export const zh: Translations = {
       gatewayOffline: '离线',
       gatewayRestarting: '重启中…',
       gatewayTitle: '网关',
+      localOnly: '仅本地',
+      localOnlyTitle: '仅本地隐私模式已启用。远程提供商和网络工具已被阻止。',
       customizeTitle: '在状态栏中显示',
       hideStatusbar: '隐藏状态栏',
       resetStatusbar: '恢复默认设置',

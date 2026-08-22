@@ -116,6 +116,7 @@ function ConfigSettingsInner({
   const [elevenLabsVoiceOptions, setElevenLabsVoiceOptions] = useState<string[] | null>(null)
   const [elevenLabsVoiceLabels, setElevenLabsVoiceLabels] = useState<Record<string, string>>({})
   const saveVersionRef = useRef(0)
+  const localOnlyDisableConfirmedRef = useRef(false)
   const savedDiscoverySignatureRef = useRef<string | undefined>(undefined)
   const [saveVersion, setSaveVersion] = useState(0)
 
@@ -178,7 +179,9 @@ function ConfigSettingsInner({
     const t = window.setTimeout(() => {
       void (async () => {
         try {
-          const result = await saveHermesConfig(config, scopeProfile ?? undefined)
+          const result = await saveHermesConfig(config, scopeProfile ?? undefined, {
+            confirmLocalOnlyDisable: localOnlyDisableConfirmedRef.current
+          })
 
           if (!result.ok) {
             throw new Error(c.autosaveFailed)
@@ -187,6 +190,7 @@ function ConfigSettingsInner({
           // Mirror the saved record into the shared cache so MCP/model surfaces
           // reflect the edit without their own refetch.
           writeConfigCache(config)
+          localOnlyDisableConfirmedRef.current = false
 
           if (saveVersionRef.current === v) {
             // The repo-discovery scan reads the ACTIVE profile's workspace
@@ -221,6 +225,21 @@ function ConfigSettingsInner({
   }
 
   const updateConfig = (next: HermesConfigRecord) => {
+    if (
+      config &&
+      getNested(config, 'security.local_only') === true &&
+      getNested(next, 'security.local_only') === false
+    ) {
+      void confirm({ destructive: true, title: c.localOnlyDisableConfirm }).then(ok => {
+        if (ok) {
+          localOnlyDisableConfirmedRef.current = true
+          applyConfig(next)
+        }
+      })
+
+      return
+    }
+
     // Guard the single most destructive config edit: clearing the entire
     // "Enabled Toolsets" list silently disables memory, terminal, web search,
     // delegation, and most tools, and a stray select-all + Backspace can do it.

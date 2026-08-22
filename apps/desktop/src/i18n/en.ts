@@ -667,6 +667,8 @@ export const en: Translations = {
       invalidJson: 'Invalid config JSON',
       toolsetsWipeConfirm:
         'Remove all enabled toolsets? This disables memory, terminal, web search, delegation, and most other tools until you re-enable them.',
+      localOnlyDisableConfirm:
+        'Turn off local-only mode? New conversations may send workspace content to remote model providers and network tools.',
       keepAwakeTitle: 'Keep computer awake',
       keepAwakeDesc: 'Stop this machine from sleeping so long or overnight runs keep going. The display can still dim.',
       disableF12Title: 'Disable F12 DevTools',
@@ -2872,6 +2874,8 @@ export const en: Translations = {
       gatewayOffline: 'offline',
       gatewayRestarting: 'restarting…',
       gatewayTitle: 'Gateway',
+      localOnly: 'Local only',
+      localOnlyTitle: 'Local-only privacy mode is active. Remote providers and network tools are blocked.',
       customizeTitle: 'Show in status bar',
       hideStatusbar: 'Hide status bar',
       resetStatusbar: 'Reset to defaults',

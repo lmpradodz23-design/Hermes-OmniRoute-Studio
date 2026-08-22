@@ -46,6 +46,35 @@ def broadcast_calls(monkeypatch):
 
 
 class TestApprovalsSaveBroadcast:
+    def test_local_only_disable_requires_confirmation_and_is_audited(self, client):
+        from hermes_constants import get_hermes_home
+        from hermes_cli.config import read_raw_config
+
+        enabled = client.put("/api/config", json={"config": {"security": {"local_only": True}}})
+        assert enabled.status_code == 200
+
+        denied = client.put("/api/config", json={"config": {"security": {"local_only": False}}})
+        assert denied.status_code == 409
+        assert read_raw_config()["security"]["local_only"] is True
+
+        confirmed = client.put(
+            "/api/config",
+            json={
+                "config": {"security": {"local_only": False}},
+                "confirm_local_only_disable": True,
+            },
+        )
+        assert confirmed.status_code == 200
+        assert read_raw_config()["security"]["local_only"] is False
+
+        audit = get_hermes_home() / "runtime" / "security" / "audit.jsonl"
+        assert '"action": "local_only_disabled"' in audit.read_text(encoding="utf-8")
+
+    def test_local_only_is_exposed_by_config_schema(self, client):
+        schema = client.get("/api/config/schema").json()["fields"]
+
+        assert schema["security.local_only"]["type"] == "boolean"
+
     def test_get_shaped_record_roundtrip_does_not_broadcast(self, client, broadcast_calls):
         """The settings page PUTs the defaulted GET record back verbatim on
         every autosave. That must not broadcast: disk holds sparse YAML while

@@ -7646,6 +7646,7 @@ def _denormalize_config_from_web(config: Dict[str, Any]) -> Dict[str, Any]:
 async def update_config(body: ConfigUpdate, profile: Optional[str] = None):
     def _run():
         approvals_mode_changed = False
+        local_only_disabled = False
         with _profile_scope(body.profile or profile):
             # The dashboard form is schema-driven (see CONFIG_SCHEMA). Any root
             # key absent from the schema — most visibly ``custom_providers``, but
@@ -7657,6 +7658,12 @@ async def update_config(body: ConfigUpdate, profile: Optional[str] = None):
                 existing = read_raw_config()
                 incoming = _denormalize_config_from_web(body.config)
                 merged = _deep_merge(existing, incoming)
+                local_only_disabled = _local_only_of(existing) and not _local_only_of(merged)
+                if local_only_disabled and not body.confirm_local_only_disable:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Disabling local-only mode requires explicit user confirmation",
+                    )
                 # Compare normalized approvals.mode across the in-memory
                 # documents, not config blocks and not cache re-reads: the
                 # settings page PUTs the defaulted GET record while disk
@@ -7667,6 +7674,8 @@ async def update_config(body: ConfigUpdate, profile: Optional[str] = None):
                 # it is the honest trigger.
                 approvals_mode_changed = _approval_mode_of(merged) != _approval_mode_of(existing)
                 save_config(merged)
+                if local_only_disabled:
+                    _append_local_only_audit("disabled", body.profile or profile)
         # REST saves bypass the config.set RPC (which re-emits itself), so
         # refresh live sessions' cached approval/YOLO indicators after a mode
         # change. Own-profile saves only: a profile-scoped save targets a
@@ -7694,6 +7703,27 @@ def _is_other_profile(profile: Optional[str]) -> bool:
     except HTTPException:
         return True
     return target.resolve() != get_process_hermes_home().resolve()
+
+
+def _local_only_of(config: Dict[str, Any]) -> bool:
+    security = config.get("security", {}) if isinstance(config, dict) else {}
+    return bool(security.get("local_only", False)) if isinstance(security, dict) else False
+
+
+def _append_local_only_audit(action: str, profile: Optional[str]) -> None:
+    """Append a minimal local privacy-boundary audit record."""
+    from datetime import datetime, timezone
+
+    audit_dir = get_hermes_home() / "runtime" / "security"
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    record = {
+        "action": f"local_only_{action}",
+        "at": datetime.now(timezone.utc).isoformat(),
+        "profile": str(profile or "current"),
+        "source": "user_config_api",
+    }
+    with (audit_dir / "audit.jsonl").open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
 
 
 def _approval_mode_of(config: Dict[str, Any]) -> str:

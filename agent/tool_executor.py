@@ -618,6 +618,12 @@ def _run_agent_tool_execution_middleware(
 
         block_message = scope_block
         block_error_type = "tool_scope_block"
+        local_only_policy = getattr(agent, "_local_only_policy", None)
+        if block_message is None and local_only_policy is not None:
+            local_only_decision = local_only_policy.authorize_tool(function_name, final_args)
+            if not local_only_decision.allowed:
+                block_message = local_only_decision.message
+                block_error_type = "local_only_block"
         if block_message is None:
             block_error_type = "plugin_block"
 
@@ -835,7 +841,14 @@ def _run_sequential_tool_execution_middleware(
         "display_index": display_index,
         "middleware_trace": middleware_trace,
     }
-    if function_name in _NEVER_PARALLEL_TOOLS:
+    local_only_policy = getattr(agent, "_local_only_policy", None)
+    local_only_blocked = False
+    if local_only_policy is not None:
+        local_only_blocked = not local_only_policy.authorize_tool(function_name, function_args).allowed
+
+    # Policy denials never need a worker. Resolve them synchronously so a
+    # blocked network tool cannot even allocate an execution thread.
+    if local_only_blocked or scope_block is not None or function_name in _NEVER_PARALLEL_TOOLS:
         return _run_agent_tool_execution_middleware(agent, **kwargs)
 
     from tools.daemon_pool import DaemonThreadPoolExecutor

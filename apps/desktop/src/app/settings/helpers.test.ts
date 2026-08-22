@@ -30,7 +30,9 @@ describe('settings helpers', () => {
     expect(fieldCopyForSchemaKey(FIELD_LABELS, 'desktop.repo_scan_enabled')).toBeTruthy()
     expect(fieldCopyForSchemaKey(FIELD_DESCRIPTIONS, 'desktop.repo_scan_exclude_paths')).toBeTruthy()
     expect(fieldCopyForSchemaKey(FIELD_LABELS, 'security.spend_ceiling.session_usd')).toBeTruthy()
+    expect(fieldCopyForSchemaKey(FIELD_LABELS, 'security.local_only')).toBe('Local-only mode')
     expect(SECTIONS.find(section => section.id === 'safety')?.keys).toContain('security.spend_ceiling.session_usd')
+    expect(SECTIONS.find(section => section.id === 'safety')?.keys).toContain('security.local_only')
     expect(fieldCopyForSchemaKey(FIELD_LABELS, 'recording.enabled')).toBe('Session Recording')
     expect(fieldCopyForSchemaKey(FIELD_DESCRIPTIONS, 'recording.retention_days')).toContain('days')
     expect(SECTIONS.find(section => section.id === 'safety')?.keys).toEqual(

@@ -557,6 +557,7 @@ export interface Translations {
       imported: string
       invalidJson: string
       toolsetsWipeConfirm: string
+      localOnlyDisableConfirm: string
       keepAwakeTitle: string
       keepAwakeDesc: string
       disableF12Title: string
@@ -2439,6 +2440,8 @@ export interface Translations {
       gatewayOffline: string
       gatewayRestarting: string
       gatewayTitle: string
+      localOnly: string
+      localOnlyTitle: string
       customizeTitle: string
       hideStatusbar: string
       resetStatusbar: string

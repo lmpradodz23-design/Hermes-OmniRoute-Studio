@@ -1636,6 +1636,21 @@ class TestExecuteToolCalls:
         assert messages[0]["role"] == "tool"
         assert "search result" in messages[0]["content"]
 
+    def test_local_only_blocks_egress_tool_before_dispatch(self, agent):
+        from agent.local_only import LocalOnlyConfig, LocalOnlyPolicy
+
+        agent._local_only_policy = LocalOnlyPolicy(LocalOnlyConfig(enabled=True))
+        tc = _mock_tool_call(name="web_search", arguments='{"q":"private"}', call_id="c1")
+        mock_msg = _mock_assistant_msg(content="", tool_calls=[tc])
+        messages = []
+
+        with patch("run_agent.handle_function_call", return_value="leaked") as mock_hfc:
+            agent._execute_tool_calls(mock_msg, messages, "task-1")
+
+        mock_hfc.assert_not_called()
+        assert len(messages) == 1
+        assert "BLOCKED: local-only mode" in messages[0]["content"]
+
     def test_sequential_tool_calls_run_without_delay(self, agent):
         """Two sequential tool calls execute back-to-back with no sleep between them."""
         tc1 = _mock_tool_call(name="web_search", arguments="{}", call_id="c1")
@@ -3171,6 +3186,27 @@ class TestRunConversation:
         assert result["failed"] is True
         assert result["api_calls"] == 0
         assert result["final_response"].startswith("BLOCKED: session spend ceiling")
+        assert agent.client.chat.completions.create.call_count == 0
+
+    def test_local_only_blocks_remote_provider_before_provider_call(self, agent):
+        from agent.local_only import LocalOnlyConfig, LocalOnlyPolicy
+
+        self._setup_agent(agent)
+        agent.model = "gpt-5.6-luna"
+        agent.provider = "openai"
+        agent.base_url = "https://api.openai.com/v1"
+        agent._local_only_policy = LocalOnlyPolicy(LocalOnlyConfig(enabled=True))
+
+        with (
+            patch.object(agent, "_persist_session"),
+            patch.object(agent, "_save_trajectory"),
+            patch.object(agent, "_cleanup_task_resources"),
+        ):
+            result = agent.run_conversation("private client code")
+
+        assert result["failed"] is True
+        assert result["api_calls"] == 0
+        assert result["final_response"].startswith("BLOCKED: local-only mode")
         assert agent.client.chat.completions.create.call_count == 0
 
     def test_spend_confirmation_is_requested_once_per_task(self, agent, tmp_path):

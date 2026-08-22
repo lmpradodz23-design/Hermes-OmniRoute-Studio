@@ -675,6 +675,8 @@ export const ptBrBase: Translations = {
       invalidJson: 'Configura\u00E7\u00E3o inv\u00E1lida JSON',
       toolsetsWipeConfirm:
         'Remover todos os conjuntos de ferramentas ativados? Isso desativa a mem\u00F3ria, o terminal, a pesquisa na web, a delega\u00E7\u00E3o e a maioria das outras ferramentas at\u00E9 que voc\u00EA as reative.',
+      localOnlyDisableConfirm:
+        'Desativar o modo somente local? Novas conversas poder\u00E3o enviar conte\u00FAdo do projeto para provedores remotos e ferramentas de rede.',
       keepAwakeTitle: 'Mantenha o computador acordado',
       keepAwakeDesc:
         'Impe\u00E7a esta m\u00E1quina de dormir por tanto tempo ou as corridas durante a noite continuam. A tela ainda pode escurecer.',
@@ -2949,6 +2951,9 @@ Deixe em branco para manter o ${mode} padr\u00E3o.`,
       gatewayOffline: 'off-line',
       gatewayRestarting: 'reiniciando\u2026',
       gatewayTitle: 'Portal',
+      localOnly: 'Somente local',
+      localOnlyTitle:
+        'Modo de privacidade somente local ativo. Provedores remotos e ferramentas de rede est\u00E3o bloqueados.',
       customizeTitle: 'Mostrar na barra de status',
       hideStatusbar: 'Ocultar barra de status',
       resetStatusbar: 'Redefinir para os padr\u00F5es',
