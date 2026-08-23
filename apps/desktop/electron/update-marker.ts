@@ -238,68 +238,93 @@ function peekMarker(
 export const CLAIM_CS_TTL_MS = 30 * 1000
 const CLAIM_CS_SPIN_MS = 2000 // total time to wait for the CS before failing closed
 
-function claimCsPath(file) {
-  return `${file}.cs`
+// The claim critical section is a DIRECTORY, not a lock file. `mkdir` is the
+// most robust cross-process exclusive-create primitive on both POSIX and
+// Windows/NTFS: CreateDirectory fails atomically if the directory exists, and a
+// directory is free of the file-handle hazards that make an O_EXCL *file* lock
+// unreliable on NTFS (delete-pending-on-open-handle, and MoveFileEx replace
+// failing when a reader has the destination open). This is exactly why mature
+// cross-platform lockers (e.g. proper-lockfile) use a lock directory. The
+// owning token is stamped in a file INSIDE the directory so release is
+// owner-scoped and a reaper's fresh lock is never removed by a slow prior owner.
+function claimCsDir(file) {
+  return `${file}.cslock`
+}
+
+function claimCsOwnerPath(file) {
+  return path.join(claimCsDir(file), 'owner')
 }
 
 /**
- * Enter the claim critical section by atomically creating a CS lock file
- * (`open(..., 'wx')` — O_EXCL). Returns a unique owner token on success, or null
- * if the CS could not be taken within the spin budget (→ caller fails closed).
+ * Atomically reap a CS directory older than the TTL (its holder crashed
+ * mid-claim). Renames the whole directory away first — a directory rename is
+ * atomic and exactly ONE racer wins it (the rest get ENOENT), so two reapers can
+ * never both "remove then recreate" and let two claimants in. The winner then
+ * removes the grave. Best-effort throughout; the caller re-loops afterward.
+ */
+function reapStaleClaimCs(file, pid) {
+  const csDir = claimCsDir(file)
+  const grave = `${csDir}.reap.${pid}.${Date.now()}.${csTokenCounter++}`
+  try {
+    fs.renameSync(csDir, grave) // atomic dir rename; exactly one reaper wins
+  } catch {
+    return // lost the reap race (ENOENT) — someone else handled it
+  }
+  try {
+    fs.unlinkSync(path.join(grave, 'owner'))
+  } catch {
+    void 0
+  }
+  try {
+    fs.rmdirSync(grave)
+  } catch {
+    void 0
+  }
+}
+
+/**
+ * Enter the claim critical section by atomically creating a CS DIRECTORY
+ * (`mkdir`). Returns a unique owner token on success, or null if the CS could
+ * not be taken within the spin budget (→ caller fails closed).
  *
- * A CS older than CLAIM_CS_TTL_MS belonged to a process that crashed mid-claim;
- * it is reaped owner-safely: rename it away (atomic; one reaper wins) then delete
- * the grabbed copy only if it is STILL the stale one — never a fresh CS.
+ * A CS older than CLAIM_CS_TTL_MS belonged to a process that crashed mid-claim
+ * and is reaped atomically (see reapStaleClaimCs). The CS is held for only a
+ * couple of syscalls, so a live holder is never within a TTL of being reaped.
  */
 function enterClaimCs(file, pid): string | null {
-  const cs = claimCsPath(file)
-  // The CS spinlock times itself against REAL wall-clock, because it compares
-  // against the CS file's real mtime and busy-spins in real time. A test's
-  // injected `now` (which controls MARKER staleness) must NOT drive this, or a
-  // constant fake clock would make the spin deadline unreachable and hang.
+  const csDir = claimCsDir(file)
+  const owner = claimCsOwnerPath(file)
+  // The spinlock times itself against REAL wall-clock (it compares against the
+  // CS directory's real mtime and busy-spins in real time). A test's injected
+  // `now` (which controls MARKER staleness) must NOT drive this.
   const now = Date.now
   const token = `${pid}\n${now()}\n${csTokenCounter++}\n${process.pid}`
   const deadline = now() + CLAIM_CS_SPIN_MS
 
   for (;;) {
-    let fd
+    let made = false
     try {
-      fd = fs.openSync(cs, 'wx') // atomic exclusive create
+      fs.mkdirSync(csDir) // atomic exclusive create on POSIX and NTFS
+      made = true
     } catch (err) {
-      if (err && (err as NodeJS.ErrnoException).code === 'EEXIST') {
-        // A CS exists — fall through to inspect/reap it below.
-      } else {
+      if (!(err && (err as NodeJS.ErrnoException).code === 'EEXIST')) {
         return null // unexpected IO error → fail closed
       }
-      fd = undefined
     }
 
-    if (fd !== undefined) {
-      // We created the CS. Write the token; if that fails (e.g. disk full), do
-      // NOT leave an EMPTY cs behind — it would wedge every claim until the TTL
-      // reap. Unlink it and fail closed immediately.
-      let wrote = false
+    if (made) {
+      // We own the CS directory. Stamp ownership so release is owner-scoped. If
+      // the stamp fails, abandon the directory and fail closed (no empty wedge).
       try {
-        fs.writeSync(fd, token)
-        wrote = true
+        fs.writeFileSync(owner, token, 'utf8')
       } catch {
-        wrote = false
-      } finally {
         try {
-          fs.closeSync(fd)
-        } catch {
-          void 0
-        }
-      }
-
-      if (!wrote) {
-        try {
-          fs.unlinkSync(cs)
+          fs.rmdirSync(csDir)
         } catch {
           void 0
         }
 
-        return null // could not stamp the CS → fail closed, no empty-cs wedge
+        return null
       }
 
       return token
@@ -308,46 +333,20 @@ function enterClaimCs(file, pid): string | null {
     // CS is held. Reap it only if it is abandoned (older than the TTL).
     let ageMs = 0
     try {
-      ageMs = now() - fs.statSync(cs).mtimeMs
+      ageMs = now() - fs.statSync(csDir).mtimeMs
     } catch {
-      // Vanished between openSync(EEXIST) and stat → retry immediately.
-      continue
+      continue // vanished between EEXIST and stat → retry immediately
     }
 
     if (ageMs > CLAIM_CS_TTL_MS) {
-      const grave = `${cs}.reap.${pid}.${now()}.${csTokenCounter++}`
-      try {
-        fs.renameSync(cs, grave) // atomic; exactly one reaper wins
-      } catch {
-        continue // lost the reap race → retry the create
-      }
-      // Only delete if it is STILL abandoned (a fresh CS created in the window
-      // would have a young mtime — restore it rather than discard a live CS).
-      try {
-        if (now() - fs.statSync(grave).mtimeMs > CLAIM_CS_TTL_MS) {
-          fs.unlinkSync(grave)
-        } else {
-          try {
-            fs.linkSync(grave, cs)
-          } catch {
-            void 0
-          }
-          try {
-            fs.unlinkSync(grave)
-          } catch {
-            void 0
-          }
-        }
-      } catch {
-        void 0
-      }
+      reapStaleClaimCs(file, pid)
       continue
     }
 
     if (now() >= deadline) {
       return null // a live CS held the section past our budget → fail closed
     }
-    // Brief busy spin; the CS is microseconds-long so this rarely loops.
+
     spinBriefly()
   }
 }
@@ -361,14 +360,24 @@ function spinBriefly() {
   }
 }
 
-/** Release the claim CS only if we still own it (token match) — never delete a
- * reaper's fresh CS. */
+/** Release the claim CS only if we still own it (owner token match) — never
+ * delete a reaper's fresh CS. Removes the owner file, then the directory. */
 function exitClaimCs(file, token: string) {
-  const cs = claimCsPath(file)
+  const owner = claimCsOwnerPath(file)
   try {
-    if (fs.readFileSync(cs, 'utf8') === token) {
-      fs.unlinkSync(cs)
+    if (fs.readFileSync(owner, 'utf8') !== token) {
+      return // not ours (reaped/handed off) — leave it
     }
+  } catch {
+    return // owner file gone → nothing of ours to release
+  }
+  try {
+    fs.unlinkSync(owner)
+  } catch {
+    void 0
+  }
+  try {
+    fs.rmdirSync(claimCsDir(file))
   } catch {
     void 0
   }

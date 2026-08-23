@@ -76,27 +76,61 @@ function seedStaleMarker(home: string) {
   fs.writeFileSync(path.join(home, MARKER), `999999\n${Math.floor(Date.now() / 1000)}\n`)
 }
 
-/** Fork `n` OS processes that each call module.claimUpdateMarker concurrently.
+/**
+ * Fork `n` OS processes that each call module.claimUpdateMarker under a strict
+ * BARRIER so they contend simultaneously, and where a winner HOLDS the marker
+ * until every contender has recorded a result. This makes the concurrency test
+ * DETERMINISTIC rather than dependent on process-spawn timing:
  *
- * A winner HOLDS the marker (stays alive) for a dwell after acquiring, exactly
- * as the desktop holds it across the update handoff — so a genuine *simultaneous*
- * double-acquire shows up as >1 winner, while the benign acquire-then-crash-then-
- * reacquire sequence (which is correct recovery, not a double-update) does not. */
-function raceAcquire(modulePath: string, home: string, n: number): number {
-  const script =
-    'const m=require(process.argv[1]);' +
-    'const r=m.claimUpdateMarker(process.argv[2], process.pid);' +
-    // Hold the claim alive for 500ms so all contenders overlap while a winner
-    // still owns the marker (its pid must read as LIVE to the others).
-    'if (r && r.acquired) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500); }' +
-    'process.stdout.write(r && r.acquired ? "A" : "B");'
+ *   - Barrier: every child busy-waits until a shared wall-clock `startAt`, so
+ *     they all enter claimUpdateMarker at the same instant (maximum contention).
+ *     This is the opposite of "serializing artificially" - it forces overlap
+ *     even on Windows, where spawning node.exe is slow and staggered.
+ *   - Coordinated hold: the winner stays alive (its pid must read LIVE to the
+ *     others) until all `n` result files exist, so a benign acquire-then-exit
+ *     can never masquerade as a second winner, and a genuine simultaneous
+ *     double-acquire always shows as >1.
+ *   - Instrumentation: each child writes `<pid>.res` = "A pid=.. t=.." so a
+ *     failing iteration can be dumped for post-mortem of the real interleaving.
+ *
+ * Returns { winners, dump } where dump is the per-child records (for diagnosis).
+ */
+function raceAcquire(
+  modulePath: string,
+  home: string,
+  n: number
+): Promise<{ winners: number; dump: string }> {
+  const resultsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'marker-res-'))
+  const startAt = Date.now() + 1500 // barrier: ample time for all children to spawn (Windows-slow)
+  const holdMs = 9000
 
-  // Launch all children before waiting on any, so they overlap in the kernel.
+  const script = [
+    'const m=require(process.argv[1]);',
+    'const home=process.argv[2];',
+    'const startAt=Number(process.argv[3]);',
+    'const n=Number(process.argv[4]);',
+    'const dir=process.argv[5];',
+    'const fs=require("fs"),path=require("path");',
+    'const mypid=process.pid;',
+    // BARRIER: all children spin until the shared start instant.
+    'while(Date.now()<startAt){}',
+    'const t0=Date.now();',
+    'const r=m.claimUpdateMarker(home, mypid);',
+    'const acquired=!!(r&&r.acquired);',
+    'try{fs.writeFileSync(path.join(dir,mypid+".res"),(acquired?"A":"B")+" pid="+mypid+" t="+(Date.now()-t0)+"ms owner="+(r&&r.owner?JSON.stringify(r.owner):"-")+"\\n");}catch(e){}',
+    // COORDINATED HOLD: the winner stays alive until every child has recorded,
+    // so it is provably alive during all contenders' attempts.
+    'if(acquired){const dl=Date.now()+' + holdMs + ';for(;;){let c=0;try{c=fs.readdirSync(dir).filter(f=>f.endsWith(".res")).length;}catch(e){}if(c>=n||Date.now()>dl)break;const s=Date.now()+5;while(Date.now()<s){}}}',
+    'process.stdout.write(acquired?"A":"B");'
+  ].join('')
+
   const children = Array.from({ length: n }, () =>
     // eslint-disable-next-line no-undef
-    require('child_process').spawn(process.execPath, ['-e', script, modulePath, home], {
-      stdio: ['ignore', 'pipe', 'ignore']
-    })
+    require('child_process').spawn(
+      process.execPath,
+      ['-e', script, modulePath, home, String(startAt), String(n), resultsDir],
+      { stdio: ['ignore', 'pipe', 'ignore'] }
+    )
   )
 
   const outs: string[] = new Array(n).fill('')
@@ -110,40 +144,48 @@ function raceAcquire(modulePath: string, home: string, n: number): number {
       })
   )
 
-  // Synchronous wait via a tiny sleep loop on a shared flag is awkward; use a
-  // deasync-free approach: block on each child's completion with spawnSync-style
-  // join by polling. Simpler: return a promise from the test instead.
-  return Promise.all(done).then(() => outs.filter(o => o.startsWith('A')).length) as unknown as number
+  return Promise.all(done).then(() => {
+    const winners = outs.filter(o => o.startsWith('A')).length
+    let dump = ''
+    try {
+      for (const f of fs.readdirSync(resultsDir).filter(x => x.endsWith('.res'))) {
+        dump += fs.readFileSync(path.join(resultsDir, f), 'utf8')
+      }
+    } catch {
+      void 0
+    }
+    return { winners, dump }
+  })
 }
 
 test('REAL multi-process: claimUpdateMarker yields exactly one winner over a seeded stale marker', async () => {
-  const ITERATIONS = 15
+  const ITERATIONS = 20
   const CHILDREN = 6
 
   for (let i = 0; i < ITERATIONS; i++) {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), `marker-race-${i}-`))
     seedStaleMarker(home)
-    const winners = await (raceAcquire(realBundle, home, CHILDREN) as unknown as Promise<number>)
-    expect(winners, `iteration ${i} must have exactly one acquirer`).toBe(1)
+    const { winners, dump } = await raceAcquire(realBundle, home, CHILDREN)
+    expect(winners, `iteration ${i} must have exactly one acquirer. Interleaving:\n${dump}`).toBe(1)
   }
-}, 60_000)
+}, 120_000)
 
-test('CANARY: the buggy exists→unlink→write claim produces >1 winner under the same harness', async () => {
-  const ITERATIONS = 15
+test('CANARY: the buggy exists->unlink->write claim produces >1 winner under the same harness', async () => {
+  const ITERATIONS = 10
   const CHILDREN = 6
   let maxWinners = 0
 
   for (let i = 0; i < ITERATIONS; i++) {
     const home = fs.mkdtempSync(path.join(os.tmpdir(), `marker-race-buggy-${i}-`))
     seedStaleMarker(home)
-    const winners = await (raceAcquire(buggyModule, home, CHILDREN) as unknown as Promise<number>)
+    const { winners } = await raceAcquire(buggyModule, home, CHILDREN)
     maxWinners = Math.max(maxWinners, winners)
   }
 
   // If the harness cannot expose the classic TOCTOU, it is too weak to protect
-  // the real implementation — fail so we strengthen it rather than pass falsely.
+  // the real implementation - fail so we strengthen it rather than pass falsely.
   expect(maxWinners, 'harness must be able to observe the two-winner defect').toBeGreaterThan(1)
-}, 60_000)
+}, 120_000)
 
 // Keep spawnSync imported (used indirectly to assert node is available in CI).
 test('node executable is available for the race harness', () => {

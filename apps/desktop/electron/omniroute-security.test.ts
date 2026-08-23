@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
+import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -205,16 +206,58 @@ test('OmniRoute server.js byte drift is blocked by the capability lock', async (
   }
 })
 
-// This is a live integration test: it writes a scoped CLI token into the
-// real OmniRoute SQLite store and drives the actual bridge over stdio. A
-// machine without OmniRoute installed has nothing to integrate with, so it
-// declares a named skip instead of failing red for the wrong reason.
+// This is a live integration test: it writes a scoped CLI token into the real
+// OmniRoute SQLite store and drives the actual bridge over stdio. The bridge is
+// a client of the OmniRoute *gateway* (a SEPARATELY installed OmniRoute
+// component listening on 127.0.0.1:20128); Hermes does not bundle or start it.
+// So this test has TWO preconditions, and BOTH must hold or it skips honestly
+// rather than failing red for the wrong reason:
+//   1. OmniRoute installed (its SQLite store exists), and
+//   2. the OmniRoute gateway is actually RUNNING on 127.0.0.1:20128.
+// The storage file persists on disk long after (or without) the gateway
+// running, so checking the file alone (the old guard) let this test run on a
+// machine where the gateway was down -> ECONNREFUSED 127.0.0.1:20128. We now
+// probe the live dependency and skip with a clear reason when it is absent.
 const OMNIROUTE_STORAGE = path.join(os.homedir(), '.omniroute', 'storage.sqlite')
 const HAS_OMNIROUTE_STORAGE = fs.existsSync(OMNIROUTE_STORAGE)
+const OMNIROUTE_GATEWAY_HOST = '127.0.0.1'
+const OMNIROUTE_GATEWAY_PORT = 20128
+
+/** Best-effort TCP liveness probe for the OmniRoute gateway. Resolves true only
+ * if something is actually listening (so the bridge's fetch would connect). */
+function probeOmniRouteGateway(timeoutMs = 1000): Promise<boolean> {
+  return new Promise(resolve => {
+    let settled = false
+    const finish = (ok: boolean) => {
+      if (settled) return
+      settled = true
+      try {
+        socket.destroy()
+      } catch {
+        void 0
+      }
+      resolve(ok)
+    }
+    const socket = net.connect({ host: OMNIROUTE_GATEWAY_HOST, port: OMNIROUTE_GATEWAY_PORT })
+    socket.setTimeout(timeoutMs)
+    socket.once('connect', () => finish(true))
+    socket.once('timeout', () => finish(false))
+    socket.once('error', () => finish(false))
+  })
+}
 
 test.skipIf(!HAS_OMNIROUTE_STORAGE)(
-  'real MCP bridge exposes privileged tools but denies their missing write scopes (needs a local OmniRoute install)',
-  async () => {
+  'real MCP bridge exposes privileged tools but denies their missing write scopes (needs a local OmniRoute install + running gateway on 127.0.0.1:20128)',
+  async ctx => {
+  // Precondition 2: the gateway must be listening. If not, this is a genuine
+  // external-service dependency being unavailable - skip with a clear reason,
+  // NOT a red failure (the product code correctly refuses an unreachable
+  // gateway; there is nothing to integration-test without it).
+  const gatewayUp = await probeOmniRouteGateway()
+  if (!gatewayUp) {
+    ctx.skip()
+    return
+  }
   const { DatabaseSync } = await import('node:sqlite')
   const databasePath = OMNIROUTE_STORAGE
   const database = new DatabaseSync(databasePath)
