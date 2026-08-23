@@ -207,6 +207,26 @@ if errorlevel 1 (
 )
 call :log "Commit: !R_COMMIT!   HEAD: !R_LOCALHEAD!"
 
+rem =========================== 12b. Completar historia (se shallow) =========
+call :step "Verificando profundidade do repositorio (shallow?)"
+set "ISSHALLOW="
+for /f "usebackq delims=" %%s in (`git rev-parse --is-shallow-repository 2^>nul`) do set "ISSHALLOW=%%s"
+if /I "!ISSHALLOW!"=="true" (
+  call :log "Repositorio e SHALLOW (clone raso). O GitHub rejeita push de clone raso."
+  call :log "Completando a historia a partir do upstream: git fetch --unshallow origin (somente leitura; pode demorar alguns minutos)..."
+  git fetch --unshallow origin >>"%LOG%" 2>&1
+  if errorlevel 1 (
+    call :log "fetch --unshallow retornou erro; tentando git fetch origin --depth=2147483647..."
+    git fetch origin "--depth=2147483647" >>"%LOG%" 2>&1
+  )
+  set "ISSHALLOW="
+  for /f "usebackq delims=" %%s in (`git rev-parse --is-shallow-repository 2^>nul`) do set "ISSHALLOW=%%s"
+  if /I "!ISSHALLOW!"=="true" (call :log "Ainda shallow apos o fetch. Verifique a conexao com github.com e rode o .bat de novo. NADA foi enviado." & set "FAILSTEP=UNSHALLOW" & goto :FAIL)
+  call :log "Historia completa (repositorio nao-shallow)."
+) else (
+  call :log "Repositorio ja tem historia completa (nao-shallow)."
+)
+
 rem =========================== 13. Push (sem force) =========================
 call :step "Push para oss develop (SEM force)"
 git push -u oss HEAD:develop >>"%LOG%" 2>&1 || (set "R_PUSH=FAILED" & set "FAILSTEP=PUSH" & goto :FAIL)
