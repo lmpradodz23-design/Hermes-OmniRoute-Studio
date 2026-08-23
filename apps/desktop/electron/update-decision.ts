@@ -17,6 +17,93 @@
 import { type BackoffState, shouldAttemptUpdate } from './update-backoff'
 import { type InstallState, resolveUpdatePolicy, UpdatePolicy } from './update-policy'
 
+/**
+ * Coleta o InstallState a partir do git — PURO/injetável (sem Electron), para
+ * que o matriz de falhas de leitura seja testável. Regra central (§5): UNKNOWN
+ * != SAFE. Qualquer falha de leitura de uma dimensão que decide divergência
+ * (branch / dirty / origin / ahead) → `{ ok: false }`, e o chamador PULA o
+ * update (inicia o backend, não toca no runtime). `behind` é a única dimensão
+ * "unknown = disponível": uma leitura falha nela vira `null`, não um erro.
+ */
+export interface InstallStateProbe {
+  /** Executa um comando git; DEVE rejeitar/lançar em falha (git ausente, repo inválido, ref ausente, exit != 0). */
+  git: (args: string[]) => Promise<string>
+  /** Resolve a URL do origin; rejeita/lança quando origin está ausente/ilegível. */
+  originUrl: () => Promise<string>
+  /** Canonicaliza um remote e diz se é o upstream oficial. */
+  isOfficialUpstream: (url: string) => boolean
+  /** Branch que o desktop rastreia para update (ex.: 'main'). */
+  updateBranch: string
+}
+
+export interface CollectResult {
+  ok: boolean
+  /** Preenchido apenas quando ok=true. */
+  state: InstallState | null
+  /** Preenchido apenas quando ok=false. */
+  reason: string
+}
+
+export async function collectInstallState(probe: InstallStateProbe): Promise<CollectResult> {
+  let currentBranch: string
+  try {
+    currentBranch = (await probe.git(['rev-parse', '--abbrev-ref', 'HEAD'])).trim()
+  } catch (err) {
+    return { ok: false, state: null, reason: `branch read failed: ${(err as Error).message}` }
+  }
+  if (!currentBranch) {
+    return { ok: false, state: null, reason: 'current branch is empty (git could not determine HEAD)' }
+  }
+
+  let dirty: boolean
+  try {
+    dirty = (await probe.git(['status', '--porcelain'])).trim().length > 0
+  } catch (err) {
+    return { ok: false, state: null, reason: `status read failed: ${(err as Error).message}` }
+  }
+
+  let originUrl: string
+  try {
+    originUrl = (await probe.originUrl()) || ''
+  } catch (err) {
+    return { ok: false, state: null, reason: `origin read failed: ${(err as Error).message}` }
+  }
+
+  let ahead: number
+  try {
+    const aheadStr = (await probe.git(['rev-list', `origin/${probe.updateBranch}..HEAD`, '--count'])).trim()
+    if (!/^\d+$/.test(aheadStr)) {
+      // Ref ausente / saída não-numérica → não podemos afirmar "0 à frente".
+      return { ok: false, state: null, reason: `ahead count unreadable ('${aheadStr}') — origin/${probe.updateBranch} missing?` }
+    }
+    ahead = Number(aheadStr)
+  } catch (err) {
+    return { ok: false, state: null, reason: `ahead read failed (origin/${probe.updateBranch} missing?): ${(err as Error).message}` }
+  }
+
+  // behind: unknown = disponível; falha vira null (seguro).
+  let behind: number | null
+  try {
+    const behindStr = (await probe.git(['rev-list', `HEAD..origin/${probe.updateBranch}`, '--count'])).trim()
+    behind = /^\d+$/.test(behindStr) ? Number(behindStr) : null
+  } catch {
+    behind = null
+  }
+
+  return {
+    ok: true,
+    reason: '',
+    state: {
+      currentBranch,
+      updateBranch: probe.updateBranch,
+      behind,
+      ahead,
+      dirty,
+      remoteIsOfficialUpstream: probe.isOfficialUpstream(originUrl)
+    }
+  }
+}
+
 export enum GateAction {
   PROCEED = 'proceed', // pode iniciar o update
   SKIP_POLICY = 'skip_policy', // fork/divergente → MANUAL_REQUIRED

@@ -154,6 +154,50 @@ class MemoryProvider(ABC):
         """
         return ""
 
+    def local_only_denial(self) -> str:
+        """Reason this provider must NOT be activated under LOCAL_ONLY.
+
+        LOCAL_ONLY (security.local_only) means ZERO cloud egress. A memory
+        provider can ship user content off-machine in many shapes — turns,
+        summaries, extracted facts, embeddings, documents, metadata — to a
+        remote memory SaaS, a cloud embedder, or a remote self-hosted host.
+        This is the SINGLE dispatch-boundary gate the activation path
+        (``agent_init``) checks before a provider is added to the manager and
+        before ``initialize()`` opens any connection.
+
+        Contract:
+          * Return ``""`` only when EVERY route this provider would use stays
+            on the local machine (loopback / local host / in-process, no
+            network). Reuse ``agent.local_only.egress_denial_reason`` — do NOT
+            re-implement the loopback policy.
+          * Return a non-empty human-readable reason when activation could
+            egress content, so the provider is disabled for this session.
+
+        FAIL-CLOSED default: the base class cannot prove an arbitrary provider
+        keeps all egress local, so when LOCAL_ONLY is on it DENIES by default.
+        A provider that is genuinely local — or that inspects its own config to
+        confirm every route is loopback — MUST override this to return ``""``
+        for the local case (see plugins/memory/mem0, plugins/memory/hindsight).
+        An unknown/undeclared provider is never silently trusted: unknown state
+        must never become permission to egress.
+
+        When LOCAL_ONLY is off this returns ``""`` (no restriction).
+        """
+        try:
+            from agent.local_only import config_local_only_enabled
+        except Exception:
+            # Cannot even load the policy → be conservative only if we can tell
+            # local-only is on; without the policy module we cannot, so allow
+            # (matches egress gates elsewhere: policy-load failure is not itself
+            # a local-only signal).
+            return ""
+        if not config_local_only_enabled():
+            return ""
+        return (
+            f"memory provider {self.name!r} does not declare LOCAL_ONLY safety; "
+            "disabled under local-only to prevent memory egress to a remote service"
+        )
+
     def system_prompt_block(self) -> str:
         """Return text to include in the system prompt.
 

@@ -906,6 +906,60 @@ class HindsightMemoryProvider(MemoryProvider):
             return ""
         return _local_runtime_hint(reason).strip()
 
+    def local_only_denial(self) -> str:
+        """LOCAL_ONLY dispatch-gate override (MemoryProvider contract).
+
+        Hindsight can egress user turns/summaries in several shapes; deny any
+        route that leaves the machine, allow a fully-local one. Runs at
+        activation (before initialize), so it reads the persisted config the
+        same way ``is_available`` does. Reuses egress_denial_reason — no
+        duplicate loopback policy.
+
+          * cloud            → remote Hindsight API → denied.
+          * local_external   → denied unless api_url is loopback.
+          * local_embedded   → embeddings are in-process (local), but the
+            embedded fact-extraction LLM can point at a REMOTE provider, which
+            ships turn content off-machine → denied unless that LLM route
+            (provider name / llm_base_url) is local.
+        Unknown mode or unreadable config → fail-closed (deny).
+        """
+        try:
+            from agent.local_only import config_local_only_enabled, egress_denial_reason
+        except Exception:
+            return ""
+        if not config_local_only_enabled():
+            return ""
+        try:
+            cfg = _load_config()
+        except Exception:
+            return "hindsight config could not be read to verify local-only routing"
+        mode = str(cfg.get("mode", "cloud")).strip().lower()
+        if mode == "cloud":
+            return "hindsight cloud mode sends memories to the remote Hindsight API"
+        if mode == "local_external":
+            api_url = str(
+                cfg.get("api_url") or os.environ.get("HINDSIGHT_API_URL", "") or _DEFAULT_LOCAL_URL
+            )
+            if egress_denial_reason(provider="hindsight", base_url=api_url):
+                return f"hindsight local_external API is not local ({api_url})"
+            return ""
+        if mode in ("local", "local_embedded"):
+            llm_provider = str(cfg.get("llm_provider", "")).strip().lower()
+            llm_base_url = str(
+                cfg.get("llm_base_url") or os.environ.get("HINDSIGHT_API_LLM_BASE_URL", "")
+            ).strip()
+            if llm_base_url:
+                if egress_denial_reason(provider=llm_provider, base_url=llm_base_url):
+                    return f"hindsight embedded LLM endpoint is not local ({llm_base_url})"
+                return ""
+            if egress_denial_reason(provider=llm_provider, base_url=""):
+                return (
+                    "hindsight embedded LLM provider is not local "
+                    f"({llm_provider or 'remote default'})"
+                )
+            return ""
+        return f"hindsight mode {mode!r} cannot be verified local under local-only"
+
     def save_config(self, values, hermes_home):
         """Write config to $HERMES_HOME/hindsight/config.json."""
         import json

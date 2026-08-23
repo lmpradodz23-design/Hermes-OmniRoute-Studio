@@ -497,6 +497,11 @@ def build_turn_context(
         # never-raising variant OUTSIDE the argument list, so a resolution
         # failure can only lose the scope — never the whole runtime binding.
         _cache_scope = resolve_prompt_cache_scope_safe(agent) or ""
+        # Propagate the agent's local-only boundary into the auxiliary context so
+        # compression/title/vision/MoA/fallback egress is gated at the client
+        # chokepoint (same policy the main route enforces). Fail-safe read.
+        _lo_policy = getattr(agent, "_local_only_policy", None)
+        _local_only = bool(getattr(getattr(_lo_policy, "config", None), "enabled", False))
         set_runtime_main(
             getattr(agent, "provider", "") or "",
             getattr(agent, "model", "") or "",
@@ -507,6 +512,7 @@ def build_turn_context(
             auth_mode=getattr(agent, "auth_mode", "") or "",
             session_id=getattr(agent, "session_id", "") or "",
             cache_scope=_cache_scope,
+            local_only=_local_only,
         )
     except Exception:
         pass

@@ -152,6 +152,73 @@ class TestOSSBackend:
         assert "api_base" not in captured["embedder"]["config"]
         assert raw == before
 
+    def _stub_mem0(self, monkeypatch, memory):
+        import sys
+        import types
+
+        class Memory:
+            @staticmethod
+            def from_config(config):
+                return memory
+
+        stub_mem0 = types.ModuleType("mem0")
+        stub_mem0.Memory = Memory  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "mem0", stub_mem0)
+
+    def test_local_only_forces_mem0_telemetry_off(self, monkeypatch):
+        # N1 (adversarial): activating a local OSS backend must not re-enable
+        # mem0's default PostHog telemetry (metadata egress the route gate
+        # cannot see). Under local-only the env flag is forced off BEFORE
+        # Memory construction and any live telemetry client is disabled.
+        import agent.local_only as lo
+
+        monkeypatch.setattr(lo, "config_local_only_enabled", lambda: True)
+        monkeypatch.delenv("MEM0_TELEMETRY", raising=False)
+
+        class _Client:
+            def __init__(self):
+                self.disabled = False
+                self.shut = False
+
+            def shutdown(self):
+                self.shut = True
+
+        class _Tel:
+            def __init__(self):
+                self.posthog = _Client()
+
+        mem = FakeOSSMemory()
+        mem.telemetry = _Tel()
+        self._stub_mem0(monkeypatch, mem)
+
+        OSSBackend({
+            "llm": {"provider": "ollama", "config": {"ollama_base_url": "http://127.0.0.1:11434"}},
+            "embedder": {"provider": "ollama", "config": {"ollama_base_url": "http://127.0.0.1:11434"}},
+            "vector_store": {"provider": "qdrant", "config": {"path": "~/.hermes/mem0_qdrant"}},
+        })
+
+        import os
+        assert os.environ.get("MEM0_TELEMETRY") == "false"
+        assert mem.telemetry.posthog.disabled is True
+        assert mem.telemetry.posthog.shut is True
+
+    def test_local_only_off_does_not_force_telemetry(self, monkeypatch):
+        import agent.local_only as lo
+
+        monkeypatch.setattr(lo, "config_local_only_enabled", lambda: False)
+        monkeypatch.delenv("MEM0_TELEMETRY", raising=False)
+        self._stub_mem0(monkeypatch, FakeOSSMemory())
+
+        OSSBackend({
+            "llm": {"provider": "ollama", "config": {}},
+            "embedder": {"provider": "ollama", "config": {}},
+            "vector_store": {"provider": "qdrant", "config": {"path": "~/.hermes/mem0_qdrant"}},
+        })
+
+        import os
+        # Not forced — operator's choice (absent here) is left untouched.
+        assert os.environ.get("MEM0_TELEMETRY") is None
+
 
 httpx = pytest.importorskip("httpx")
 

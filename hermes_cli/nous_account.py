@@ -352,6 +352,19 @@ def get_nous_portal_account_info(
     ``/api/oauth/account`` and bypasses the short-lived cache. JWT claims are
     decoded locally for UX gating only; server APIs remain authoritative.
     """
+    # LOCAL_ONLY = zero cloud egress. Every fresh account/entitlement fetch is a
+    # remote GET to the Nous portal (portal.nousresearch.com/api/oauth/account),
+    # so under local-only we never take a remote path: decode the OAuth JWT
+    # LOCALLY (no network) when present, else report unavailable. This gates the
+    # shared chokepoint so /usage, /topup, and credit views cannot egress.
+    _local_only = False
+    try:
+        from agent.local_only import config_local_only_enabled
+
+        _local_only = bool(config_local_only_enabled())
+    except Exception:
+        _local_only = False
+
     try:
         from hermes_cli.auth import get_provider_auth_state
 
@@ -362,6 +375,15 @@ def get_nous_portal_account_info(
     access_token = state.get("access_token")
     portal_base_url = _portal_base_url(state)
     if not isinstance(access_token, str) or not access_token.strip():
+        if _local_only:
+            # The pool fallbacks (_info_from_oauth_pool / _info_from_inference_key_pool)
+            # may hit the portal — suppress entirely under local-only.
+            return NousPortalAccountInfo(
+                logged_in=False,
+                source="none",
+                fresh=False,
+                portal_base_url=portal_base_url,
+            )
         pool_oauth_info = _info_from_oauth_pool(
             force_fresh=force_fresh,
             min_jwt_ttl_seconds=min_jwt_ttl_seconds,
@@ -379,7 +401,9 @@ def get_nous_portal_account_info(
             portal_base_url=portal_base_url,
         )
 
-    if not force_fresh:
+    # Under local-only, force the local JWT-decode path (never a fresh remote
+    # fetch), regardless of the caller's force_fresh.
+    if not force_fresh or _local_only:
         jwt_info = _info_from_valid_jwt(
             access_token,
             state=state,
@@ -388,6 +412,16 @@ def get_nous_portal_account_info(
         )
         if jwt_info is not None:
             return jwt_info
+
+    if _local_only:
+        # Have a token but no usable local snapshot (e.g. expired JWT) and no
+        # egress allowed → degraded state (logged in, no remote refresh).
+        return NousPortalAccountInfo(
+            logged_in=True,
+            source="none",
+            fresh=False,
+            portal_base_url=portal_base_url,
+        )
 
     return _fresh_account_info(
         state=state,

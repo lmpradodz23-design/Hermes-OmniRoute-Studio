@@ -611,6 +611,21 @@ def redeem_codex_reset_credit(
     """
     import uuid
 
+    # LOCAL_ONLY = zero cloud egress. This does a remote GET *and* a POST write
+    # to the Codex backend (chatgpt.com), so under local-only it is suppressed
+    # entirely rather than reaching a cloud SaaS. Same chokepoint contract as
+    # fetch_account_usage.
+    try:
+        from agent.local_only import config_local_only_enabled
+
+        if config_local_only_enabled():
+            return CodexResetRedeemResult(
+                status="unavailable",
+                message="Account reset is unavailable under local-only mode (no cloud egress).",
+            )
+    except Exception:
+        pass
+
     try:
         token, resolved_base_url, account_id = _resolve_codex_usage_credentials(base_url, api_key)
     except Exception:
@@ -890,6 +905,17 @@ def fetch_account_usage(
     normalized = str(provider or "").strip().lower()
     if normalized in {"", "auto", "custom"}:
         return None
+    # LOCAL_ONLY = zero cloud egress. Every account-usage endpoint is a remote
+    # SaaS (api.anthropic.com, chatgpt.com, openrouter) with no loopback form, so
+    # under local-only this fetch is suppressed entirely rather than shipping
+    # account metadata off-machine. Single chokepoint for all three providers.
+    try:
+        from agent.local_only import config_local_only_enabled
+
+        if config_local_only_enabled():
+            return None
+    except Exception:
+        pass
     try:
         if normalized == "openai-codex":
             return _fetch_codex_account_usage(base_url=base_url, api_key=api_key)

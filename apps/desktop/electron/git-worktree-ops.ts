@@ -310,6 +310,13 @@ async function addWorktree(repoPath, options, gitBin) {
     // latest remote commit. Local branches are used as-is.
     const base = String(opts.base)
 
+    // A git refname can never legitimately begin with '-'. Reject it: pushed
+    // positionally at the end of the argv, a base like '--exec=…' or '-x' would
+    // be parsed by git as a FLAG (argument injection), not a commit-ish.
+    if (base.startsWith('-')) {
+      throw new Error(`invalid base ref (must not start with '-'): ${base}`)
+    }
+
     if (base.startsWith('origin/')) {
       const remoteBranch = base.slice('origin/'.length)
 

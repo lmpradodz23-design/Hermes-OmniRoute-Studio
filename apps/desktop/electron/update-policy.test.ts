@@ -59,6 +59,30 @@ describe('resolveUpdatePolicy — fork guard (P0 root cause)', () => {
     expect(d.autoUpdateAllowed).toBe(false)
   })
 
+  // --- Fail-open hardening (audit P1): unknown != safe ---
+  // Before the fix, an empty currentBranch (a failed `git rev-parse`) skipped the
+  // branch-mismatch check, so an otherwise-official/clean/ahead-0 state resolved
+  // to AUTO — a git-read anomaly could auto-update and clobber a custom checkout.
+  it('J. an UNKNOWN current branch (failed git read) does NOT auto-update (unknown != safe)', () => {
+    const d = resolveUpdatePolicy(official({ currentBranch: '', behind: 5 }))
+    expect(d.policy).toBe(UpdatePolicy.MANUAL_REQUIRED)
+    expect(d.autoUpdateAllowed).toBe(false)
+    expect(d.reasons.join(' ')).toContain('desconhecido')
+  })
+
+  it('K. an UNKNOWN update branch also forces manual (cannot confirm tracked branch)', () => {
+    const d = resolveUpdatePolicy(official({ updateBranch: '', behind: 5 }))
+    expect(d.policy).toBe(UpdatePolicy.MANUAL_REQUIRED)
+    expect(d.autoUpdateAllowed).toBe(false)
+  })
+
+  // Canary: this MUST fail if the unknown-branch guard is removed from
+  // resolveUpdatePolicy. It pins that a blank branch can never be AUTO.
+  it('CANARY: blank branch is never AUTO', () => {
+    expect(resolveUpdatePolicy(official({ currentBranch: '' })).policy).not.toBe(UpdatePolicy.AUTO)
+    expect(resolveUpdatePolicy(official({ updateBranch: '' })).policy).not.toBe(UpdatePolicy.AUTO)
+  })
+
   it('collects every reason when several fork signals combine', () => {
     const d = resolveUpdatePolicy(
       official({ currentBranch: 'fork', updateBranch: 'main', dirty: true, ahead: 2, remoteIsOfficialUpstream: false })

@@ -158,6 +158,25 @@ class OSSBackend(Mem0Backend):
 
     def __init__(self, oss_config: dict):
         import os
+
+        # LOCAL_ONLY: mem0's OSS library initializes a PostHog telemetry client
+        # (default ON) that captures event metadata — an anonymous UUID, the
+        # configured provider names, and mem0 add/search operations — to
+        # us.i.posthog.com. That is metadata egress the route-level gate cannot
+        # see (the endpoint is hardcoded in the library, not in this config), so
+        # under local-only we force it OFF *before* constructing Memory. When
+        # local-only is off we leave the operator's MEM0_TELEMETRY choice alone.
+        _local_only = False
+        try:
+            from agent.local_only import config_local_only_enabled
+
+            _local_only = bool(config_local_only_enabled())
+        except Exception:
+            _local_only = False
+        if _local_only:
+            os.environ["MEM0_TELEMETRY"] = "false"
+            os.environ["MEM0_TELEMETRY_ENABLED"] = "false"
+
         from mem0 import Memory
 
         def _provider_block(name: str) -> dict:
@@ -204,6 +223,25 @@ class OSSBackend(Mem0Backend):
             "version": "v1.1",
         }
         self._memory = Memory.from_config(config)
+
+        # Belt-and-suspenders: if this mem0 version already constructed a
+        # telemetry client despite the env flag, neutralize it so no event can
+        # be captured under local-only.
+        if _local_only:
+            try:
+                _tel = getattr(self._memory, "telemetry", None)
+                _client = getattr(_tel, "posthog", None) if _tel is not None else None
+                if _client is not None:
+                    try:
+                        _client.disabled = True
+                    except Exception:
+                        pass
+                    try:
+                        _client.shutdown()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
     @staticmethod
     def _recreate_collection_if_dims_changed(provider: str, vs_config: dict, expected_dims: int) -> None:

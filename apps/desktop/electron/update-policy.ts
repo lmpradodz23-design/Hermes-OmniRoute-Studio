@@ -53,6 +53,13 @@ export function resolveUpdatePolicy(state: InstallState): UpdateDecision {
   const currentBranch = (state.currentBranch || '').trim()
   const updateBranch = (state.updateBranch || '').trim()
 
+  // Unknown != safe. If we could not determine the current branch (git read
+  // failed → empty) or the tracked update branch, we CANNOT confirm this is the
+  // official tracked branch, so we must NOT auto-update — a failed read must
+  // never be silently treated as "on the tracked branch, not divergent".
+  if (!currentBranch || !updateBranch) {
+    reasons.push('não foi possível determinar o branch atual/rastreado do checkout (estado desconhecido → manual)')
+  }
   if (currentBranch && updateBranch && currentBranch !== updateBranch) {
     reasons.push(`checkout está no branch '${currentBranch}', mas o update rastreia '${updateBranch}'`)
   }

@@ -285,6 +285,21 @@ test('addWorktree: base param branches off a specified local branch', async () =
   }
 })
 
+test('addWorktree: a base starting with "-" is rejected (no git-flag injection)', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-base-inj-'))
+  try {
+    await ensureGitRepo('git', dir)
+    await assert.rejects(
+      () => addWorktree(dir, { base: '--exec=touch /tmp/hermes_pwned', branch: 'x', name: 'x' }, 'git'),
+      /invalid base ref/
+    )
+    // CANARY intent: without the guard, git would parse the base as a flag.
+    assert.equal(fs.existsSync('/tmp/hermes_pwned'), false)
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 test('addWorktree: base origin/main does not set up upstream tracking', async () => {
   // Two repos: a bare "remote" and a clone, so origin/main resolves as a
   // remote-tracking ref — the condition that triggers auto-tracking.

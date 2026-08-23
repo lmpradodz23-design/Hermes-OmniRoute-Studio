@@ -264,7 +264,174 @@ class Mem0MemoryProvider(MemoryProvider):
         from ._setup import post_setup
         post_setup(hermes_home, config)
 
+    def local_only_denial(self) -> str:
+        """Public LOCAL_ONLY dispatch-gate contract (MemoryProvider override).
+
+        This runs at ACTIVATION (agent_init), BEFORE ``initialize()`` — so it
+        must resolve config from disk the same way ``is_available`` does, not
+        from ``self._mode`` / ``self._config`` (still the ``__init__`` defaults
+        of platform/None at that point, which would deny every mode blindly and
+        leave the OSS/self-hosted logic dead). Reuses the same loopback policy as
+        model egress — no duplicate policy.
+        """
+        try:
+            from agent.local_only import config_local_only_enabled
+        except Exception:
+            return ""
+        if not config_local_only_enabled():
+            return ""
+        cfg = _load_config()
+        return self._local_only_denial_for(
+            cfg.get("mode", "platform"), cfg.get("host", ""), cfg
+        )
+
+    def _local_only_denial(self) -> str:
+        """Backend-factory variant, called from ``_create_backend`` AFTER
+        ``initialize()`` has populated the instance. Falls back to disk if the
+        instance is not yet initialized, so it can never disagree with the
+        activation gate above.
+        """
+        try:
+            from agent.local_only import config_local_only_enabled
+        except Exception:
+            return ""
+        if not config_local_only_enabled():
+            return ""
+        if self._config is not None:
+            return self._local_only_denial_for(self._mode, self._host, self._config)
+        cfg = _load_config()
+        return self._local_only_denial_for(
+            cfg.get("mode", "platform"), cfg.get("host", ""), cfg
+        )
+
+    @classmethod
+    def _local_only_denial_for(cls, mode, host, config) -> str:
+        """Shared LOCAL_ONLY decision over a resolved (mode, host, config).
+
+        - Platform (cloud): always denied.
+        - Self-hosted: denied unless the host is loopback.
+        - OSS (in-process): denied if the embedder / llm / vector store route is
+          not local (that is where the embedding + fact-extraction content goes).
+        Returns '' when every route stays on the local machine.
+        """
+        from agent.local_only import egress_denial_reason
+
+        if mode == "oss":
+            oss = (config or {}).get("oss", {}) or {}
+            # embedder/llm/vector_store are what OSSBackend wires today; graph_store
+            # and reranker are gated too as defense-in-depth so that if either is
+            # ever passed to mem0.Memory a remote endpoint cannot egress unchecked.
+            for block_key in ("embedder", "llm", "vector_store", "graph_store", "reranker"):
+                reason = cls._oss_block_denial(block_key, oss.get(block_key, {}) or {})
+                if reason:
+                    return reason
+            return ""
+        if host:
+            if egress_denial_reason(provider="mem0", base_url=str(host)):
+                return f"mem0 self-hosted host is not local ({host})"
+            return ""
+        return "mem0 Platform (cloud) sends memories to a remote service"
+
+    @staticmethod
+    def _oss_block_denial(block_key, block) -> str:
+        """Deny one OSS block (embedder/llm/vector_store) whose route egresses.
+
+        Extracts EVERY route string, not a fixed key list, because _backend.py
+        remaps legacy keys (e.g. ``api_base``) onto the canonical base-url key —
+        a remote ``api_base`` under a "local" provider name (ollama) must not
+        slip past. Two shapes are recognised:
+          * scheme'd URLs (``http://…``) → checked as-is.
+          * bare host / host:port under a host/url/endpoint/base-named key (mem0's
+            qdrant vector_store uses ``{host, port}`` with no scheme) → checked as
+            ``http://<value>`` so a remote host still trips the loopback rule
+            while a bare ``localhost`` is correctly allowed.
+        Any non-loopback route → deny. No route string at all → judged by the
+        provider name (openai → cloud default).
+        """
+        from agent.local_only import egress_denial_reason
+
+        # ONLY the optional blocks (graph_store/reranker) are safe to skip when
+        # absent/empty — mem0 treats them as disabled. embedder/llm/vector_store
+        # must NOT be skipped when present-but-empty: mem0 defaults a providerless
+        # embedder/llm to the OpenAI CLOUD (and vector_store likewise), so an empty
+        # `{}` block there still egresses and must be denied (fall through to the
+        # provider-name check, which denies a "remote default").
+        is_empty = not block or (not block.get("provider") and not block.get("config"))
+        if is_empty and block_key in ("graph_store", "reranker"):
+            return ""
+
+        cfg = block.get("config", {}) or {}
+        provider = str(block.get("provider", "")).strip().lower()
+        # Endpoint-ish keys whose value is a route even without a scheme. Kept
+        # wide (server/node/address/uri as well as host/url/endpoint/base) so a
+        # remote endpoint can't hide under an unusual key name and ride the
+        # provider-name allowlist (defense-in-depth for N3).
+        _route_key_tokens = (
+            "host", "url", "endpoint", "base", "server", "node", "address", "uri",
+        )
+
+        def _as_route(value: str) -> str:
+            v = value.strip()
+            if "://" in v:
+                return v
+            # Bracket a bare IPv6 literal so it parses as a host, not host:port.
+            if v.count(":") >= 2 and not v.startswith("["):
+                return f"http://[{v}]"
+            return f"http://{v}"
+
+        routes = []
+        has_local_path = False
+        for key, value in cfg.items():
+            key_l = str(key).lower()
+            if key_l in ("path", "persist_directory") or "path" in key_l:
+                # An embedded on-disk store (qdrant/chroma/faiss path=…) is a
+                # local filesystem sink — no network. Note it (N2: the DEFAULT
+                # mem0 vector store is an on-disk qdrant and must not be denied).
+                # But a "path" whose VALUE is a URL is a remote locator, not a
+                # filesystem path — route it instead of trusting the key name
+                # (N2b: don't let a remote hide under a path key).
+                if isinstance(value, str) and value.strip():
+                    if "://" in value:
+                        routes.append(_as_route(value))
+                    else:
+                        has_local_path = True
+                continue
+            if not isinstance(value, str) or not value.strip():
+                continue
+            if "://" in value or any(tok in key_l for tok in _route_key_tokens):
+                routes.append(_as_route(value))
+        if routes:
+            # An explicit network route is authoritative even if a path is also
+            # present (a remote server never becomes local via a path key).
+            for route in routes:
+                if egress_denial_reason(provider=provider, base_url=route):
+                    return f"mem0 OSS {block_key} route is not local ({route})"
+            return ""
+        if has_local_path:
+            return ""  # embedded on-disk, no network route → local
+        if egress_denial_reason(provider=provider, base_url=""):
+            return f"mem0 OSS {block_key} provider is not local ({provider or 'remote default'})"
+        return ""
+
     def _create_backend(self):
+        # local-only: refuse a backend that would egress user content off-machine.
+        _lo = self._local_only_denial()
+        if _lo:
+            logger.error("Mem0 disabled under local-only: %s", _lo)
+            self._init_error = f"local-only: {_lo}"
+            return None
+        # N1 hardening: force mem0's PostHog telemetry OFF as early as possible —
+        # before the lazy-install and ANY `from mem0 import` the backend triggers
+        # — so no import-time flag latch or construction-time init event can leak
+        # metadata under local-only, regardless of process import order. Forced
+        # (not setdefault): under local-only we override an operator "true".
+        try:
+            from agent.local_only import config_local_only_enabled
+            if config_local_only_enabled():
+                os.environ["MEM0_TELEMETRY"] = "false"
+                os.environ["MEM0_TELEMETRY_ENABLED"] = "false"
+        except Exception:
+            pass
         # Lazy-install the mem0 SDK on demand before either backend imports
         # it. ensure() honors security.allow_lazy_installs (default true) and,
         # on a sealed Docker venv, redirects the install to the durable

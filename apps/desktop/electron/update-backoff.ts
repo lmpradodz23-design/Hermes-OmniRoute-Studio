@@ -88,12 +88,27 @@ export function recordUpdateSuccess(now: number): BackoffState {
 }
 
 /**
- * Parse tolerante do estado persistido (JSON em disco). Um arquivo ausente,
- * vazio, corrompido ou parcial NUNCA derruba o boot nem "esquece" o backoff de
- * forma insegura — campos inválidos caem para o INITIAL (sem backoff), e um
- * `backoffUntil` só é respeitado se for um número finito. Puro/testável.
+ * Janela conservadora aplicada quando o arquivo de backoff EXISTE mas está
+ * corrompido (JSON inválido / não-objeto). Um arquivo ausente/vazio é legítimo
+ * (INITIAL, sem backoff); um arquivo PRESENTE porém ilegível pode ser um estado
+ * de falha truncado — zerá-lo reabriria o loop de update. Sem `now` (default e
+ * testes puros) mantém o comportamento antigo (INITIAL).
  */
-export function parseBackoffState(raw: string | null | undefined): BackoffState {
+function corruptBackoffState(now: number): BackoffState {
+  if (!(now > 0)) {
+    return { ...INITIAL_BACKOFF_STATE }
+  }
+  return recordUpdateFailure({ ...INITIAL_BACKOFF_STATE }, now, 'corrupt-backoff-file', 'failed')
+}
+
+/**
+ * Parse tolerante do estado persistido (JSON em disco). Um arquivo ausente ou
+ * vazio → INITIAL (sem backoff). Um arquivo PRESENTE porém corrompido/parcial
+ * NUNCA derruba o boot; com `now` fornecido aplica uma janela de backoff
+ * conservadora (não "esquece" o backoff de forma insegura). `backoffUntil` só é
+ * respeitado se for um número finito. Puro/testável.
+ */
+export function parseBackoffState(raw: string | null | undefined, now = 0): BackoffState {
   if (!raw) {
     return { ...INITIAL_BACKOFF_STATE }
   }
@@ -101,17 +116,23 @@ export function parseBackoffState(raw: string | null | undefined): BackoffState 
   try {
     obj = JSON.parse(raw)
   } catch {
-    return { ...INITIAL_BACKOFF_STATE }
+    return corruptBackoffState(now)
   }
   if (!obj || typeof obj !== 'object') {
-    return { ...INITIAL_BACKOFF_STATE }
+    return corruptBackoffState(now)
   }
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
+  // Bound an absurd FUTURE backoffUntil (a corrupt/partial file claiming e.g. the
+  // year 3000 must NOT disable updates indefinitely). When `now` is known, clamp
+  // to now + max window. A negative/past value is harmless (shouldAttemptUpdate
+  // just attempts), so only the upper bound needs clamping.
+  const clampFuture = (v: number) =>
+    now > 0 && v > now + DEFAULT_MAX_BACKOFF_MS ? now + DEFAULT_MAX_BACKOFF_MS : v
   const result = obj.lastResult
   return {
     lastResult: result === 'ok' || result === 'failed' || result === 'blocked' ? result : null,
     lastAttemptAt: num(obj.lastAttemptAt),
-    backoffUntil: num(obj.backoffUntil),
+    backoffUntil: clampFuture(num(obj.backoffUntil)),
     retryCount: Math.max(0, Math.floor(num(obj.retryCount))),
     lastFailureReason: typeof obj.lastFailureReason === 'string' ? obj.lastFailureReason.slice(0, 500) : ''
   }

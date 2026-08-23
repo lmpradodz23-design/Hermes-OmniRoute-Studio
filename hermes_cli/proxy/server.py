@@ -62,6 +62,43 @@ def _json_error(status: int, message: str, code: str = "proxy_error") -> "web.Re
     return web.json_response(body, status=status)
 
 
+class _LocalOnlyProxyBlock(Exception):
+    """Raised inside _send_upstream when LOCAL_ONLY forbids the resolved upstream."""
+
+
+def _local_only_upstream_denial(base_url: str) -> str:
+    """Denial reason if LOCAL_ONLY forbids forwarding to *base_url*, else ''.
+
+    Defense-in-depth against the proxy-indirection bypass: the agent connects to
+    this forwarder on loopback (which passes the client-side local-only gate),
+    but the forwarder attaches credentials and relays to the adapter's REMOTE
+    upstream (nous_portal, xai, …). Without this check, a loopback proxy would
+    launder chat/embeddings/completions egress straight past LOCAL_ONLY. Reuses
+    the SAME loopback policy as the model/aux boundary — no duplicate policy.
+
+    Only bites when security.local_only is active; returns '' otherwise so the
+    forwarder behaves exactly as before for normal (non-local-only) sessions.
+    """
+    try:
+        from agent.local_only import config_local_only_enabled, egress_denial_reason
+    except Exception:
+        # If we cannot even load the policy we cannot prove local-only is on;
+        # do not invent a restriction (matches the model/aux boundary).
+        return ""
+    try:
+        if not config_local_only_enabled():
+            return ""
+    except Exception:
+        return ""
+    reason = egress_denial_reason(provider="proxy-upstream", base_url=str(base_url or ""))
+    if reason:
+        return (
+            "BLOCKED: local-only mode forbids the credential proxy from "
+            f"forwarding to a non-loopback upstream ({base_url or 'unconfigured'})"
+        )
+    return ""
+
+
 def _filter_request_headers(headers: "aiohttp.typedefs.LooseHeaders") -> dict:
     """Strip hop-by-hop + auth headers from the inbound request."""
     out = {}
@@ -136,6 +173,12 @@ def create_app(adapter: UpstreamAdapter) -> "web.Application":
         timeout = aiohttp.ClientTimeout(total=None, sock_connect=15, sock_read=300)
 
         async def _send_upstream(active_cred: UpstreamCredential):
+            # LOCAL_ONLY: refuse to relay to a non-loopback upstream. Checked
+            # here (not just in handle_proxy) so it also covers the retry
+            # credential, whose base_url can differ from the first.
+            _lo = _local_only_upstream_denial(getattr(active_cred, "base_url", ""))
+            if _lo:
+                raise _LocalOnlyProxyBlock(_lo)
             upstream_url = f"{active_cred.base_url.rstrip('/')}{rel_path}"
             # Preserve query string verbatim.
             if request.query_string:
@@ -170,6 +213,9 @@ def create_app(adapter: UpstreamAdapter) -> "web.Application":
         async def _open_upstream(active_cred: UpstreamCredential):
             try:
                 return await _send_upstream(active_cred)
+            except _LocalOnlyProxyBlock as exc:
+                logger.error("proxy: %s", exc)
+                return _json_error(403, str(exc), code="local_only_egress_blocked"), None
             except RuntimeError as exc:
                 return _json_error(500, str(exc)), None
             except aiohttp.ClientError as exc:

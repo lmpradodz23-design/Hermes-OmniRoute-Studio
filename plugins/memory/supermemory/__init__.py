@@ -575,6 +575,33 @@ class SupermemoryMemoryProvider(MemoryProvider):
         # Mirrors honcho/mem0, which check config only. No network calls.
         return bool(get_secret("SUPERMEMORY_API_KEY", ""))
 
+    def local_only_denial(self) -> str:
+        """LOCAL_ONLY dispatch-gate override (MemoryProvider contract).
+
+        Supermemory is a remote SaaS by default (api.supermemory.ai) but also
+        supports a self-hosted server via base_url / SUPERMEMORY_BASE_URL. Under
+        local-only, deny any non-loopback base URL (the SDK client AND the
+        conversation-ingest urllib POST both target it, shipping turns/summaries/
+        memories off-machine); allow a loopback self-hosted server. Runs at
+        activation (before initialize), so it resolves base_url the same way
+        initialize() will. Reuses egress_denial_reason — no duplicate policy.
+        """
+        try:
+            from agent.local_only import config_local_only_enabled, egress_denial_reason
+        except Exception:
+            return ""
+        if not config_local_only_enabled():
+            return ""
+        try:
+            from hermes_constants import get_hermes_home
+            cfg = _load_supermemory_config(str(get_hermes_home()))
+            base_url = _resolve_base_url(cfg.get("base_url", ""))
+        except Exception:
+            base_url = _resolve_base_url("")  # cloud default → denied below
+        if egress_denial_reason(provider="supermemory", base_url=base_url):
+            return f"supermemory base URL is not local ({base_url})"
+        return ""
+
     def get_config_schema(self):
         # Only prompt for the API key during `hermes memory setup`.
         # All other options are documented for $HERMES_HOME/supermemory.json

@@ -1865,7 +1865,30 @@ def init_agent(
                 agent._memory_manager = _MemoryManager()
                 _mp = _load_mem(_mem_provider_name)
                 if _mp and _mp.is_available():
-                    agent._memory_manager.add_provider(_mp)
+                    # LOCAL_ONLY dispatch-boundary gate: before the provider is
+                    # registered (and before initialize() opens any connection),
+                    # refuse any provider that would ship memory content to a
+                    # remote service. This is the SINGLE chokepoint for all
+                    # external memory providers — fail-closed for any provider
+                    # that does not prove local-only safety (see
+                    # MemoryProvider.local_only_denial). Do NOT move this into
+                    # each plugin.
+                    try:
+                        _lo_denial = _mp.local_only_denial()
+                    except Exception:
+                        # A provider whose self-check raises cannot prove it is
+                        # local → deny (unknown state is never permission).
+                        _lo_denial = "local-only self-check failed"
+                    if _lo_denial:
+                        logger.error(
+                            "Memory provider %r disabled under LOCAL_ONLY: %s",
+                            _mem_provider_name, _lo_denial,
+                        )
+                        _warn_memory_provider_unavailable(
+                            _mem_provider_name, f"local-only: {_lo_denial}"
+                        )
+                    else:
+                        agent._memory_manager.add_provider(_mp)
                 elif _mp is not None:
                     # Skip the (potentially expensive) unavailable_reason() call
                     # if we've already warned for this provider — the gateway

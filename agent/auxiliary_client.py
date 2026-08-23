@@ -256,11 +256,83 @@ def _openai_http_client_kwargs(
         return {}
     return {"http_client": client}
 
+_LOCAL_ONLY_CFG_CACHE: Dict[str, Any] = {"val": None, "ts": 0.0}
+
+
+def _config_local_only_fallback() -> bool:
+    """Process-level fallback for auxiliary calls that run with NO turn context
+    (background/CLI paths: kanban_specify/decompose, profile_describer, goals…).
+    Those never call set_runtime_main, so the ContextVar has no local_only flag.
+    Read the PERSISTED security.local_only (briefly cached) so those paths are
+    gated too. Fail-open (False) only if the config genuinely can't be read —
+    matching the historical 'no context → allow' default so non-local-only
+    installs are never broken."""
+    import time
+
+    now = time.monotonic()
+    c = _LOCAL_ONLY_CFG_CACHE
+    if c["val"] is None or (now - c["ts"]) > 30.0:
+        try:
+            from agent.local_only import config_local_only_enabled
+
+            c["val"] = config_local_only_enabled()
+        except Exception:
+            c["val"] = False
+        c["ts"] = now
+    return bool(c["val"])
+
+
+def _local_only_denial(base_url: str, provider: str = "") -> str:
+    """Non-raising predicate: '' if this route is allowed for THIS context, else
+    the denial reason. Returns '' when local-only is not active (no-op). Single
+    source of truth for the raising chokepoints AND the fallback chain (which
+    SKIPS a blocked provider so a later loopback fallback can still win).
+
+    When a turn context IS present it is authoritative (respects an explicit
+    local_only=False turn). When there is NO context (background/CLI aux call),
+    fall back to the persisted config so those paths are gated too.
+    """
+    try:
+        ctx = _RUNTIME_MAIN_CONTEXT.get()
+    except Exception:
+        ctx = None
+
+    if ctx is not None and "local_only" in ctx:
+        active = bool(ctx.get("local_only"))
+        ctx_provider = ctx.get("provider") or ""
+    else:
+        active = _config_local_only_fallback()
+        ctx_provider = ""
+
+    if not active:
+        return ""
+    from agent.local_only import egress_denial_reason
+
+    return egress_denial_reason(provider=provider or ctx_provider or "", base_url=base_url)
+
+
+def _enforce_local_only_egress(base_url: str, provider: str = "") -> None:
+    """Fail-closed auxiliary egress boundary. When THIS context is local-only,
+    any non-loopback model route raises LocalOnlyViolation BEFORE a client is
+    built — so compression/title/vision/MoA/one-shot/plugin-LLM/cloud-fallback
+    can never send content off the machine. No context / not local-only → no-op
+    (zero behavior change). Shares the loopback rule with the main-route policy.
+    """
+    reason = _local_only_denial(base_url, provider)
+    if reason:
+        from agent.local_only import LocalOnlyViolation
+
+        raise LocalOnlyViolation(reason)
+
+
 def _create_openai_client(*, api_key: str, base_url: str, **kwargs: Any) -> Any:
     if _aux_probe_active():
         # Availability probe: credentials/base_url resolved — that is the
         # answer. Skip the openai import + httpx/SSL construction entirely.
         return _AuxProbeClientStub(api_key=api_key, base_url=base_url)
+    # Central privacy chokepoint: 15+ construction sites route through here, so a
+    # new auxiliary caller cannot accidentally escape local-only.
+    _enforce_local_only_egress(base_url)
     kwargs = {**_openai_http_client_kwargs(base_url), **kwargs}
     # Hermes owns auxiliary retry + provider/model fallback policy (the
     # same-provider transient retry in call_llm plus the except-chain
@@ -2736,6 +2808,7 @@ def _resolve_api_key_provider() -> Tuple[Optional[OpenAI], Optional[str]]:
                 from agent.gemini_native_adapter import GeminiNativeClient, is_native_gemini_base_url
 
                 if is_native_gemini_base_url(base_url):
+                    _enforce_local_only_egress(base_url, "gemini")
                     return GeminiNativeClient(api_key=api_key, base_url=base_url), model
             extra = {}
             if base_url_host_matches(base_url, "api.kimi.com"):
@@ -2776,6 +2849,7 @@ def _resolve_api_key_provider() -> Tuple[Optional[OpenAI], Optional[str]]:
             from agent.gemini_native_adapter import GeminiNativeClient, is_native_gemini_base_url
 
             if is_native_gemini_base_url(base_url):
+                _enforce_local_only_egress(base_url, "gemini")
                 return GeminiNativeClient(api_key=api_key, base_url=base_url), model
         extra = {}
         if base_url_host_matches(base_url, "api.kimi.com"):
@@ -3449,6 +3523,7 @@ def set_runtime_main(
     auth_mode: str = "",
     session_id: str = "",
     cache_scope: str = "",
+    local_only: bool = False,
 ) -> contextvars.Token:
     """Record the current context's live main runtime for auxiliary routing.
 
@@ -3477,6 +3552,11 @@ def set_runtime_main(
         "auth_mode": (auth_mode or "").strip().lower(),
         "session_id": (session_id or "").strip(),
         "cache_scope": (cache_scope or "").strip(),
+        # Privacy boundary for THIS context's auxiliary egress (#local-only).
+        # Read by _enforce_local_only_egress at the client-construction chokepoint
+        # so compression/title/vision/MoA/fallback can never reach a remote
+        # provider under local-only. Defaults false → no behavior change.
+        "local_only": bool(local_only),
     }
     # Publish authoritative context before updating locked compatibility
     # mirrors; concurrent sessions never read those mirrors at runtime.
@@ -5403,8 +5483,24 @@ def _try_payment_fallback(
             _log_skip_unhealthy(label, task)
             tried.append(f"{label} (unhealthy)")
             continue
-        client, model = try_fn()
+        # Local-only: a cloud fallback after a local failure is exactly the egress
+        # §11 forbids. The provider builders now RAISE LocalOnlyViolation at
+        # construction, so catch it and SKIP this provider — a later loopback
+        # fallback in the chain can still win (that is the whole point of the
+        # chain). Never let the raise abort the chain, never send off-machine.
+        from agent.local_only import LocalOnlyViolation
+
+        try:
+            client, model = try_fn()
+        except LocalOnlyViolation:
+            tried.append(f"{label} (local-only blocked)")
+            continue
         if client is not None:
+            # Belt-and-suspenders for any builder that returns a blocked client
+            # WITHOUT raising (defensive; the raising path above is primary).
+            if _local_only_denial(str(getattr(client, "base_url", "") or "")):
+                tried.append(f"{label} (local-only blocked)")
+                continue
             logger.info(
                 "Auxiliary %s: %s on %s — falling back to %s (%s)",
                 task or "call", reason, failed_provider, label, model or "default",
@@ -6042,13 +6138,29 @@ def _resolve_auto_route(
 
     # ── Step 3: aggregator / fallback chain ──────────────────────────────
     tried = []
+    from agent.local_only import LocalOnlyViolation
+
     for label, try_fn in _get_provider_chain():
         if _is_provider_unhealthy(label):
             _log_skip_unhealthy(label)
             tried.append(f"{label} (unhealthy)")
             continue
-        client, model = try_fn()
+        # Local-only: skip a provider whose builder raises (remote route); a later
+        # loopback provider in the chain can still win. Never abort the chain.
+        try:
+            client, model = try_fn()
+        except LocalOnlyViolation:
+            tried.append(f"{label} (local-only blocked)")
+            continue
         if client is not None:
+            # Belt-and-suspenders (mirrors _try_payment_fallback): if a builder
+            # returned a blocked client WITHOUT raising (e.g. a native adapter
+            # whose inner gate was bypassed), deny it here too. This is the outer
+            # layer that makes the GeminiNativeClient egress fail-closed even if
+            # its per-site gate were removed.
+            if _local_only_denial(str(getattr(client, "base_url", "") or "")):
+                tried.append(f"{label} (local-only blocked)")
+                continue
             if tried:
                 logger.info("Auxiliary auto-detect: using %s (%s) — skipped: %s",
                             label, model or "default", ", ".join(tried))
@@ -6116,6 +6228,11 @@ def _to_async_client(sync_client, model: str, is_vision: bool = False):
 
     if isinstance(sync_client, _AuxProbeClientStub):
         return sync_client, model
+    # Local-only boundary for EVERY async client (native adapters included) —
+    # placed ABOVE the isinstance early-returns so Anthropic/Bedrock/Gemini-native/
+    # Codex async wrappers cannot escape it. Native cloud adapters carry a remote
+    # base_url (or none → defaults remote), so this denies them under local-only.
+    _enforce_local_only_egress(str(getattr(sync_client, "base_url", "") or ""))
     if isinstance(sync_client, CodexAuxiliaryClient):
         return AsyncCodexAuxiliaryClient(sync_client), model
     if isinstance(sync_client, AnthropicAuxiliaryClient):
@@ -6181,6 +6298,9 @@ def _to_async_client(sync_client, model: str, is_vision: bool = False):
     # See _create_openai_client: disable SDK-internal retries so Hermes owns
     # the auxiliary retry/timeout budget (issue #54465).
     async_kwargs.setdefault("max_retries", 0)
+    # Same fail-closed local-only boundary as the sync factory — the async path
+    # (streaming MoA aggregator, async aux calls) must not escape it.
+    _enforce_local_only_egress(sync_base_url)
     return AsyncOpenAI(**async_kwargs), model
 
 
@@ -6196,7 +6316,7 @@ def _normalize_resolved_model(model_name: Optional[str], provider: str) -> Optio
         return model_name
 
 
-def resolve_provider_client(
+def _resolve_provider_client_impl(
     provider: str,
     model: str = None,
     async_mode: bool = False,
@@ -7035,6 +7155,18 @@ def resolve_provider_client(
 
 
 # ── Public API ──────────────────────────────────────────────────────────────
+
+def resolve_provider_client(*args: Any, **kwargs: Any) -> Tuple[Optional[Any], Optional[str]]:
+    """Central router (public). Thin wrapper over the impl that enforces the
+    local-only egress boundary on the RESOLVED client — so native adapters
+    (Anthropic / Bedrock / Vertex / Gemini-native / Codex) that build their own
+    clients without touching _create_openai_client cannot escape local-only.
+    """
+    client, resolved_model = _resolve_provider_client_impl(*args, **kwargs)
+    if client is not None and not isinstance(client, _AuxProbeClientStub):
+        _enforce_local_only_egress(str(getattr(client, "base_url", "") or ""))
+    return client, resolved_model
+
 
 def get_text_auxiliary_client(
     task: str = "",

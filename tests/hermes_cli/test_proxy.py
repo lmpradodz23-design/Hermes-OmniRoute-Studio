@@ -366,6 +366,104 @@ def test_server_strips_client_auth_header():
 
 
 # ---------------------------------------------------------------------------
+# LOCAL_ONLY — proxy-indirection egress guard
+#
+# The credential proxy runs on loopback (the client-side local-only gate sees
+# only 127.0.0.1 and passes), but it relays to the adapter's REMOTE upstream.
+# Under security.local_only the forwarder must refuse a non-loopback upstream,
+# or it would launder egress straight past LOCAL_ONLY.
+# ---------------------------------------------------------------------------
+
+
+def _patch_local_only(monkeypatch_value: bool):
+    import agent.local_only as lo
+    _orig = lo.config_local_only_enabled
+    lo.config_local_only_enabled = lambda: monkeypatch_value
+    return lo, _orig
+
+
+def test_local_only_blocks_remote_upstream():
+    """Under local-only, a non-loopback upstream is refused with 403 (never connected)."""
+    lo, orig = _patch_local_only(True)
+
+    async def run():
+        # Remote base_url — the guard must fire BEFORE any outbound connection,
+        # so no real server for this host is needed.
+        adapter = FakeAdapter("https://blocked.example.com/v1",
+                              allowed=["/chat/completions", "/embeddings"])
+        proxy_runner, proxy_base = await _start_runner(create_app(adapter))
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(f"{proxy_base}/v1/embeddings", json={"input": "secret"}) as resp:
+                    payload = await resp.json()
+                    assert resp.status == 403, payload
+                    assert payload["error"]["code"] == "local_only_egress_blocked"
+        finally:
+            await proxy_runner.cleanup()
+
+    try:
+        asyncio.run(run())
+    finally:
+        lo.config_local_only_enabled = orig
+
+
+def test_local_only_allows_loopback_upstream():
+    """Under local-only, a loopback upstream is forwarded normally."""
+    lo, orig = _patch_local_only(True)
+
+    async def run():
+        captured: Dict[str, Any] = {"requests": []}
+        upstream_runner, upstream_base = await _start_runner(_build_fake_upstream(captured))
+        # upstream_base is http://127.0.0.1:<port> — loopback → allowed.
+        adapter = FakeAdapter(f"{upstream_base}/v1", allowed=["/embeddings"])
+        proxy_runner, proxy_base = await _start_runner(create_app(adapter))
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(f"{proxy_base}/v1/embeddings", json={"input": "x"}) as resp:
+                    await resp.read()
+                    assert resp.status == 200
+            assert len(captured["requests"]) == 1  # upstream WAS reached
+        finally:
+            await proxy_runner.cleanup()
+            await upstream_runner.cleanup()
+
+    try:
+        asyncio.run(run())
+    finally:
+        lo.config_local_only_enabled = orig
+
+
+def test_local_only_off_allows_remote_upstream_canary():
+    """CANARY: with local-only OFF the remote upstream is forwarded (guard must not over-block).
+
+    If the guard fired regardless of the local_only flag this would 502/timeout
+    trying to reach the loopback echo server via a 'remote' label — instead we
+    point at a real loopback echo and confirm normal 200 passthrough.
+    """
+    lo, orig = _patch_local_only(False)
+
+    async def run():
+        captured: Dict[str, Any] = {"requests": []}
+        upstream_runner, upstream_base = await _start_runner(_build_fake_upstream(captured))
+        adapter = FakeAdapter(f"{upstream_base}/v1", allowed=["/embeddings"])
+        proxy_runner, proxy_base = await _start_runner(create_app(adapter))
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(f"{proxy_base}/v1/embeddings", json={"input": "x"}) as resp:
+                    await resp.read()
+                    assert resp.status == 200
+            assert len(captured["requests"]) == 1
+        finally:
+            await proxy_runner.cleanup()
+            await upstream_runner.cleanup()
+
+    try:
+        asyncio.run(run())
+    finally:
+        lo.config_local_only_enabled = orig
+
+
+# ---------------------------------------------------------------------------
 # CLI handlers
 # ---------------------------------------------------------------------------
 

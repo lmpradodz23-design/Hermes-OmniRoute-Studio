@@ -330,10 +330,15 @@ import {
   shouldCountCommits
 } from './update-count'
 import { waitForUpdateClearance } from './update-gate'
-import { readLiveUpdateMarker, updateHandoffConflict, writeUpdateMarker } from './update-marker'
+import {
+  claimUpdateMarker,
+  readLiveUpdateMarker,
+  releaseUpdateMarker,
+  writeUpdateMarker
+} from './update-marker'
 import { canonicalGitHubRemote, isOfficialSshRemote, OFFICIAL_REPO_CANONICAL, OFFICIAL_REPO_HTTPS_URL } from './update-remote'
 import { UpdatePolicy } from './update-policy'
-import { decideUpdateGate, GateAction } from './update-decision'
+import { collectInstallState, decideUpdateGate, GateAction } from './update-decision'
 import {
   type BackoffState,
   INITIAL_BACKOFF_STATE,
@@ -853,7 +858,10 @@ const DESKTOP_UPDATE_BACKOFF_PATH = path.join(app.getPath('userData'), 'update-b
 
 function readUpdateBackoffState(): BackoffState {
   try {
-    return parseBackoffState(fs.readFileSync(DESKTOP_UPDATE_BACKOFF_PATH, 'utf-8'))
+    // Pass `now` so a PRESENT-but-corrupt file applies a conservative backoff
+    // window instead of resetting to zero (which would re-open the update loop).
+    // A genuinely absent file throws ENOENT here → INITIAL (legitimate, no backoff).
+    return parseBackoffState(fs.readFileSync(DESKTOP_UPDATE_BACKOFF_PATH, 'utf-8'), Date.now())
   } catch {
     return { ...INITIAL_BACKOFF_STATE }
   }
@@ -861,7 +869,12 @@ function readUpdateBackoffState(): BackoffState {
 
 function writeUpdateBackoffState(state: BackoffState): void {
   try {
-    fs.writeFileSync(DESKTOP_UPDATE_BACKOFF_PATH, serializeBackoffState(state))
+    // Atomic write: a crash/power-loss mid-write must not leave a torn/corrupt
+    // file. Write a temp sibling then rename (atomic on the same filesystem);
+    // parseBackoffState still tolerates a corrupt file if a rename ever fails.
+    const tmp = `${DESKTOP_UPDATE_BACKOFF_PATH}.tmp-${process.pid}`
+    fs.writeFileSync(tmp, serializeBackoffState(state))
+    fs.renameSync(tmp, DESKTOP_UPDATE_BACKOFF_PATH)
   } catch (err) {
     rememberLog(`[updates] could not persist update backoff state: ${(err as Error).message}`)
   }
@@ -3615,25 +3628,46 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean; force?: boolean 
       const guardRoot = resolveUpdateRoot()
 
       if (directoryExists(path.join(guardRoot, '.git'))) {
-        const git = (args: string[]) => runGit(args, { cwd: guardRoot }).then(r => r.stdout.trim())
+        // Strict git wrapper: a non-zero exit (missing ref, broken repo) or a
+        // spawn error (git missing) REJECTS — so collectInstallState treats it as
+        // "unknown" instead of masking it into a benign '' / '0'. Local to this
+        // gate block; other callers keep the resolve-with-code contract.
+        const git = async (args: string[]): Promise<string> => {
+          const r = await runGit(args, { cwd: guardRoot })
+          if (r.code !== 0) {
+            throw new Error(`git ${args.join(' ')} exited ${r.code}`)
+          }
+          return r.stdout.trim()
+        }
         const { branch: updateBranch } = readDesktopUpdateConfig()
-        const [currentBranch, dirtyStr, originUrl] = await Promise.all([
-          git(['rev-parse', '--abbrev-ref', 'HEAD']).catch(() => ''),
-          git(['status', '--porcelain']).catch(() => ''),
-          getOriginUrl(guardRoot).catch(() => '')
-        ])
-        const aheadStr = await git(['rev-list', `origin/${updateBranch}..HEAD`, '--count']).catch(() => '0')
-        const behindStr = await git(['rev-list', `HEAD..origin/${updateBranch}`, '--count']).catch(() => '')
+
+        // Unknown != safe. Any failed read of a divergence-deciding dimension
+        // (branch / dirty / origin / ahead) → collector returns !ok → we SKIP
+        // (start backend, touch nothing). This is exactly how a git-read anomaly
+        // on an official-origin custom checkout is prevented from slipping through
+        // to AUTO and clobbering local work. Pure + unit-tested in update-decision.
+        const collected = await collectInstallState({
+          git,
+          originUrl: () => getOriginUrl(guardRoot),
+          isOfficialUpstream: url => canonicalGitHubRemote(url) === OFFICIAL_REPO_CANONICAL,
+          updateBranch
+        })
+
+        if (!collected.ok) {
+          rememberLog(
+            '[updates] auto-update SKIPPED — could not determine the checkout state ' +
+              `(unknown is treated as unsafe): ${collected.reason}. Starting backend normally; the runtime was not touched.`
+          )
+          startHermes().catch(() => {})
+          return {
+            ok: false,
+            error: 'update-state-unknown',
+            skipped: 'skip-state-unknown'
+          }
+        }
 
         const gate = decideUpdateGate({
-          installState: {
-            currentBranch,
-            updateBranch,
-            behind: behindStr === '' ? null : Number(behindStr),
-            ahead: Number(aheadStr) || 0,
-            dirty: dirtyStr.length > 0,
-            remoteIsOfficialUpstream: canonicalGitHubRemote(originUrl) === OFFICIAL_REPO_CANONICAL
-          },
+          installState: collected.state,
           backoffState: readUpdateBackoffState(),
           now: Date.now(),
           force: false
@@ -3667,9 +3701,16 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean; force?: boolean 
         }
       }
     } catch (err) {
-      // A guard failure must never block a legitimate update nor crash boot —
-      // log and fall through to the normal path.
-      rememberLog(`[updates] update-gate check errored (proceeding): ${(err as Error).message}`)
+      // A guard failure must FAIL SAFE: an unknown state is NOT permission to
+      // run the destructive handoff (kill backend → swap → relaunch), which is
+      // what would clobber a fork and loop the boot. Start the backend normally
+      // and SKIP the update. Only an explicit operator `force` reaches the
+      // update path when the guard cannot decide.
+      rememberLog(
+        `[updates] update-gate check errored — SKIPPING update (fail-safe, runtime untouched): ${(err as Error).message}`
+      )
+      startHermes().catch(() => {})
+      return { ok: false, error: 'update-gate-error', skipped: 'skip-gate-error' }
     }
   }
 
@@ -3678,6 +3719,12 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean; force?: boolean 
   }
 
   updateInFlight = true
+  // Whether we successfully handed off to the updater. On success the marker MUST
+  // remain (it gates a relaunched desktop from respawning a backend the updater
+  // kills — #50238), even on the stale-staged-updater branch where the marker
+  // still holds OUR pid because writeUpdateMarker(child) was skipped. So the
+  // finally releases our claim ONLY on failure paths, never on success.
+  let handedOff = false
 
   try {
     const updater = resolveUpdaterBinary()
@@ -3739,17 +3786,23 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean; force?: boolean 
       rememberLog('[updates] no staged updater; using repo hand-off script for CLI install')
     }
 
-    const handoffConflict = updateHandoffConflict(HERMES_HOME)
+    // ATOMIC cross-process claim (closes the TOCTOU where two desktop instances
+    // both pass updateHandoffConflict's check and both start a destructive
+    // update). At most one process acquires; the loser refuses WITHOUT touching
+    // the backend (still running). A live foreign updater blocks; a stale/dead
+    // marker is self-healed. Released in the finally (only if still ours) so a
+    // failed attempt never wedges the next boot. Runs BEFORE any backend kill.
+    const claim = claimUpdateMarker(HERMES_HOME, process.pid)
 
-    if (handoffConflict) {
-      // A different updater already owns the marker — most often a previous
-      // "Update" click whose updater is still alive and parked mid-run.
-      // Spawning another here would overwrite its claim and let two updaters
-      // mutate the checkout at once (#75778); refuse instead.
-      rememberLog(`[updates] refusing hand-off: ${handoffConflict.message}`)
-      emitUpdateProgress({ stage: 'error', message: handoffConflict.message, percent: null })
+    if (!claim.acquired) {
+      const message =
+        claim.owner && claim.owner.pid > 0
+          ? `An update is already running (PID ${claim.owner.pid}). Wait for it to finish, then try again.`
+          : 'Another update is already starting. Try again in a moment.'
+      rememberLog(`[updates] refusing hand-off (atomic claim not acquired): ${message}`)
+      emitUpdateProgress({ stage: 'error', message, percent: null })
 
-      return { ok: false, error: 'update-already-running', message: handoffConflict.message }
+      return { ok: false, error: 'update-already-running', message }
     }
 
     emitUpdateProgress({
@@ -3793,6 +3846,13 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean; force?: boolean 
         'Update aborted: another process is holding the Hermes install open ' +
         '(a second Hermes window or a terminal running hermes?). Close it and retry.'
 
+      // P0: this failure already stopped our backend (releaseBackendLockForUpdate)
+      // and restarts it below. Without persisting backoff, the NEXT boot re-attempts
+      // the update, stops the backend again, and re-hits the same external holder —
+      // the boot-loop symptom. Record the failure so the next boot backs off.
+      writeUpdateBackoffState(
+        recordUpdateFailure(readUpdateBackoffState(), Date.now(), 'backend-lock-not-released: external venv holder', 'blocked')
+      )
       emitUpdateProgress({ stage: 'error', message, percent: null })
       startHermes().catch(() => {})
 
@@ -3972,6 +4032,12 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean; force?: boolean 
       const message = `Update failed to start: ${handoffOutcome.message}. Hermes will keep running — try again, or run \`hermes update\` from a terminal.`
 
       rememberLog(`[updates] hand-off not viable, aborting quit: ${handoffOutcome.message}`)
+      // P0: the backend was already stopped for the hand-off and is restarted
+      // here. Persist the failure so the NEXT boot backs off instead of
+      // re-attempting, stopping the backend again, and looping.
+      writeUpdateBackoffState(
+        recordUpdateFailure(readUpdateBackoffState(), Date.now(), `updater-spawn-failed: ${handoffOutcome.message}`, 'failed')
+      )
       emitUpdateProgress({ stage: 'error', message, percent: null })
       startHermes().catch(() => {})
 
@@ -3986,8 +4052,37 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean; force?: boolean 
       Math.max(0, UPDATE_HANDOFF_DWELL_MS - (Date.now() - dwellStartedAt))
     )
 
+    handedOff = true
     return { ok: true, handedOff: true, updater }
+  } catch (err) {
+    // (release of our atomic claim happens in the finally below)
+    // Fail-safe backstop: ANY unhandled throw in the update body (e.g. a
+    // synchronous spawn error AFTER releaseBackendLockForUpdate already stopped
+    // the backend) must NOT leave the backend down with no backoff — that is the
+    // boot-loop shape. Record the failure so the next boot backs off, and restart
+    // the backend (idempotent if it is still alive). The recognized failure paths
+    // above return before reaching here; this only catches the unexpected.
+    rememberLog(`[updates] applyUpdates threw — failing safe (restart backend + backoff): ${(err as Error).message}`)
+    try {
+      writeUpdateBackoffState(
+        recordUpdateFailure(readUpdateBackoffState(), Date.now(), `applyUpdates-threw: ${(err as Error).message}`, 'failed')
+      )
+    } catch {
+      // never let backoff persistence failure mask the recovery
+    }
+    startHermes().catch(() => {})
+    return { ok: false, error: 'update-exception', message: (err as Error).message }
   } finally {
+    // Release our atomic claim on FAILURE paths only (never on a successful
+    // hand-off — there the marker must survive to gate a relaunched desktop,
+    // including the stale-staged-updater branch where the marker still holds our
+    // pid). releaseUpdateMarker is owner-scoped, so on the paths where the child
+    // adopted the marker this is a no-op anyway; the handedOff guard covers the
+    // skip-pre-write branch. startHermes on failure paths POLLS for marker
+    // clearance, so this sync release lets it proceed on the next poll tick.
+    if (!handedOff) {
+      releaseUpdateMarker(HERMES_HOME, process.pid)
+    }
     updateInFlight = false
   }
 }
@@ -4003,24 +4098,44 @@ async function handOffWindowsBootstrapRecovery(reason) {
     return false
   }
 
-  const handoffConflict = updateHandoffConflict(HERMES_HOME)
+  // ATOMIC cross-process claim (same guarantee as applyUpdates). The prior
+  // updateHandoffConflict (check) + writeUpdateMarker (write) left a TOCTOU: a
+  // concurrent applyUpdates claim (or a second recovery) could interleave and
+  // race a second updater over the same install tree. claimUpdateMarker is the
+  // single exclusive gate.
+  const claim = claimUpdateMarker(HERMES_HOME, process.pid)
 
-  if (handoffConflict) {
-    // Same hazard as applyUpdates (#75778): a live foreign updater already
-    // owns the marker. Spawning another here would overwrite its claim and
-    // race a second updater over the same install tree. The live updater
-    // is already working on this exact install and will restart us when
-    // it finishes, so treat this the same as a successful hand-off instead
-    // of clobbering it with our own.
-    rememberLog(`[bootstrap] refusing recovery hand-off: ${handoffConflict.message}`)
-    isQuittingForHandoff = true
-    setTimeout(() => {
-      app.quit()
-    }, UPDATE_HANDOFF_DWELL_MS)
+  if (!claim.acquired) {
+    // A live foreign updater already owns the marker. Spawning another here
+    // would race a second updater over the same install tree. That updater is
+    // already working on this exact install and will restart us when it
+    // finishes, so treat a LIVE owner the same as a successful hand-off (quit
+    // and wait). If the claim was merely lost to a transient race with no live
+    // owner, stay alive and let the caller fall through to its next path.
+    if (claim.owner && claim.owner.pid > 0) {
+      rememberLog(
+        `[bootstrap] refusing recovery hand-off: update already running (PID ${claim.owner.pid})`
+      )
+      isQuittingForHandoff = true
+      setTimeout(() => {
+        app.quit()
+      }, UPDATE_HANDOFF_DWELL_MS)
 
-    return true
+      return true
+    }
+
+    rememberLog('[bootstrap] recovery hand-off could not acquire the update lock; staying alive')
+
+    return false
   }
 
+  // From here the marker holds OUR pid until the child adopts it. This function
+  // is NOT inside applyUpdates' finally, so release the claim ourselves on every
+  // path that does not actually hand off (throw included) — otherwise a failed
+  // recovery leaves our (live) pid in the marker and wedges backend startup.
+  let recoveryHandedOff = false
+
+  try {
   const updateRoot = resolveUpdateRoot()
   const { branch: configuredBranch } = readDesktopUpdateConfig()
 
@@ -4099,7 +4214,17 @@ async function handOffWindowsBootstrapRecovery(reason) {
     Math.max(0, UPDATE_HANDOFF_DWELL_MS - (Date.now() - dwellStartedAt))
   )
 
+  recoveryHandedOff = true
+
   return true
+  } finally {
+    // Released only when we did NOT hand off. On a real hand-off the marker was
+    // overwritten with the child pid (or deliberately kept as ours for a
+    // pre-self-adopt updater), so this owner-scoped release is a no-op there.
+    if (!recoveryHandedOff) {
+      releaseUpdateMarker(HERMES_HOME, process.pid)
+    }
+  }
 }
 
 // The running app's .app bundle (packaged macOS): execPath is
@@ -4220,15 +4345,25 @@ async function applyUpdatesPosixHandoff(opts: any) {
     return { ok: true, manual: true, command: 'hermes update', hermesRoot: updateRoot }
   }
 
-  const handoffConflict = updateHandoffConflict(HERMES_HOME)
+  // ATOMIC cross-process claim — same guarantee as the Windows applyUpdates
+  // path. macOS/Linux is the PRIMARY handoff path here, so it must not fall
+  // back to the raw updateHandoffConflict (check) + writeUpdateMarker (write)
+  // TOCTOU: two desktop instances could both pass the check and both spawn a
+  // destructive `hermes update` over the same checkout. The claim is released
+  // by applyUpdates' finally (this runs inside its try; handedOff stays false
+  // on the outer frame, and on success the marker holds the child pid so the
+  // owner-scoped release is a no-op).
+  const claim = claimUpdateMarker(HERMES_HOME, process.pid)
 
-  if (handoffConflict) {
-    // Same hazard as the Windows path (#75778): a live foreign updater
-    // already owns the marker — refuse rather than double-mutate the tree.
-    rememberLog(`[updates] refusing posix hand-off: ${handoffConflict.message}`)
-    emitUpdateProgress({ stage: 'error', message: handoffConflict.message, percent: null })
+  if (!claim.acquired) {
+    const message =
+      claim.owner && claim.owner.pid > 0
+        ? `An update is already running (PID ${claim.owner.pid}). Wait for it to finish, then try again.`
+        : 'Another update is already starting. Try again in a moment.'
+    rememberLog(`[updates] refusing posix hand-off (atomic claim not acquired): ${message}`)
+    emitUpdateProgress({ stage: 'error', message, percent: null })
 
-    return { ok: false, error: 'update-already-running', message: handoffConflict.message }
+    return { ok: false, error: 'update-already-running', message }
   }
 
   // ── Pre-flight state.db integrity guard (#68474) ──
