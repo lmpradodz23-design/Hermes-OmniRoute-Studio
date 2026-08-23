@@ -41,7 +41,7 @@ import { registry } from '@/contrib/registry'
 import { discoverRuntimePlugins } from '@/contrib/runtime-loader'
 import { translateNow } from '@/i18n'
 import { NEW_SESSION_TITLE, sessionTitle as storedSessionTitle } from '@/lib/chat-runtime'
-import { Download, FileText, LayoutDashboard, PanelBottom, Terminal, Upload, Zap } from '@/lib/icons'
+import { Activity, Download, FileText, LayoutDashboard, PanelBottom, Terminal, Upload, Zap } from '@/lib/icons'
 import { type KeybindContribution, KEYBINDS_AREA } from '@/lib/keybinds/actions'
 import { TRANSCRIPT_DIRECTIVE_AREA, type TranscriptDirectiveContribution } from '@/lib/transcript-directives'
 import { setYoloEnabled } from '@/lib/yolo-session'
@@ -56,7 +56,8 @@ import {
   setFileBrowserOpen,
   setSidebarOpen,
   SIDEBAR_DEFAULT_WIDTH,
-  SIDEBAR_MAX_WIDTH
+  SIDEBAR_MAX_WIDTH,
+  toggleNarrowAwarePane
 } from '@/store/layout'
 import { runExportProfileFlow, runImportProfileFlow } from '@/store/profile-share'
 import {
@@ -88,7 +89,7 @@ import { HudShell } from '../hud/hud-shell'
 import { $terminalTakeover, setTerminalTakeover } from '../right-sidebar/store'
 import { $workspaceIsPage } from '../routes'
 
-import { FilesPane, LogsPane, ReviewPaneContent } from './panes'
+import { FilesPane, LogsPane, MissionPane, ReviewPaneContent } from './panes'
 import { ContribWiring, WiredPane } from './wiring'
 
 /**
@@ -224,6 +225,24 @@ registry.registerMany([
       maxWidth: FILE_BROWSER_MAX_WIDTH
     },
     render: () => idle(<FilesPane />)
+  },
+  {
+    id: 'mission',
+    area: 'panes',
+    title: translateNow('missionControl.title'),
+    // Terceira coluna à direita, escondida até ser pedida — mesma mecânica de
+    // `review`. Fica na ÁRVORE, e não num overlay, de propósito: acompanhar o
+    // que roda enquanto se lê o chat é o ponto; um modal que cobre a tela
+    // resolveria o oposto do problema.
+    data: {
+      placement: 'right',
+      collapsible: true,
+      revealAliases: ['mission-control'],
+      width: FILE_BROWSER_DEFAULT_WIDTH,
+      minWidth: FILE_BROWSER_MIN_WIDTH,
+      maxWidth: FILE_BROWSER_MAX_WIDTH
+    },
+    render: () => idle(<MissionPane />)
   },
   {
     id: 'review',
@@ -611,6 +630,24 @@ registry.register(
     keywords: ['terminal', 'shell', 'console', 'pty'],
     get: () => isPaneVisible('terminal'),
     set: () => togglePaneVisible('terminal')
+  })
+)
+
+// Mission Control é um pane escondido por padrão — a porta é o ⌘K, igual ao
+// terminal acima, e pelo mesmo motivo: o estado da linha lê a ÁRVORE
+// (`isPaneVisible`), não uma flag própria, então ela nunca acende para um
+// painel que está atrás de uma aba empilhada ou numa zona minimizada.
+registry.register(
+  paletteToggle({
+    id: 'view.showMissionControl',
+    label: translateNow('missionControl.toggleCommand'),
+    icon: Activity,
+    keywords: ['mission', 'control', 'background', 'processes', 'agents', 'goals', 'running', 'tasks'],
+    get: () => isPaneVisible('mission'),
+    // Em viewport estreita o pane sai da grid e só volta pelo evento de
+    // revelação; sem esta rota o comando simplesmente não fazia nada abaixo de
+    // 768px — e a janela mínima do Electron é 400px.
+    set: () => toggleNarrowAwarePane('mission', () => togglePaneVisible('mission'))
   })
 )
 

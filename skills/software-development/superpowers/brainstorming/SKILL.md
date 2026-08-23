@@ -1,9 +1,20 @@
 ---
 name: brainstorming
-description: "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+description: Turns a vague idea into a written spec.
+version: "vendored-b36e082"
+author: "obra/superpowers"
+license: "MIT"
+platforms: [linux, macos, windows]
+metadata:
+  hermes:
+    tags: [planning, spec, ideation]
 ---
 
 # Brainstorming Ideas Into Designs
+
+## When to Use
+
+"You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
 
 Help turn ideas into fully formed designs and specs through natural collaborative dialogue.
 

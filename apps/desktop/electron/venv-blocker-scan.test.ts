@@ -15,6 +15,7 @@ import path from 'node:path'
 import { describe, it } from 'vitest'
 
 import {
+  classifyProbeError,
   formatBlockerMessage,
   formatProbeFailedMessage,
   parseVenvBlockerScanOutput,
@@ -22,6 +23,39 @@ import {
   scanVenvBlockers,
   stopSafeVenvBlockers
 } from './venv-blocker-scan'
+
+// ---------------------------------------------------------------------------
+// classifyProbeError — the real "-1" is a timeout (venv held by the gateway),
+// not "free". §4 of the P0: distinguish the failure kinds; never read a probe
+// failure as "venv free".
+// ---------------------------------------------------------------------------
+
+describe('classifyProbeError', () => {
+  it('C. a timeout (killed + SIGTERM / null code) is classified as timeout — the real "-1"', () => {
+    const err = { killed: true, signal: 'SIGTERM', code: null }
+    const { kind, detail } = classifyProbeError(err)
+    assert.equal(kind, 'timeout')
+    assert.match(detail, /venv likely held/i)
+  })
+
+  it('a spawn failure (ENOENT) is spawn_failed, not free', () => {
+    assert.equal(classifyProbeError({ code: 'ENOENT' }).kind, 'spawn_failed')
+  })
+
+  it('permission errors are access_denied', () => {
+    assert.equal(classifyProbeError({ code: 'EACCES' }).kind, 'access_denied')
+    assert.equal(classifyProbeError({ code: 'EPERM' }).kind, 'access_denied')
+  })
+
+  it('a numeric non-zero exit is nonzero_exit', () => {
+    assert.equal(classifyProbeError({ code: 2 }).kind, 'nonzero_exit')
+  })
+
+  it('an unrecognized error falls back to unknown, never to a "free" verdict', () => {
+    const { kind } = classifyProbeError({})
+    assert.equal(kind, 'unknown')
+  })
+})
 
 const VENV_SCRIPTS_DIR = process.platform === 'win32' ? 'Scripts' : 'bin'
 const VENV_PYTHON_NAME = process.platform === 'win32' ? 'python.exe' : 'python3'

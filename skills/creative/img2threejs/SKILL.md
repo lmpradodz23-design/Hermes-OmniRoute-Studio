@@ -1,11 +1,20 @@
 ---
 name: img2threejs
-description: Turn an object or character reference image into a quality-gated, animation-ready procedural Three.js model built in code. Use for image-to-3D reconstruction, detail-accurate object rebuilds, stylized/likeness-maximized human characters, sculpt specs, and staged code generation.
-license: Apache-2.0
-version: 1.4.4
+description: Turns an image into a Three.js scene.
+version: "vendored-d667338"
+author: "img2threejs/img2threejs"
+license: "Apache-2.0"
+platforms: [linux, macos, windows]
+metadata:
+  hermes:
+    tags: [3d, threejs, visual]
 ---
 
 # img2threejs — Image to procedural Three.js
+
+## When to Use
+
+Turn an object or character reference image into a quality-gated, animation-ready procedural Three.js model built in code. Use for image-to-3D reconstruction, detail-accurate object rebuilds, stylized/likeness-maximized human characters, sculpt specs, and staged code generation.
 
 Rebuild the object visible in a reference image as a **code-only** procedural Three.js model,
 gated by a staged sculpting pipeline and an AI-vision self-correction loop. This is

@@ -1,8 +1,18 @@
 ---
 name: using-superpowers
-description: Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions
+description: Finds and applies the superpowers skills.
+version: "vendored-b36e082"
+author: "obra/superpowers"
+license: "MIT"
+platforms: [linux, macos, windows]
+metadata:
+  hermes:
+    tags: [meta, skills, workflow]
 ---
 
+## When to Use
+
+Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response including clarifying questions
 <SUBAGENT-STOP>
 If you were dispatched as a subagent to execute a specific task, ignore this skill.
 </SUBAGENT-STOP>

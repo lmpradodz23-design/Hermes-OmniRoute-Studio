@@ -170,7 +170,26 @@ _teams_mod = load_plugin_adapter("teams")
 
 _teams_mod.AIOHTTP_AVAILABLE = True
 # SDK import is deferred (#62935); bind mocked symbols the same way connect() does.
-assert _teams_mod.check_teams_requirements() is True
+#
+# Isto era um `assert ... is True` no nivel do modulo. Quando o mock do SDK nao
+# se resolve — aiohttp ausente, submodulo que o mock nao cobre, lazy-install
+# bloqueado por rede — o assert dispara durante a COLETA e o pytest interrompe a
+# suite inteira com "Interrupted: 1 error during collection". Medido: 5.000+
+# testes sem relacao nenhuma com o Teams deixavam de rodar por causa desta
+# linha.
+#
+# Um skip nomeado no nivel do modulo diz a mesma coisa — "o Teams nao pode ser
+# exercitado aqui" — sem levar o resto junto, e aparece no relatorio em vez de
+# sumir. O contrato do teste nao muda: onde o mock funciona, a execucao segue
+# identica a antes.
+if _teams_mod.check_teams_requirements() is not True:
+    pytest.skip(
+        "SDK do Microsoft Teams indisponivel: o mock de sys.modules nao "
+        "satisfez check_teams_requirements(). Instale o extra `teams` "
+        "(microsoft-teams-apps + aiohttp) para exercitar este adaptador.",
+        allow_module_level=True,
+    )
+
 _teams_mod.TEAMS_SDK_AVAILABLE = True
 
 # Ensure SDK symbols that were None (import failed on Python <3.12) are

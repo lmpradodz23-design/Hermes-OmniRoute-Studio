@@ -90,6 +90,10 @@ jobs:
             apps/desktop/release/*.AppImage
             apps/desktop/release/*.deb
             apps/desktop/release/*.rpm
+            # Sem estes dois, "confira o hash" não tem com o que ser conferido:
+            # o script os gera corretamente no postdist e o upload os descartava.
+            apps/desktop/release/SHA256SUMS.txt
+            apps/desktop/release/BUILD-PROVENANCE.json
 
   ssh-live:
     name: Live OpenSSH mux and no-mux contracts

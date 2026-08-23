@@ -41,6 +41,13 @@ function mergeTranslations<T>(base: T, overrides: TranslationOverride<T> | undef
   return result as T;
 }
 
-export function defineLocale(overrides: TranslationOverrides): Translations {
-  return mergeTranslations<Translations>(en, overrides);
+/**
+ * @param base  Catálogo sobre o qual sobrepor. O padrão é o inglês, que é o
+ *   caso normal de um idioma novo. Passar outro catálogo serve para variantes
+ *   regionais: `pt-BR` herda de `pt` e sobrescreve só o que difere, em vez de
+ *   duplicar 634 strings que já estão certas nos dois. Sem isso, cada correção
+ *   em `pt` teria que ser repetida à mão em `pt-BR` — e não seria.
+ */
+export function defineLocale(overrides: TranslationOverrides, base: Translations = en): Translations {
+  return mergeTranslations<Translations>(base, overrides);
 }

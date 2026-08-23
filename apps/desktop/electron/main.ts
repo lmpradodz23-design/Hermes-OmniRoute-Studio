@@ -331,7 +331,17 @@ import {
 } from './update-count'
 import { waitForUpdateClearance } from './update-gate'
 import { readLiveUpdateMarker, updateHandoffConflict, writeUpdateMarker } from './update-marker'
-import { isOfficialSshRemote, OFFICIAL_REPO_HTTPS_URL } from './update-remote'
+import { canonicalGitHubRemote, isOfficialSshRemote, OFFICIAL_REPO_CANONICAL, OFFICIAL_REPO_HTTPS_URL } from './update-remote'
+import { UpdatePolicy } from './update-policy'
+import { decideUpdateGate, GateAction } from './update-decision'
+import {
+  type BackoffState,
+  INITIAL_BACKOFF_STATE,
+  parseBackoffState,
+  recordUpdateFailure,
+  recordUpdateSuccess,
+  serializeBackoffState
+} from './update-backoff'
 import {
   collectRelaunchArgs,
   observeUpdaterHandoff,
@@ -835,6 +845,27 @@ const DESKTOP_CONNECTION_CONFIG_PATH = path.join(app.getPath('userData'), 'conne
 const DESKTOP_CONNECTIONS_REGISTRY_PATH = path.join(app.getPath('userData'), 'connections.json')
 const DESKTOP_INSTALLATION_PATH = path.join(app.getPath('userData'), 'desktop-installation.json')
 const DESKTOP_UPDATE_CONFIG_PATH = path.join(app.getPath('userData'), 'updates.json')
+// Backoff persistido do updater (P0): sobrevive a fechar/abrir o Hermes, para
+// que um update que falhou não seja re-tentado no próximo boot (o loop
+// observado). Fica no userData do desktop — estado de ATUALIZAÇÃO, separado do
+// state.db (estado da APLICAÇÃO).
+const DESKTOP_UPDATE_BACKOFF_PATH = path.join(app.getPath('userData'), 'update-backoff.json')
+
+function readUpdateBackoffState(): BackoffState {
+  try {
+    return parseBackoffState(fs.readFileSync(DESKTOP_UPDATE_BACKOFF_PATH, 'utf-8'))
+  } catch {
+    return { ...INITIAL_BACKOFF_STATE }
+  }
+}
+
+function writeUpdateBackoffState(state: BackoffState): void {
+  try {
+    fs.writeFileSync(DESKTOP_UPDATE_BACKOFF_PATH, serializeBackoffState(state))
+  } catch (err) {
+    rememberLog(`[updates] could not persist update backoff state: ${(err as Error).message}`)
+  }
+}
 const DESKTOP_WINDOW_STATE_PATH = path.join(app.getPath('userData'), 'window-state.json')
 const DESKTOP_BACKEND_OWNERSHIP_PATH = path.join(app.getPath('userData'), 'backend-ownership.json')
 // active-profile.json records which Hermes profile the desktop launches its
@@ -2156,8 +2187,14 @@ async function waitForUpdateToFinish() {
       })
     } else if (result && result.ok) {
       rememberLog(`[updates] detached update finished OK (branch ${result.branch})`)
+      // P0: a real success clears the backoff so future auto-updates resume.
+      writeUpdateBackoffState(recordUpdateSuccess(Date.now()))
     } else if (result) {
       rememberLog(`[updates] detached update FAILED (exit ${result.exitCode}): ${result.message}`)
+      // P0: persist the failure so the next boot backs off instead of looping.
+      writeUpdateBackoffState(
+        recordUpdateFailure(readUpdateBackoffState(), Date.now(), `handoff-exit-${result.exitCode}`, 'failed')
+      )
       dialog.showErrorBox(
         'Hermes update did not finish',
         `${result.message}\n\nDetails: ${path.join(HERMES_HOME, 'logs', 'desktop-update-handoff.log')}`
@@ -3558,7 +3595,84 @@ async function releaseBackendLock(updateRoot, tag) {
 //
 // Detection (checkUpdates / commit changelog / "N behind") stays in the UI;
 // only this apply action changed.
-async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
+async function applyUpdates(opts: { stopSafeBlockers?: boolean; force?: boolean } = {}) {
+  // P0 fork-guard (root cause of the boot loop): never auto-update a fork /
+  // divergent / dirty checkout — it would clobber local work and, when the venv
+  // is held by the gateway, loop the boot by killing the backend every start.
+  // Only an explicit `force` (a deliberate user action) bypasses. See
+  // electron/update-policy.ts. Fails SAFE: on any doubt it starts the backend
+  // and skips the destructive handoff. Branch-mismatch alone (the real case)
+  // trips this even without a fetch.
+  // P0 gate (root cause of the boot loop) — ONE decision point combining the
+  // fork-guard (never auto-update a fork/divergent/dirty checkout → would clobber
+  // the fork and loop the boot) with the PERSISTED backoff (a failed update must
+  // not be retried on the next boot, killing the backend again). Only an explicit
+  // operator `force` bypasses. Fails SAFE: on any doubt it starts the backend and
+  // skips the destructive handoff. Runs at the TOP, before any backend kill or
+  // marker write — the update never touches the runtime until this passes.
+  if (!opts.force) {
+    try {
+      const guardRoot = resolveUpdateRoot()
+
+      if (directoryExists(path.join(guardRoot, '.git'))) {
+        const git = (args: string[]) => runGit(args, { cwd: guardRoot }).then(r => r.stdout.trim())
+        const { branch: updateBranch } = readDesktopUpdateConfig()
+        const [currentBranch, dirtyStr, originUrl] = await Promise.all([
+          git(['rev-parse', '--abbrev-ref', 'HEAD']).catch(() => ''),
+          git(['status', '--porcelain']).catch(() => ''),
+          getOriginUrl(guardRoot).catch(() => '')
+        ])
+        const aheadStr = await git(['rev-list', `origin/${updateBranch}..HEAD`, '--count']).catch(() => '0')
+        const behindStr = await git(['rev-list', `HEAD..origin/${updateBranch}`, '--count']).catch(() => '')
+
+        const gate = decideUpdateGate({
+          installState: {
+            currentBranch,
+            updateBranch,
+            behind: behindStr === '' ? null : Number(behindStr),
+            ahead: Number(aheadStr) || 0,
+            dirty: dirtyStr.length > 0,
+            remoteIsOfficialUpstream: canonicalGitHubRemote(originUrl) === OFFICIAL_REPO_CANONICAL
+          },
+          backoffState: readUpdateBackoffState(),
+          now: Date.now(),
+          force: false
+        })
+
+        if (!gate.proceed) {
+          const label =
+            gate.action === GateAction.SKIP_POLICY
+              ? 'custom/fork install'
+              : gate.action === GateAction.SKIP_BACKOFF
+                ? 'update backoff active after a prior failure'
+                : 'already up to date'
+          rememberLog(
+            `[updates] auto-update SKIPPED — ${label} (${gate.reasons.join('; ') || gate.action}). ` +
+              'Starting backend normally; the runtime was not touched.'
+          )
+          startHermes().catch(() => {})
+
+          return {
+            ok: false,
+            error:
+              gate.action === GateAction.SKIP_BACKOFF
+                ? 'update-backoff-active'
+                : gate.action === GateAction.SKIP_POLICY
+                  ? 'update-policy-manual-required'
+                  : 'update-up-to-date',
+            policy: gate.policy,
+            reasons: gate.reasons,
+            skipped: gate.action
+          }
+        }
+      }
+    } catch (err) {
+      // A guard failure must never block a legitimate update nor crash boot —
+      // log and fall through to the normal path.
+      rememberLog(`[updates] update-gate check errored (proceeding): ${(err as Error).message}`)
+    }
+  }
+
   if (updateInFlight) {
     throw new Error('An update is already in progress.')
   }
@@ -3712,6 +3826,11 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
         const message = formatBlockerMessage(scanOutcome.result)
 
         rememberLog(`[updates] venv-blocked: ${scanOutcome.result.processes.length} process(es) hold the install`)
+        // P0: persist the failure so the NEXT boot backs off instead of
+        // re-attempting and killing the backend again (the observed loop).
+        writeUpdateBackoffState(
+          recordUpdateFailure(readUpdateBackoffState(), Date.now(), `venv-blocked: ${scanOutcome.result.processes.length} holder(s)`, 'blocked')
+        )
         emitUpdateProgress({ stage: 'error', message, percent: null })
         startHermes().catch(() => {})
 
@@ -3721,7 +3840,11 @@ async function applyUpdates(opts: { stopSafeBlockers?: boolean } = {}) {
       if (scanOutcome.kind === 'probe-failure') {
         const message = formatProbeFailedMessage()
 
-        rememberLog(`[updates] venv-blocker probe failed: ${scanOutcome.error}`)
+        rememberLog(`[updates] venv-blocker probe failed: ${scanOutcome.error} (${scanOutcome.failureKind})`)
+        // P0: persist the failure so the NEXT boot backs off (breaks the loop).
+        writeUpdateBackoffState(
+          recordUpdateFailure(readUpdateBackoffState(), Date.now(), `venv-probe-${scanOutcome.failureKind}`, 'failed')
+        )
         emitUpdateProgress({ stage: 'error', message, percent: null })
         startHermes().catch(() => {})
 

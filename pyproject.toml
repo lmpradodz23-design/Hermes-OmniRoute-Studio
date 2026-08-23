@@ -117,7 +117,13 @@ dependencies = [
   # FastAPI's UploadFile/Form depend on python-multipart; it is NOT pulled in
   # by fastapi itself, so the dashboard's multipart upload endpoint would 500
   # without an explicit dependency here (and in the `web` extra below).
-  "python-multipart>=0.0.9,<1",
+  #
+  # Floor raised from 0.0.9 to 0.0.32: pip-audit flags 0.0.26 for PYSEC-2026-3036,
+  # -3037, -3039 and -3040, all fixed by 0.0.31 at the latest. The old floor
+  # allowed a resolver to land on a vulnerable build even though the `web` extra
+  # below already pinned 0.0.32 — and this base dependency exists precisely to
+  # serve the dashboard's upload endpoint, so it is the one that gets reached.
+  "python-multipart>=0.0.32,<1",
   "ptyprocess>=0.7.0,<1; sys_platform != 'win32'",
   "pywinpty>=2.0.0,<3; sys_platform == 'win32'",
   # Desktop SSH's Windows remote runtime (hermes_cli/windows_ssh_runtime.py)

@@ -58,6 +58,22 @@ def _(rid, params: dict) -> dict:
         return _err(rid, 5010, str(e))
 
 
+@method("process.list_all")
+def _(rid, params: dict) -> dict:
+    """Every background process, across every session, each tagged with its owner.
+
+    Read-only counterpart to ``process.list``. Kill/stop stay session-scoped on
+    purpose — seeing another session's work is not the same permission as
+    reaping it.
+    """
+    try:
+        from tui_gateway.server import _all_processes
+
+        return _ok(rid, {"processes": _all_processes()})
+    except Exception as e:
+        return _err(rid, 5010, str(e))
+
+
 @method("process.kill")
 def _(rid, params: dict) -> dict:
     """Kill ONE background process — scoped to the caller's session so one

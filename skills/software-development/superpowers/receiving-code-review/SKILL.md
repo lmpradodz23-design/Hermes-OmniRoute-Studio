@@ -1,9 +1,20 @@
 ---
 name: receiving-code-review
-description: Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not performative agreement or blind implementation
+description: Acts on code review feedback.
+version: "vendored-b36e082"
+author: "obra/superpowers"
+license: "MIT"
+platforms: [linux, macos, windows]
+metadata:
+  hermes:
+    tags: [review, collaboration, workflow]
 ---
 
 # Code Review Reception
+
+## When to Use
+
+Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not performative agreement or blind implementation
 
 ## Overview
 

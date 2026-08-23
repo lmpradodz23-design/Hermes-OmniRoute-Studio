@@ -2503,6 +2503,29 @@ export const ja = defineLocale({
     }
   },
 
+  missionControl: {
+    aria: 'ミッションコントロール',
+    title: 'ミッションコントロール',
+    empty: '実行中のものはありません',
+    emptyBody: 'すべてのセッションのバックグラウンドプロセス、サブエージェント、ゴールがここに表示されます。',
+    summary: (running: number, sessions: number) => `${sessions} 個のセッションで ${running} 件実行中`,
+    summaryFailed: (failed: number) => `${failed} 件失敗`,
+    refresh: '更新',
+    stop: 'このプロセスを停止',
+    dismiss: 'この行を閉じる',
+    openSession: 'このセッションを開く',
+    untitledSession: '無題のセッション',
+    stopFailed: 'プロセスを停止できませんでした。',
+    groupRunning: (n: number) => `${n} 件実行中`,
+    groupFailed: (n: number) => `${n} 件失敗`,
+    stateRunning: '実行中',
+    stateDone: '完了',
+    stateFailed: '失敗',
+    exit: (code: number) => `終了コード ${code}`,
+    untitledSessionWithId: (id: string) => `セッション ${id}`,
+    toggleCommand: 'ミッションコントロールの表示切替'
+  },
+
   rightSidebar: {
     aria: '右サイドバー',
     panelsAria: '右サイドバーパネル',

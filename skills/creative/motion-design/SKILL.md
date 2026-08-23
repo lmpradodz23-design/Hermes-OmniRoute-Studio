@@ -1,18 +1,22 @@
 ---
 name: motion-design
-description: >
-  Applies motion design principles to create emotionally-driven, technically sound animations and transitions.
-  Provides timing, easing, choreography, and Disney animation principles adapted for UI.
-  Use when creating animations, transitions, micro-interactions, loading states, page transitions,
-  scroll-triggered effects, or any motion work. Works with CSS, Framer Motion, GSAP, Lottie, Spring,
-  or any animation system.
-license: MIT
+description: Designs motion timing, easing and choreography.
+version: "vendored-f9a8a04"
+author: "LottieFiles/motion-design-skill"
+license: "MIT"
+platforms: [linux, macos, windows]
 metadata:
+  hermes:
+    tags: [animation, motion, design]
   author: LottieFiles
   version: "1.0.0"
 ---
 
 # Motion Design Skill
+
+## When to Use
+
+> Applies motion design principles to create emotionally-driven, technically sound animations and transitions. Provides timing, easing, choreography, and Disney animation principles adapted for UI. Use when creating animations, transitions, micro-interactions, loading states, page transitions, scroll-triggered effects, or any motion work. Works with CSS, Framer Motion, GSAP, Lottie, Spring, or any animation system.
 
 ## When to Apply
 

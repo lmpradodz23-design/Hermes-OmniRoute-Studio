@@ -142,6 +142,7 @@ import {
   SKILLS_ROUTE
 } from '../../routes'
 import type { SidebarNavItem } from '../../types'
+import { SIDEBAR_NAV } from './nav-items'
 
 import { SidebarCronJobsSection } from './cron-jobs-section'
 import { SidebarFilterMenu } from './filter-menu'
@@ -185,43 +186,8 @@ const NON_SESSION_LOAD_STEP = 10
 // screen — has the connection to itself first.
 const PROJECT_TREE_WARM_MS = 2_000
 
-const SIDEBAR_NAV: SidebarNavItem[] = [
-  {
-    id: 'new-session',
-    label: '',
-    icon: props => <Codicon name="robot" {...props} />,
-    action: 'new-session',
-    keybindActionId: 'session.new'
-  },
-  {
-    id: 'skills',
-    label: '',
-    icon: props => <Codicon name="symbol-misc" {...props} />,
-    route: SKILLS_ROUTE,
-    keybindActionId: 'nav.skills'
-  },
-  {
-    id: 'messaging',
-    label: '',
-    icon: props => <Codicon name="comment" {...props} />,
-    route: MESSAGING_ROUTE,
-    keybindActionId: 'nav.messaging'
-  },
-  {
-    id: 'artifacts',
-    label: '',
-    icon: props => <Codicon name="files" {...props} />,
-    route: ARTIFACTS_ROUTE,
-    keybindActionId: 'nav.artifacts'
-  },
-  {
-    id: 'cron',
-    label: '',
-    icon: props => <Codicon name="watch" {...props} />,
-    route: CRON_ROUTE,
-    keybindActionId: 'nav.cron'
-  }
-]
+// SIDEBAR_NAV lives in ./nav-items so it can be unit-tested in isolation
+// (without mounting the whole sidebar). Imported at the top of this file.
 
 // Two modes via the `compact` height variant (styles.css):
 //   tall    → each section is shrink-0, capped, its own scroller; Sessions is flex-1.

@@ -13,7 +13,11 @@
  */
 
 /* global importScripts, HermesSwPolicy */
-importScripts('/sw-policy.js')
+// RELATIVO, como todo o resto deste arquivo. Absoluto, ele resolvia contra a
+// raiz do host: servido sob um prefixo de proxy (/hermes/), dava 404 e a
+// instalação do service worker abortava no topo do script — sem cache, sem
+// página offline, e sem erro visível, porque isto roda antes do `install`.
+importScripts('sw-policy.js')
 
 // Troque a versão para invalidar tudo que ficou em disco. O nome carrega a
 // versão, então um cache antigo some inteiro no `activate` em vez de conviver.

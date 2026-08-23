@@ -7934,9 +7934,14 @@ def _get_env_vars_sync(profile: Optional[str] = None):
     for var_name in env_on_disk:
         if var_name in result or var_name in channel_keys:
             continue
-        row = _row(var_name, {}, custom=True)
+        # A intenção de segredo tem que entrar em `_row`, não ser corrigida
+        # depois dele: `redacted_value` é calculado LÁ DENTRO a partir de
+        # `is_password`. Marcar `row["is_password"] = True` no retorno deixava
+        # a UI mascarando um valor que já tinha saído do servidor em texto
+        # puro — exatamente para as chaves que este bloco existe para tratar
+        # como segredo por não reconhecê-las.
+        row = _row(var_name, {"password": True}, custom=True)
         row["category"] = "custom"
-        row["is_password"] = True
         result[var_name] = row
     return result
 
@@ -10507,7 +10512,15 @@ def _claude_code_only_status() -> Dict[str, Any]:
             "has_refresh_token": False,
         }
 
-    status_env = os.environ.copy()
+    # É um spawn de verdade (`claude auth status` abaixo), então passa pela
+    # fábrica: `os.environ.copy()` cru perde a propagação de HERMES_HOME/HOME
+    # que o guard em tests/agent/test_subprocess_env_guard.py protege.
+    # `scrub_secrets=False` preserva o comportamento anterior — as chaves da
+    # Anthropic são removidas logo abaixo de propósito, para que a CLI reporte
+    # o estado do LOGIN e não o de uma variável de ambiente.
+    from tools.environments.local import build_subprocess_env
+
+    status_env = build_subprocess_env(scrub_secrets=False)
     api_key_override = any(
         status_env.get(name)
         for name in (

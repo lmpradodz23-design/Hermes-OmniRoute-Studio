@@ -1,9 +1,14 @@
 ---
 name: design
-description: "Comprehensive design skill: brand identity, design tokens, UI styling, logo generation (55 styles, Gemini AI), corporate identity program (50 deliverables, CIP mockups), HTML presentations (Chart.js), banner design (22 styles, social/ads/web/print), icon design (15 styles, SVG, Gemini 3.1 Pro), social photos (HTML→screenshot, multi-platform). Actions: design logo, create CIP, generate mockups, build slides, design banner, generate icon, create social photos, social media images, brand identity, design system. Platforms: Facebook, Twitter, LinkedIn, YouTube, Instagram, Pinterest, TikTok, Threads, Google Ads."
+description: Generates UI designs from a reference aesthetic.
+version: "vendored-bc826e2"
+author: "nextlevelbuilder/ui-ux-pro-max-skill"
+license: "MIT; see LICENSE.nextlevelbuilder"
+platforms: [linux, macos, windows]
 argument-hint: "[design-type] [context]"
-license: MIT
 metadata:
+  hermes:
+    tags: [design, ui, visual]
   author: claudekit
   version: "2.1.0"
 ---
@@ -17,6 +22,8 @@ Unified design skill: brand, tokens, UI, logo, CIP, slides, banners, social phot
 `<skill-directory>` means the directory containing this `SKILL.md`. Use Hermes' configured image-generation, browser/preview, user-input, and delegation tools when this upstream skill names Claude-only tools. Never execute a path below `.claude/skills`; keep generated secrets out of prompts and logs.
 
 ## When to Use
+
+"Comprehensive design skill: brand identity, design tokens, UI styling, logo generation (55 styles, Gemini AI), corporate identity program (50 deliverables, CIP mockups), HTML presentations (Chart.js), banner design (22 styles, social/ads/web/print), icon design (15 styles, SVG, Gemini 3.1 Pro), social photos (HTML→screenshot, multi-platform). Actions: design logo, create CIP, generate mockups, build slides, design banner, generate icon, create social photos, social media images, brand identity, design system. Platforms: Facebook, Twitter, LinkedIn, YouTube, Instagram, Pinterest, TikTok, Threads, Google Ads." argument-hint: "[design-type] [context]"
 
 - Brand identity, voice, assets
 - Design system tokens and specs

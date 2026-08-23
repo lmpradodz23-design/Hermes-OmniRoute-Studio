@@ -1,9 +1,20 @@
 ---
 name: executing-plans
-description: Use when you have a written implementation plan to execute in a separate session with review checkpoints
+description: Executes a written plan task by task.
+version: "vendored-b36e082"
+author: "obra/superpowers"
+license: "MIT"
+platforms: [linux, macos, windows]
+metadata:
+  hermes:
+    tags: [planning, execution, workflow]
 ---
 
 # Executing Plans
+
+## When to Use
+
+Use when you have a written implementation plan to execute in a separate session with review checkpoints
 
 ## Overview
 

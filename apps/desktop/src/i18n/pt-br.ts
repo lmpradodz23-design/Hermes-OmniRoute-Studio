@@ -3,6 +3,57 @@ import { ptBrBase } from './pt-br.generated'
 
 export const ptBr = defineLocale(
   {
+    notifications: {
+      updateReadyMessage: (count: number) =>
+        `${count} ${count === 1 ? 'nova mudança disponível' : 'novas mudanças disponíveis'}.`
+    },
+    updates: {
+      moreChanges: (count: number) =>
+        `+ ${count} ${count === 1 ? 'mudança incluída' : 'mudanças incluídas'}.`
+    },
+    install: {
+      lines: (count: number) => `${count} ${count === 1 ? 'linha' : 'linhas'}`
+    },
+    cron: {
+      count: (n: number) => `${n} ${n === 1 ? 'tarefa' : 'tarefas'}`,
+      tabs: { jobs: 'Tarefas' },
+      modelImpact: {
+        message: (count: number) =>
+          `${count} ${count === 1 ? 'tarefa agendada será ignorada' : 'tarefas agendadas serão ignoradas'}` +
+          ' até você revisar as configurações de modelo.'
+      }
+    },
+    assistant: {
+      thread: {
+        resumeWhenBackgroundDone: (count: number) =>
+          count === 1
+            ? 'Retoma quando a tarefa em segundo plano terminar'
+            : `Retoma quando as ${count} tarefas em segundo plano terminarem`
+      }
+    },
+    missionControl: {
+      aria: 'Central de missões',
+      title: 'Central de missões',
+      empty: 'Nada em execução',
+      emptyBody: 'Processos de fundo, subagentes e objetivos de todas as sessões aparecem aqui.',
+      summary: (running: number, sessions: number) =>
+        `${running} em execução em ${sessions} ${sessions === 1 ? 'sessão' : 'sessões'}`,
+      summaryFailed: (failed: number) => `${failed} com falha`,
+      refresh: 'Atualizar',
+      stop: 'Parar este processo',
+      dismiss: 'Dispensar esta linha',
+      openSession: 'Abrir esta sessão',
+      untitledSession: 'Sessão sem título',
+      stateRunning: 'Em execução',
+      stateDone: 'Concluído',
+      stateFailed: 'Falhou',
+      exit: (code: number) => `saída ${code}`,
+      untitledSessionWithId: (id: string) => `Sessão ${id}`,
+      toggleCommand: 'Alternar Central de missões',
+      stopFailed: 'Não foi possível parar o processo.',
+      groupRunning: (n: number) => `${n} em execução`,
+      groupFailed: (n: number) => `${n} com falha`
+    },
     common: {
       apply: 'Aplicar',
       back: 'Voltar',
@@ -54,6 +105,41 @@ export const ptBr = defineLocale(
       noResults: 'Nenhum idioma encontrado'
     },
     settings: {
+      uninstall: {
+        dangerZone: 'Zona de perigo',
+        heading: 'Desinstalar o Hermes',
+        intro:
+          'Escolha quanto remover. O app fecha para concluir; reabra o instalador quando quiser voltar.',
+        checking: 'Verificando o que está instalado…',
+        confirmTitle: 'Confirmar desinstalação',
+        confirmBody: (consequence: string) => `Isto remove ${consequence}. Não dá para desfazer.`,
+        appPath: (path: string) => `App: ${path}`,
+        confirm: 'Sim, desinstalar',
+        running: 'Desinstalando…',
+        guiTitle: 'Desinstalar só a interface de chat',
+        guiDescription: 'Remove este app. O agente Hermes, sua configuração e suas conversas ficam.',
+        guiConsequence: 'a interface de chat (este app e os dados dele)',
+        liteTitle: 'Desinstalar interface + agente, manter meus dados',
+        liteDescription:
+          'Remove o app e o agente Hermes, mas mantém configuração, conversas e segredos para reinstalar depois.',
+        liteConsequence: 'a interface de chat e o agente Hermes (configuração, conversas e segredos ficam)',
+        fullTitle: 'Desinstalar tudo',
+        fullDescription:
+          'Remove o app, o agente e todos os dados — configuração, conversas, tarefas agendadas, segredos e logs.',
+        fullConsequence:
+          'TUDO — a interface de chat, o agente Hermes e toda a sua configuração, conversas, segredos e logs'
+      },
+      about: {
+        updateReady: (count: number) =>
+          `Uma nova atualização está pronta (${count} ${count === 1 ? 'mudança incluída' : 'mudanças incluídas'}).`,
+        branchCommit: (branch: string, commit: string) => `Branch ${branch} · Commit ${commit}`
+      },
+      appearance: {
+        pet: { count: (n: number) => `${n} ${n === 1 ? 'mascote' : 'mascotes'}.` }
+      },
+      toolsets: {
+        modelCount: (count: number) => `${count} ${count === 1 ? 'modelo' : 'modelos'}`
+      },
       closeSettings: 'Fechar configurações',
       exportConfig: 'Exportar configuração',
       importConfig: 'Importar configuração',
@@ -438,10 +524,12 @@ export const ptBr = defineLocale(
     sidebar: {
       nav: {
         'new-session': 'Nova conversa',
+        agents: 'Agentes',
         skills: 'Capacidades',
         messaging: 'Mensagens',
         artifacts: 'Artefatos',
-        cron: 'Tarefas agendadas'
+        cron: 'Tarefas agendadas',
+        starmap: 'Memória'
       },
       searchAria: 'Pesquisar conversas',
       searchPlaceholder: 'Pesquisar conversas…',
@@ -460,6 +548,7 @@ export const ptBr = defineLocale(
       }
     },
     composer: {
+      attachments: (count: number) => `${count} ${count === 1 ? 'anexo' : 'anexos'}`,
       message: 'Mensagem',
       externalContextActive: turns => `Contexto externo ativo · ${turns} turno${turns === 1 ? '' : 's'}`,
       externalContextDetails: (source, detail) => `${source}: ${detail}`,
@@ -550,12 +639,19 @@ export const ptBr = defineLocale(
         offDescription: 'Executar sem perguntas; bloqueios críticos de segurança continuam ativos'
       },
       statusbar: {
+        commitsBehind: (count: number, branch: string) =>
+          `${count} ${count === 1 ? 'commit atrás de' : 'commits atrás de'} ${branch}`,
+        subagents: (count: number) => `${count} ${count === 1 ? 'subagente' : 'subagentes'}`,
         localOnly: 'Somente local',
         localOnlyTitle:
           'Modo de privacidade somente local ativo. Provedores remotos e ferramentas de rede estão bloqueados.'
       }
     },
     preview: {
+      console: {
+        sentMessage: (count: number) =>
+          `${count} ${count === 1 ? 'entrada de log adicionada' : 'entradas de log adicionadas'} ao editor de mensagem`
+      },
       tab: 'Visualização',
       // Rótulos das abas do painel de visualização. Vinham do inglês porque a
       // string gerada era idêntica ao original ('SOURCE' / 'PREVIEW') e o
@@ -591,6 +687,8 @@ export const ptBr = defineLocale(
       }
     },
     skills: {
+      bulkUpdated: (count: number) =>
+        `${count} ${count === 1 ? 'item atualizado' : 'itens atualizados'} para novas sessões.`,
       tabSkills: 'Skills',
       tabToolsets: 'Ferramentas',
       tabMcp: 'MCP',
@@ -606,6 +704,9 @@ export const ptBr = defineLocale(
       toolsetsEnabled: (enabled, total) => `${enabled}/${total} conjuntos de ferramentas ativos`,
       changesApplyNewSessions: 'As alterações valem para novas conversas.',
       hub: {
+        findings: (count: number) => `${count} ${count === 1 ? 'achado' : 'achados'}`,
+        resultCount: (count: number, ms: null | number) =>
+          `${count} ${count === 1 ? 'resultado' : 'resultados'}${ms !== null ? ` em ${ms} ms` : ''}`,
         searchPlaceholder: 'Pesquisar no catálogo de Skills',
         search: 'Pesquisar',
         searching: 'Pesquisando…',

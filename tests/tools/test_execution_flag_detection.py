@@ -204,7 +204,6 @@ def test_exec_flag_payload_reaches_hardline_floor(command):
         "python3 --version",
         "sort names.txt",
         "rg --pretty pattern src/",
-        "pip install --pre somepackage",
         "man -k pager",
         "man -p e ls",
     ],
@@ -214,6 +213,29 @@ def test_non_executing_flags_are_not_flagged(command):
     dangerous, _, _ = detect_dangerous_command(command)
     assert hardline is False
     assert dangerous is False
+
+
+def test_pip_pre_is_a_dependency_finding_not_an_execution_one():
+    """`--pre` não é flag de execução — mas `pip install <pacote>` é instalação.
+
+    Este caso vivia na lista acima afirmando ``dangerous is False``, o que
+    conflitava com a regra de supply-chain que o próprio repositório aplica:
+    nomear um pacote novo muda o grafo de dependências e pode rodar hooks de
+    ciclo de vida na hora. As duas coisas são verdadeiras ao mesmo tempo, e a
+    asserção certa distingue uma da outra em vez de negar as duas.
+    """
+    command = "pip install --pre somepackage"
+
+    hardline, _ = detect_hardline_command(command)
+    dangerous, description, _ = detect_dangerous_command(command)
+
+    assert hardline is False, "instalar dependência nunca é piso hardline"
+    assert dangerous is True
+    assert "dependency installation" in (description or ""), (
+        f"esperava achado de instalação de dependência, veio {description!r} — "
+        "se isto virar um achado de EXECUÇÃO, o `--pre` passou a ser lido como "
+        "flag de execução, que é o erro que este arquivo existe para pegar"
+    )
 
 
 @pytest.mark.parametrize(

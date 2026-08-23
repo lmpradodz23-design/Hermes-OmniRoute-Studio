@@ -51,3 +51,29 @@ def test_every_row_has_custom_flag(monkeypatch):
     """The ``custom`` field is always present so the SPA can branch on it."""
     rows = _env_rows(monkeypatch, {"MY_CUSTOM_THING": "x"})
     assert all("custom" in row for row in rows.values())
+
+
+def test_no_custom_value_ever_rides_in_the_full_payload(monkeypatch):
+    """A regressão que este teste tranca já aconteceu.
+
+    A linha custom era montada com `_row(var_name, {})` — `is_password` False
+    lá dentro, então `redacted_value` recebia o valor CRU — e só depois o
+    dicionário retornado era marcado `is_password = True`. Resultado: a UI
+    mascarava e oferecia "revelar" um segredo que já tinha saído do servidor em
+    texto puro, justamente para as chaves que o bloco existe para tratar como
+    segredo por não reconhecê-las.
+
+    Por isso a asserção é sobre o payload INTEIRO, e não sobre um campo: o
+    vazamento não estava no campo que a gente olhava.
+    """
+    secrets = {
+        "MY_CUSTOM_THING": "s3cret-value",
+        "SHORT_ONE": "abc",  # curto demais para mascarar parcialmente
+        "LONG_ONE": "x" * 200,
+    }
+    rows = _env_rows(monkeypatch, secrets)
+
+    payload = str(rows)
+    for name, value in secrets.items():
+        assert rows[name]["is_password"] is True, name
+        assert value not in payload, f"{name}: valor cru presente no payload"

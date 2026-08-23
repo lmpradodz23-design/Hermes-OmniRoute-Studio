@@ -28,9 +28,21 @@ def _run_model_probe(
     max_turns = max(2, min(len(replay.tools) + 2, 12))
     with tempfile.TemporaryDirectory(prefix="hermes-replay-") as temporary:
         capture = Path(temporary) / "decisions.jsonl"
-        env = os.environ.copy()
-        env["HERMES_REPLAY_DECISION_CAPTURE"] = str(capture)
-        env["HERMES_REPLAY_APPROVALS_JSON"] = json.dumps(prior_approvals)
+        # `os.environ.copy()` cru perde a propagação de HERMES_HOME/HOME que
+        # todo spawn do Hermes precisa — o guard em
+        # tests/agent/test_subprocess_env_guard.py existe porque isso já foi
+        # corrigido site a site umas onze vezes. `scrub_secrets=False` mantém o
+        # comportamento anterior: o filho é o próprio Hermes, rodando o mesmo
+        # perfil, e precisa das credenciais do modelo.
+        from tools.environments.local import build_subprocess_env
+
+        env = build_subprocess_env(
+            scrub_secrets=False,
+            extra={
+                "HERMES_REPLAY_DECISION_CAPTURE": str(capture),
+                "HERMES_REPLAY_APPROVALS_JSON": json.dumps(prior_approvals),
+            },
+        )
         command = [
             sys.executable,
             "-m",

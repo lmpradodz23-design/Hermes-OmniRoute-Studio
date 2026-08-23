@@ -15,7 +15,11 @@
 #>
 
 $ErrorActionPreference = 'Stop'
-$repo = 'C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute'
+# O repositorio e o diretorio deste script. Um caminho absoluto fixo fazia o
+# script abortar na maquina de qualquer outra pessoa que clonasse o projeto — e
+# vazava o nome de usuario do autor num repositorio que vai a publico.
+$repo = Split-Path -Parent $MyInvocation.MyCommand.Path
+if (-not $repo) { $repo = (Get-Location).Path }
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $logDir = Join-Path $repo 'audit\_raw'
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null

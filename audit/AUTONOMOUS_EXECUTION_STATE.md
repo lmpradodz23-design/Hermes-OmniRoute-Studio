@@ -44,17 +44,17 @@ Legenda: `PENDENTE` · `EM EXECUÇÃO` · `FEITO` · `BLOCKED_BY_EXTERNAL_DEPEND
 |---|---|---|
 | B1 | Commit integral da árvore válida | EM EXECUÇÃO |
 | B2 | Remote do fork + proteção do upstream contra push | BLOCKED_BY_EXTERNAL_DEPENDENCY |
-| B3 | Secret scan do histórico completo (`--all`) | PENDENTE |
+| B3 | Secret scan do histórico completo (`--all`) | FEITO — gitleaks 8.28.0 sobre 22 commits/251MB: 0 achados, exit 0; `.gitleaks.toml` + workflow; canários provam que um PAT real ainda é detectado |
 | B4 | Remover `<<PREENCHER>>` — contatos de segurança/governança | BLOCKED_BY_EXTERNAL_DEPENDENCY |
-| B5 | Build reproduzível: release falha com worktree sujo + SHA-256 | PENDENTE |
-| B6 | Inventário de licenças + `SOURCES.json` + teste que falha sem origem/licença | PENDENTE |
+| B5 | Build reproduzível: release falha com worktree sujo + SHA-256 | FEITO — `write-release-checksums.mjs` (SHA256SUMS.txt + BUILD-PROVENANCE.json), recusa árvore suja/commit placeholder/release vazio, 13 testes |
+| B6 | Inventário de licenças + `SOURCES.json` + teste que falha sem origem/licença | FEITO — `skills/PROVENANCE.json` + `tests/skills/test_skill_provenance.py` (7 testes) + `audit/SKILL_LICENSE_INVENTORY.md` |
 
 ### Testes e gates
 
 | # | Tarefa | Estado |
 |---|---|---|
-| T1 | Suíte Electron/desktop no container (typecheck, lint, vitest) | PENDENTE |
-| T2 | Suíte Python completa relevante (approval, goals, plugins, gateway) | PENDENTE |
+| T1 | Suíte Electron/desktop no container (typecheck, lint, vitest) | PARCIAL — `tsc --noEmit` limpo; vitest `ui` 5379/5379; vitest `electron` 1598 passed/9 skipped. Falta: lint |
+| T2 | Suíte Python completa relevante (approval, goals, plugins, gateway) | PARCIAL — `tests/skills` 1797/1797, `tests/hermes_cli` por arquivo: 3 falhas em 240 arquivos (1 era o vazamento R5-02, já corrigido; 2 são do ambiente do contêiner). Falta: varredura completa de `tests/` com HOME limpo |
 | T3 | Suíte web (build, typecheck, lint, vitest) | FEITO — 359 passed, exit 0 |
 | T4 | Dependency audit / supply-chain | PENDENTE |
 | T5 | Clean-install test | PENDENTE |
@@ -63,10 +63,10 @@ Legenda: `PENDENTE` · `EM EXECUÇÃO` · `FEITO` · `BLOCKED_BY_EXTERNAL_DEPEND
 
 | # | Tarefa | Estado |
 |---|---|---|
-| P1 | Interface U1 (sidebar, tarefas em background, paleta @, composer) | PENDENTE |
+| P1 | Interface U1 (sidebar, tarefas em background, paleta @, composer) | PARCIAL — ver §U1 |
 | P2 | Passe responsivo mobile (M1.3) | PENDENTE |
 | P3 | APK ↔ gateway: tela de conexão, HTTP nativo, token no Keystore | PENDENTE |
-| P4 | pt-BR no `web/src/i18n` | PENDENTE |
+| P4 | pt-BR no `web/src/i18n` | FEITO — 713 chaves, 0 faltando, 0 lusitanismos, 6 testes verdes |
 | P5 | Product/Design Studio (§4 do design system) | PENDENTE |
 | P6 | CI pública segura (roda em PR de terceiro sem segredos) | PENDENTE |
 | P7 | Builds macOS/Linux (AppImage/deb) com prova | PENDENTE |
@@ -145,3 +145,45 @@ BLOCKED_BY_EXTERNAL_DEPENDENCY
 3. **`device_bash` não apaga arquivos.** Mova para `_to_delete/`.
 4. **Verificar correção de segurança injetando a regressão de volta**, para provar
    que o teste morde. Teste verde sem isso não prova nada.
+
+---
+
+## §U1 — o que a auditoria da UI encontrou (2026-08-22)
+
+A tarefa P1 estava registrada como se a interface não existisse. Auditando o
+código real de `apps/desktop/src` (588 arquivos `.tsx`), quase tudo já existe —
+e reimplementar seria exatamente o que o próprio briefing proíbe:
+
+| item de "U1" | situação real |
+|---|---|
+| sidebar | **existe** — `app/chat/sidebar/` (1902 linhas): busca FTS, sessões fixadas/recentes, projetos, worktrees, cron, filtros por status/projeto/perfil, lista virtualizada, ⌘B |
+| composer | **existe** — `app/chat/composer/` com editor rich contenteditable, anexos, drop, paste de imagem, fila de follow-up (⌘⏎), voz, pop-out, undo próprio, 42 arquivos de teste |
+| paleta `@` | **existe** — `hooks/use-at-completions.ts`: `@file:` `@folder:` `@url:` `@image:` `@tool:` `@git:`, `@diff`, `@staged`, com navegação de pastas e chips |
+| paleta de comandos | **existe** — `app/command-palette/` (~1400 linhas): sessões, projetos, temas com preview, catálogo de settings, contribuições de plugin |
+| shell/layout | **existe** — árvore de panes redimensionáveis (`components/pane-shell/tree/`), presets, painéis flutuantes, overlays em viewport estreita |
+| **tarefas em background** | **era a lacuna real** |
+
+A informação de trabalho em segundo plano existia em **quatro** superfícies, e
+nenhuma respondia "o que está rodando agora?": a status stack do composer só
+mostra a sessão aberta; o overlay Agents cobre a tela e só mostra subagentes; a
+statusbar dá um número sem o quê; os dots da sidebar dão uma cor sem o porquê.
+Com cinco sessões trabalhando, era preciso abrir as cinco.
+
+**Entregue: `app/mission-control/`** — um pane de verdade na árvore (à direita,
+escondido até ser pedido pelo ⌘K "Toggle Mission Control"), que agrega goals,
+subagentes e processos de fundo de **todas** as sessões, ordenados por urgência
+(falha antes de execução: falha não muda sozinha), com parar/dispensar
+endereçados pelo id de RUNTIME e abrir-sessão pelo id ARMAZENADO.
+
+Consome os mesmos stores e as mesmas ações da status stack — nenhuma segunda
+implementação. Lógica de agrupamento e ordenação isolada em `rows.ts`, testável
+sem React.
+
+Cobertura: 11 testes da projeção + 9 do painel montado contra os stores reais,
+incluindo o teste que impede o erro caro (usar o id armazenado para matar
+processo mataria o processo de outra sessão, em silêncio). i18n em en, pt-BR e
+zh; `tsc --noEmit` limpo.
+
+Resta de P1, agora com escopo honesto: unificar Agents e Command Center como
+panes da árvore (hoje são overlays modais que não coabitam com o chat) e cobrir
+`command-palette/index.tsx` com teste (1400 linhas sem nenhum).

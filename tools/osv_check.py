@@ -126,6 +126,26 @@ _INSTALL_ECOSYSTEMS = {
 }
 
 
+# Opções que consomem o próximo token como valor. Espelha
+# ``tools.approval._PKG_VALUE_TAKING_FLAGS`` — as duas listas descrevem o mesmo
+# fato sobre as mesmas CLIs, e divergir é como um evasor entra por uma porta que
+# a outra já fechou.
+# `python3.12 -m pip install …` é a mesma coisa que `python3 -m pip install …`.
+# A comparação literal contra {"python","python3","py"} deixava passar toda
+# instalação feita por um interpretador versionado — comum em CI e em imagens
+# com vários Pythons.
+_PYTHON_EXE_RE = re.compile(r"^(?:.*[/\\])?(?:python|py)(?:\d+(?:\.\d+)*)?(?:\.exe)?$")
+
+_VALUE_TAKING_FLAGS = {
+    "--target", "--prefix", "--root", "--index-url", "--extra-index-url",
+    "--find-links", "--constraint", "--cache-dir", "--cert", "--client-cert",
+    "--config-settings", "--only-binary", "--no-binary", "--platform",
+    "--python-version", "--implementation", "--abi", "--proxy", "--registry",
+    "--trusted-host", "--src", "--log", "--report", "--python", "--build",
+    "-t", "-c", "-i", "-f", "-p", "--prefer",
+}
+
+
 def _first_package_token(args: list[str]) -> Optional[str]:
     """Return the first package-shaped token, ignoring CLI options.
 
@@ -133,8 +153,20 @@ def _first_package_token(args: list[str]) -> Optional[str]:
     ``tools.approval``. Lockfile/requirements restores are excluded before
     this helper is called.
     """
+    skip_next = False
     for arg in args:
-        if not arg or arg.startswith("-"):
+        if skip_next:
+            skip_next = False
+            continue
+        if not arg:
+            continue
+        if arg.startswith("-"):
+            # Opção cujo VALOR é o próximo token. Sem isto, `pip install
+            # --target . requests` devolvia `.` (o valor de --target), o
+            # helper desistia, e um pacote com advisory MAL-* confirmado
+            # escapava do bloqueio incondicional.
+            if "=" not in arg and arg.lower() in _VALUE_TAKING_FLAGS:
+                skip_next = True
             continue
         return arg.strip("\"'")
     return None
@@ -149,6 +181,31 @@ def check_install_command_for_malware(command: str) -> Optional[str]:
     advisory. Unparseable commands and temporary network failures still fall
     through to the separate human-approval boundary.
     """
+    # Um bloqueio incondicional que só olha o começo da string não é
+    # incondicional: `true && npm install pacote-malicioso` e
+    # `cd /tmp; npm install pacote-malicioso` passavam inteiros, porque o
+    # parser lia apenas ``tokens[0]``. ``detect_dangerous_command`` já
+    # segmentava o shell; aqui não segmentava — e a diferença era a porta.
+    for segment in _iter_command_segments(command):
+        blocked = _check_single_install_segment(segment)
+        if blocked:
+            return blocked
+    return None
+
+
+def _iter_command_segments(command: str):
+    """Segmentos de comando de nível superior, reusando o parser do approval."""
+    try:
+        from tools.approval import _iter_top_level_shell_segments
+
+        yield from _iter_top_level_shell_segments(command)
+    except Exception:
+        # Sem o parser compartilhado, ainda é melhor inspecionar o comando
+        # inteiro do que não inspecionar nada.
+        yield command
+
+
+def _check_single_install_segment(command: str) -> Optional[str]:
     try:
         tokens = shlex.split(command, posix=True)
     except ValueError:
@@ -158,7 +215,7 @@ def check_install_command_for_malware(command: str) -> Optional[str]:
 
     lowered = [token.lower() for token in tokens]
     start = 0
-    if len(tokens) >= 4 and lowered[0] in {"python", "python3", "py"} and lowered[1:3] == ["-m", "pip"]:
+    if len(tokens) >= 4 and _PYTHON_EXE_RE.match(lowered[0]) and lowered[1:3] == ["-m", "pip"]:
         manager = "pip"
         start = 3
     elif len(tokens) >= 4 and lowered[0] == "uv" and lowered[1:3] == ["pip", "install"]:

@@ -342,6 +342,30 @@ export const ptBrBase: Translations = {
     noResults: 'Nenhum idioma encontrado'
   },
   settings: {
+    uninstall: {
+      dangerZone: 'Zona de perigo',
+      heading: 'Desinstalar o Hermes',
+      intro:
+      'Escolha quanto remover. O app fecha para concluir; reabra o instalador quando quiser voltar.',
+      checking: 'Verificando o que está instalado…',
+      confirmTitle: 'Confirmar desinstalação',
+      confirmBody: (consequence: string) => `Isto remove ${consequence}. Não dá para desfazer.`,
+      appPath: (path: string) => `App: ${path}`,
+      confirm: 'Sim, desinstalar',
+      running: 'Desinstalando…',
+      guiTitle: 'Desinstalar só a interface de chat',
+      guiDescription: 'Remove este app. O agente Hermes, sua configuração e suas conversas ficam.',
+      guiConsequence: 'a interface de chat (este app e os dados dele)',
+      liteTitle: 'Desinstalar interface + agente, manter meus dados',
+      liteDescription:
+      'Remove o app e o agente Hermes, mas mantém configuração, conversas e segredos para reinstalar depois.',
+      liteConsequence: 'a interface de chat e o agente Hermes (configuração, conversas e segredos ficam)',
+      fullTitle: 'Desinstalar tudo',
+      fullDescription:
+      'Remove o app, o agente e todos os dados — configuração, conversas, tarefas agendadas, segredos e logs.',
+      fullConsequence:
+      'TUDO — a interface de chat, o agente Hermes e toda a sua configuração, conversas, segredos e logs'
+    },
     closeSettings: 'Fechar configura\u00E7\u00F5es',
     exportConfig: 'Exportar configura\u00E7\u00E3o',
     importConfig: 'Importar configura\u00E7\u00E3o',
@@ -3010,6 +3034,30 @@ Deixe em branco para manter o ${mode} padr\u00E3o.`,
       providerModelTitle: (provider, model) => `${provider} · ${model}`
     }
   },
+  missionControl: {
+    aria: 'Central de missões',
+    title: 'Central de missões',
+    empty: 'Nada em execução',
+    emptyBody: 'Processos de fundo, subagentes e objetivos de todas as sessões aparecem aqui.',
+    summary: (running: number, sessions: number) =>
+      `${running} em execução em ${sessions} ${sessions === 1 ? 'sessão' : 'sessões'}`,
+    summaryFailed: (failed: number) => `${failed} com falha`,
+    refresh: 'Atualizar',
+    stop: 'Parar este processo',
+    dismiss: 'Dispensar esta linha',
+    openSession: 'Abrir esta sessão',
+    untitledSession: 'Sessão sem título',
+    stateRunning: 'Em execução',
+    stateDone: 'Concluído',
+    stateFailed: 'Falhou',
+    exit: (code: number) => `saída ${code}`,
+    untitledSessionWithId: (id: string) => `Sessão ${id}`,
+    toggleCommand: 'Alternar Central de missões',
+    stopFailed: 'Não foi possível parar o processo.',
+    groupRunning: (n: number) => `${n} em execução`,
+    groupFailed: (n: number) => `${n} com falha`
+  },
+
   rightSidebar: {
     aria: 'Barra lateral direita',
     panelsAria: 'Pain\u00E9is da barra lateral direita',

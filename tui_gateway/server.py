@@ -13247,6 +13247,31 @@ def _session_processes(session: dict) -> list:
     return owned
 
 
+def _all_processes() -> list:
+    """Every background process in the registry, each carrying its owner.
+
+    ``_session_processes`` answers "what is MY session running?" — which is the
+    right question for the composer's status stack, and the wrong one for a
+    cross-session view. A desktop pane that only ever learns about sessions the
+    user happened to open cannot report the process that died in a session they
+    closed, which is exactly the case such a pane exists for.
+
+    The registry itself is already global; only the projection was scoped. Each
+    entry gains ``session_key`` so the caller can group by owner.
+    """
+    from tools.process_registry import process_registry
+
+    out = []
+    for entry in process_registry.list_sessions():
+        proc = process_registry.get(entry["session_id"])
+        if proc is None:
+            continue
+        entry["session_key"] = str(getattr(proc, "session_key", "") or "")
+        entry["output_tail"] = (proc.output_buffer or "")[-4000:]
+        out.append(entry)
+    return out
+
+
 # reload.mcp runs on the RPC pool (see _LONG_HANDLERS) so a slow/flapping MCP
 # server can't freeze the reader thread. Serialize reloads: overlapping
 # shutdown+discover pairs from stacked config-change polls would interleave

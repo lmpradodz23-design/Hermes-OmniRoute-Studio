@@ -2219,6 +2219,29 @@ export const ar = defineLocale({
       providerModelTitle: (provider, model) => `${provider}: ${model}`
     }
   },
+  missionControl: {
+    aria: 'مركز المهام',
+    title: 'مركز المهام',
+    empty: 'لا شيء قيد التشغيل',
+    emptyBody: 'تظهر هنا العمليات الخلفية والوكلاء الفرعيون والأهداف من كل الجلسات.',
+    summary: (running: number, sessions: number) => `${running} قيد التشغيل في ${sessions} جلسة`,
+    summaryFailed: (failed: number) => `${failed} فشل`,
+    refresh: 'تحديث',
+    stop: 'إيقاف هذه العملية',
+    dismiss: 'إخفاء هذا السطر',
+    openSession: 'فتح هذه الجلسة',
+    untitledSession: 'جلسة بلا عنوان',
+    stopFailed: 'تعذر إيقاف العملية.',
+    groupRunning: (n: number) => `${n} قيد التشغيل`,
+    groupFailed: (n: number) => `${n} فشل`,
+    stateRunning: 'قيد التشغيل',
+    stateDone: 'اكتمل',
+    stateFailed: 'فشل',
+    exit: (code: number) => `رمز الخروج ${code}`,
+    untitledSessionWithId: (id: string) => `جلسة ${id}`,
+    toggleCommand: 'إظهار/إخفاء مركز المهام'
+  },
+
   rightSidebar: {
     aria: 'الشريط الجانبي الأيمن',
     panelsAria: 'لوحات الشريط الأيمن',

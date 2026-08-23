@@ -1,9 +1,20 @@
 ---
 name: using-git-worktrees
-description: Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback
+description: Isolates parallel work in git worktrees.
+version: "vendored-b36e082"
+author: "obra/superpowers"
+license: "MIT"
+platforms: [linux, macos, windows]
+metadata:
+  hermes:
+    tags: [git, worktree, workflow]
 ---
 
 # Using Git Worktrees
+
+## When to Use
+
+Use when starting feature work that needs isolation from current workspace or before executing implementation plans - ensures an isolated workspace exists via native tools or git worktree fallback
 
 ## Overview
 

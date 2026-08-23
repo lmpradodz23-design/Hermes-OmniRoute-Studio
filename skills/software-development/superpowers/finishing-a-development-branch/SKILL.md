@@ -1,9 +1,20 @@
 ---
 name: finishing-a-development-branch
-description: Use when implementation is complete, all tests pass, and you need to decide how to integrate the work
+description: Finishes a branch with review, merge and cleanup.
+version: "vendored-b36e082"
+author: "obra/superpowers"
+license: "MIT"
+platforms: [linux, macos, windows]
+metadata:
+  hermes:
+    tags: [git, branch, workflow]
 ---
 
 # Finishing a Development Branch
+
+## When to Use
+
+Use when implementation is complete, all tests pass, and you need to decide how to integrate the work
 
 ## Overview
 

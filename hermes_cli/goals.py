@@ -214,6 +214,25 @@ DEFAULT_MAX_CONSECUTIVE_TRANSPORT_FAILURES = 5
 # agent). A failed gate short-circuits the judge — its output IS the
 # continuation prompt, so the agent works on concrete evidence instead of a
 # vibe check.
+# ── Detecção de estagnação (mission-level) ────────────────────────────────
+#
+# As pausas existentes cobrem falhas de INFRAESTRUTURA: judge inalcançável,
+# judge ilegível, orçamento de turnos, gate que esgotou retries. Nenhuma delas
+# cobre o caso em que tudo funciona e mesmo assim nada anda: o agente gasta
+# turno após turno, o workspace não muda um byte e a falha volta idêntica.
+# Isso é atividade, não progresso — e sem medir a diferença o loop repete a
+# mesma abordagem até o orçamento acabar.
+#
+# Progresso aqui é medido, não declarado: ou o workspace mudou
+# (``workspace_fingerprint()``), ou a falha mudou — falha diferente é
+# informação nova, o diagnóstico andou. As duas iguais = turno queimado.
+DEFAULT_STALL_STRATEGY_CHANGE_TURNS = 3
+DEFAULT_STALL_ESCALATION_TURNS = 5
+
+STALL_DIRECTIVE_NONE = ""
+STALL_DIRECTIVE_STRATEGY_CHANGE = "STRATEGY_CHANGE_REQUIRED"
+STALL_DIRECTIVE_ESCALATE = "ESCALATE_TO_DIAGNOSTIC_AGENT"
+
 DEFAULT_GATE_TIMEOUT_SECONDS = 300
 DEFAULT_GATE_MAX_RETRIES = 3
 # Bounded tail of a failed gate's combined stdout/stderr fed back to the agent.
@@ -624,10 +643,138 @@ def workspace_fingerprint(cwd: Optional[str] = None) -> str:
         )
         if status.returncode != 0:
             return ""
-        blob = head.stdout.strip() + "\n" + status.stdout
-        return hashlib.sha256(blob.encode("utf-8", "replace")).hexdigest()
+        # HEAD + a LISTA de arquivos tocados não bastam: `git status
+        # --porcelain` devolve ` M src.py` tanto na primeira edição quanto na
+        # décima. Duas consequências, ambas medidas:
+        #
+        #  1. o pulo de gate ("workspace inalterado desde a última falha") não
+        #     re-roda a suíte depois de o agente editar um arquivo que já
+        #     estava modificado — a correção nunca é testada, a falha antiga é
+        #     reproduzida, e o contador de tentativas avança sozinho;
+        #  2. a detecção de estagnação não enxerga trabalho real e acusa de
+        #     parado quem está iterando no mesmo arquivo.
+        #
+        # `git diff HEAD` cobre o conteúdo do que está rastreado. Os não
+        # rastreados não aparecem nele, então entram por (tamanho, mtime) —
+        # lidos apenas dos caminhos que o porcelain JÁ listou, sem varrer a
+        # árvore.
+        diff = subprocess.run(
+            ["git", "diff", "HEAD"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=30, cwd=workdir,
+        )
+        parts = [head.stdout.strip(), status.stdout, diff.stdout if diff.returncode == 0 else ""]
+
+        for line in status.stdout.splitlines():
+            if not line.startswith("?? "):
+                continue
+            rel = line[3:].strip().strip('"')
+            try:
+                info = os.stat(os.path.join(workdir, rel))
+                parts.append(f"{rel}:{info.st_size}:{info.st_mtime_ns}")
+            except OSError:
+                parts.append(f"{rel}:missing")
+
+        return hashlib.sha256("\n".join(parts).encode("utf-8", "replace")).hexdigest()
     except Exception:
         return ""
+
+
+def classify_progress(
+    state: GoalState,
+    *,
+    fingerprint: str,
+    failure_signature: str,
+    now: float,
+    store_fingerprint: Optional[str] = None,
+) -> str:
+    """Atualiza os contadores de estagnação e devolve a diretiva resultante.
+
+    Função pura sobre o estado: sem judge, sem git, sem I/O. É assim que a
+    detecção de estagnação fica testável de verdade — o chamador mede o mundo
+    (fingerprint do workspace, assinatura da falha) e esta função decide.
+
+    Progresso é QUALQUER uma destas:
+
+      * o workspace mudou desde o último turno;
+      * a falha mudou — falha diferente é informação nova, o diagnóstico
+        avançou mesmo que nenhum arquivo tenha mudado ainda;
+      * não há falha nenhuma neste turno.
+
+    Nenhuma das duas ⇒ turno queimado. Aí os contadores sobem e, nos limites,
+    sai a diretiva:
+
+      3 falhas equivalentes  → ``STRATEGY_CHANGE_REQUIRED``  (mesma abordagem,
+                               proibido repetir: o loop segue, com instrução
+                               explícita de mudar de estratégia)
+      5 turnos sem progresso → ``ESCALATE_TO_DIAGNOSTIC_AGENT`` (o chamador
+                               pausa; insistir daqui em diante é queimar
+                               orçamento)
+
+    A escalação vence a troca de estratégia: quem já passou por 5 turnos parados
+    não precisa de mais uma tentativa, precisa de outro par de olhos.
+
+    Fora de um repositório git ``workspace_fingerprint()`` devolve string vazia.
+    Nesse caso a estagnação passa a depender só da assinatura da falha: sem
+    sinal de mudança medido, o critério fica MAIS conservador, nunca menos —
+    ausência de medição jamais vira acusação de estagnação.
+    """
+    state.heartbeat_at = now
+
+    workspace_moved = bool(fingerprint) and fingerprint != state.last_workspace_fingerprint
+    failure_changed = failure_signature != state.last_failure_signature
+    no_failure = not failure_signature
+
+    progressed = workspace_moved or no_failure or failure_changed
+
+    # O que se COMPARA e o que se GUARDA são medidas diferentes de propósito.
+    #
+    # Comparar: o fingerprint do início deste turno, contra o guardado no fim do
+    # turno anterior — ou seja, o que mudou no intervalo em que o AGENTE
+    # trabalhou. Guardar: o fingerprint do fim deste turno, depois de os gates
+    # rodarem.
+    #
+    # Sem essa separação, qualquer gate que escreva um arquivo (relatório de
+    # cobertura, `dist/`, log) muda o fingerprint para sempre e todo turno lê
+    # como progresso — a feature inteira fica inerte, silenciosamente. Medir uma
+    # vez no início do turno não resolve: o artefato escrito no turno N ainda
+    # está lá no início do turno N+1.
+    state.last_workspace_fingerprint = (
+        store_fingerprint if store_fingerprint is not None else fingerprint
+    )
+    state.last_failure_signature = failure_signature
+
+    if progressed:
+        state.last_progress_at = now
+        state.no_progress_turns = 0
+        state.same_failure_count = 1 if failure_signature else 0
+        state.stall_directive = STALL_DIRECTIVE_NONE
+        return STALL_DIRECTIVE_NONE
+
+    state.no_progress_turns += 1
+    state.same_failure_count += 1
+
+    if state.no_progress_turns >= DEFAULT_STALL_ESCALATION_TURNS:
+        state.stall_directive = STALL_DIRECTIVE_ESCALATE
+    elif state.same_failure_count >= DEFAULT_STALL_STRATEGY_CHANGE_TURNS:
+        state.stall_directive = STALL_DIRECTIVE_STRATEGY_CHANGE
+    else:
+        state.stall_directive = STALL_DIRECTIVE_NONE
+
+    return state.stall_directive
+
+
+STRATEGY_CHANGE_BLOCK = (
+    "\n\nATENÇÃO — ESTAGNAÇÃO DETECTADA ({same_failure_count} tentativas com a "
+    "mesma falha e nenhuma mudança no workspace).\n"
+    "A abordagem atual não está funcionando. NÃO repita a mesma tentativa.\n"
+    "Antes de escrever qualquer código: enuncie a hipótese que já foi descartada, "
+    "escolha uma estratégia DIFERENTE, e diga qual evidência vai distinguir uma da "
+    "outra. Se a causa raiz ainda não estiver identificada, investigue-a primeiro — "
+    "instrumente, leia o log real, reduza o caso ao menor reprodutível.\n"
+    "Proibido obter verde artificialmente: remover teste, enfraquecer assertion, "
+    "engolir exceção, mock apresentado como integração."
+)
 
 
 def run_gate(gate: GoalGate, *, cwd: Optional[str] = None) -> Tuple[bool, int, str]:
@@ -730,6 +877,19 @@ class GoalState:
     # must ALL pass before the judge may declare the goal done. Empty by
     # default — a goal with no gates behaves exactly as before.
     gates: List[GoalGate] = field(default_factory=list)
+    # Anti-estagnação. Todos com default: linhas antigas de ``state_meta``
+    # carregam sem eles e o comportamento fica idêntico ao anterior.
+    #
+    # ``heartbeat_at`` marca que o loop rodou; ``last_progress_at`` marca que
+    # ele ANDOU. Manter os dois separados é o ponto: heartbeat não é progresso,
+    # e um loop que só bate heartbeat é exatamente o que precisa ser detectado.
+    heartbeat_at: float = 0.0
+    last_progress_at: float = 0.0
+    no_progress_turns: int = 0
+    same_failure_count: int = 0
+    last_failure_signature: str = ""
+    last_workspace_fingerprint: str = ""
+    stall_directive: str = ""
 
     def to_json(self) -> str:
         data = asdict(self)
@@ -767,6 +927,13 @@ class GoalState:
                 for g in (data.get("gates") or [])
                 if isinstance(g, dict) and str(g.get("command") or "").strip()
             ],
+            heartbeat_at=float(data.get("heartbeat_at", 0.0) or 0.0),
+            last_progress_at=float(data.get("last_progress_at", 0.0) or 0.0),
+            no_progress_turns=int(data.get("no_progress_turns", 0) or 0),
+            same_failure_count=int(data.get("same_failure_count", 0) or 0),
+            last_failure_signature=str(data.get("last_failure_signature") or ""),
+            last_workspace_fingerprint=str(data.get("last_workspace_fingerprint") or ""),
+            stall_directive=str(data.get("stall_directive") or ""),
         )
 
     # --- contract helpers -------------------------------------------------
@@ -1622,6 +1789,22 @@ class GoalManager:
         self._state.waiting_until = 0.0
         self._state.waiting_reason = None
         self._state.waiting_since = 0.0
+        # Retomar depois de uma pausa por estagnação abre uma JANELA NOVA de
+        # tentativas. Sem isso o contador retomaria em 5 e o primeiro turno
+        # ainda vermelho re-pausaria na hora — um botão de resume que não
+        # resume. As assinaturas ficam: se a falha voltar idêntica sobre um
+        # workspace idêntico, a contagem recomeça do 1 e chega de novo aos
+        # limites. Janela nova, não amnésia.
+        self._state.no_progress_turns = 0
+        self._state.same_failure_count = 0
+        self._state.stall_directive = STALL_DIRECTIVE_NONE
+        # Mesmo raciocínio para a pausa por retries esgotados: sem zerar as
+        # tentativas por gate, a condição da pausa continua satisfeita e o
+        # próximo turno re-pausa na hora. A mensagem manda "conserte e dê
+        # /goal resume" — e o resume sozinho não gastava um turno sequer.
+        for gate in self._state.gates:
+            gate.attempts = 0
+            gate.last_failed_fingerprint = ""
         if reset_budget:
             self._state.turns_used = 0
         save_goal(self.session_id, self._state)
@@ -1753,7 +1936,64 @@ class GoalManager:
             lines.append(f"- {i}. $ {g.command}{status}")
         return "\n".join(lines)
 
-    def _check_gates(self) -> Optional[Dict[str, Any]]:
+    def _note_turn_outcome(
+        self, failure_signature: str, fingerprint: str, store_fingerprint: Optional[str] = None
+    ) -> str:
+        """Mede o turno que acabou e devolve a diretiva de estagnação.
+
+        Chamado nos dois caminhos que terminam um turno sem concluir o goal —
+        gate vermelho e judge dizendo ``continue`` — porque a estagnação
+        clássica acontece nos dois: o gate que volta idêntico e o judge que
+        repete a mesma ressalva enquanto nada muda no disco.
+
+        ``fingerprint`` é a medida do INÍCIO do turno (o que se compara);
+        ``store_fingerprint``, quando dado, é a do fim (o que se guarda para o
+        próximo turno comparar). Ver ``classify_progress``: sem separar as duas,
+        um gate que escreve qualquer arquivo desliga a detecção em silêncio.
+        """
+        state = self._state
+        if state is None:
+            return STALL_DIRECTIVE_NONE
+        return classify_progress(
+            state,
+            fingerprint=fingerprint,
+            failure_signature=failure_signature,
+            now=time.time(),
+            store_fingerprint=store_fingerprint,
+        )
+
+    def _stall_escalation_decision(self, reason: str) -> Dict[str, Any]:
+        """Pausa por estagnação, apontando para delegação de diagnóstico.
+
+        Pausar aqui não é desistir: é parar de queimar orçamento numa
+        abordagem que já se provou estéril por
+        ``DEFAULT_STALL_ESCALATION_TURNS`` turnos. A missão continua — o que
+        muda é quem ataca o problema.
+        """
+        state = self._state
+        state.status = "paused"
+        state.paused_reason = (
+            f"{STALL_DIRECTIVE_ESCALATE}: {state.no_progress_turns} turnos sem "
+            "progresso mensurável (workspace inalterado, mesma falha)"
+        )
+        save_goal(self.session_id, state)
+        return {
+            "status": "paused",
+            "should_continue": False,
+            "continuation_prompt": None,
+            "verdict": "stalled",
+            "reason": reason,
+            "message": (
+                f"⏸ Goal pausado — {STALL_DIRECTIVE_ESCALATE}. "
+                f"{state.no_progress_turns} turnos sem progresso mensurável: o "
+                "workspace não mudou e a falha voltou igual. Continuar na mesma "
+                "linha só queima orçamento.\n"
+                "Delegue o diagnóstico com objetivo, evidências, tentativas já "
+                "feitas, logs e hipóteses descartadas — depois /goal resume."
+            ),
+        }
+
+    def _check_gates(self, fingerprint: str) -> Optional[Dict[str, Any]]:
         """Run quality gates in order; return a decision dict on failure.
 
         Returns ``None`` when there are no gates or every gate passes —
@@ -1771,7 +2011,9 @@ class GoalManager:
         if state is None or not state.gates:
             return None
 
-        fingerprint = workspace_fingerprint()
+        # O fingerprint é o do INÍCIO do turno, medido pelo chamador. Medir aqui
+        # de novo depois de rodar os gates leria os artefatos que os próprios
+        # gates acabaram de escrever.
         for gate in state.gates:
             unchanged = (
                 bool(fingerprint)
@@ -1813,6 +2055,16 @@ class GoalManager:
                     ),
                 }
 
+            directive = self._note_turn_outcome(
+                f"gate:{gate.command}:{exit_code}",
+                fingerprint,
+                store_fingerprint=workspace_fingerprint(),
+            )
+            if directive == STALL_DIRECTIVE_ESCALATE:
+                return self._stall_escalation_decision(
+                    f"gate failed (exit {exit_code}): $ {gate.command}"
+                )
+
             save_goal(self.session_id, state)
             prompt = CONTINUATION_PROMPT_GATE_FAILED_TEMPLATE.format(
                 goal=state.goal,
@@ -1822,6 +2074,10 @@ class GoalManager:
                 max_retries=gate.max_retries,
                 output=tail or "(no output)",
             )
+            if directive == STALL_DIRECTIVE_STRATEGY_CHANGE:
+                prompt += STRATEGY_CHANGE_BLOCK.format(
+                    same_failure_count=state.same_failure_count
+                )
             return {
                 "status": "active",
                 "should_continue": True,
@@ -2018,11 +2274,16 @@ class GoalManager:
         state.turns_used += 1
         state.last_turn_at = time.time()
 
+        # UMA medição por turno, tirada ANTES de qualquer gate rodar. Ver
+        # _note_turn_outcome: medir depois transforma o lixo que o gate escreve
+        # em "progresso" e desliga a detecção de estagnação em silêncio.
+        turn_fingerprint = workspace_fingerprint()
+
         # Quality gates run BEFORE the LLM judge: a failing gate is
         # deterministic evidence the goal is not done, so the judge call is
         # skipped entirely and the gate's output drives the next turn. Gate
         # continuations respect the same turn budget as judge continuations.
-        gate_decision = self._check_gates()
+        gate_decision = self._check_gates(turn_fingerprint)
         if gate_decision is not None:
             if gate_decision.get("should_continue") and state.turns_used >= state.max_turns:
                 state.status = "paused"
@@ -2097,6 +2358,9 @@ class GoalManager:
 
         if verdict == "done":
             state.status = "done"
+            # Concluir é o progresso máximo: zera os contadores para que um
+            # /goal resume posterior não herde estagnação de outra vida.
+            self._note_turn_outcome("", turn_fingerprint)
             save_goal(self.session_id, state)
             return {
                 "status": "done",
@@ -2183,15 +2447,44 @@ class GoalManager:
                 ),
             }
 
+        # O judge disse "continue". Esse é o turno que PODE estar sendo
+        # queimado: tudo funcionou, ninguém errou, e mesmo assim talvez nada
+        # tenha andado. A assinatura é a razão do judge — quando ela volta
+        # idêntica sobre um workspace idêntico, o loop está repetindo a mesma
+        # abordagem, que é exatamente o que não pode continuar em silêncio.
+        # A assinatura é o VEREDITO, não a frase. `reason` vem verbatim do
+        # modelo auxiliar ("<one sentence>"), então uma vírgula diferente entre
+        # dois turnos lia como "a falha mudou ⇒ o diagnóstico andou" e zerava os
+        # contadores. Com um judge real (temperatura > 0) isso acontecia quase
+        # sempre, e o detector praticamente nunca disparava. Estabilizando a
+        # assinatura, o progresso no caminho do judge passa a depender do que é
+        # objetivamente verificável: o workspace mudou ou não mudou.
+        directive = self._note_turn_outcome(f"judge:{verdict}", turn_fingerprint)
+        if directive == STALL_DIRECTIVE_ESCALATE:
+            return self._stall_escalation_decision(reason)
+
+        continuation_prompt = self.next_continuation_prompt()
+        if directive == STALL_DIRECTIVE_STRATEGY_CHANGE and continuation_prompt:
+            continuation_prompt += STRATEGY_CHANGE_BLOCK.format(
+                same_failure_count=state.same_failure_count
+            )
+
         save_goal(self.session_id, state)
         return {
             "status": "active",
             "should_continue": True,
-            "continuation_prompt": self.next_continuation_prompt(),
+            "continuation_prompt": continuation_prompt,
             "verdict": "continue",
             "reason": reason,
+            "stall_directive": directive,
             "message": (
                 f"↻ Continuing toward goal ({state.turns_used}/{state.max_turns}): {reason}"
+                + (
+                    f"\n⚠ {STALL_DIRECTIVE_STRATEGY_CHANGE}: "
+                    f"{state.same_failure_count} tentativas equivalentes — mude de estratégia."
+                    if directive == STALL_DIRECTIVE_STRATEGY_CHANGE
+                    else ""
+                )
             ),
         }
 

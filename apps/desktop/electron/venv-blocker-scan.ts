@@ -36,10 +36,48 @@ export interface VenvBlockerScanResult {
   processes: VenvBlockerProcess[]
 }
 
+// Classificação da falha do probe. `exit -1` sozinho é diagnóstico insuficiente
+// (§4 do P0): distinguimos timeout (venv provavelmente ocupado por um processo
+// Hermes segurando .pyd), spawn falho, acesso negado, etc. — nunca tratamos
+// falha de probe como "venv livre".
+export type ProbeFailureKind =
+  | 'timeout' // scan excedeu o tempo — venv provavelmente ocupado (gateway?)
+  | 'spawn_failed' // não conseguiu lançar o python do venv
+  | 'access_denied' // permissão negada
+  | 'venv_missing' // python do venv não encontrado
+  | 'nonzero_exit' // python rodou e saiu != 0
+  | 'malformed_output' // JSON inválido/inconsistente
+  | 'unknown'
+
 export type ScanOutcome =
   | { kind: 'clear'; result: VenvBlockerScanResult }
   | { kind: 'blocked'; result: VenvBlockerScanResult }
-  | { kind: 'probe-failure'; error: string }
+  | { kind: 'probe-failure'; error: string; failureKind: ProbeFailureKind }
+
+/**
+ * Classifica o erro do subprocesso de scan num ProbeFailureKind. Puro/testável.
+ * Um timeout do execFile chega com killed=true e code/signal nulos (o fallback
+ * histórico "-1"): é o caso real quando o gateway segura o venv e o scan trava.
+ */
+export function classifyProbeError(err: any): { kind: ProbeFailureKind; detail: string } {
+  if (err && err.killed === true && (err.signal === 'SIGTERM' || err.signal === 'SIGKILL' || err.code == null)) {
+    return { kind: 'timeout', detail: 'scan timed out — venv likely held by a Hermes process (e.g. the gateway)' }
+  }
+  const code = err ? err.code : undefined
+  if (code === 'ENOENT') {
+    return { kind: 'spawn_failed', detail: 'could not launch the venv python' }
+  }
+  if (code === 'EACCES' || code === 'EPERM') {
+    return { kind: 'access_denied', detail: 'permission denied launching the venv python' }
+  }
+  if (typeof code === 'number' && Number.isFinite(code)) {
+    return { kind: 'nonzero_exit', detail: `venv python exited ${code}` }
+  }
+  if (typeof err?.status === 'number' && Number.isFinite(err.status)) {
+    return { kind: 'nonzero_exit', detail: `venv python exited ${err.status}` }
+  }
+  return { kind: 'unknown', detail: `exit code ${err?.status ?? err?.code ?? -1}` }
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -149,40 +187,40 @@ export function parseVenvBlockerScanOutput(raw: string): ScanOutcome {
   try {
     parsed = JSON.parse(raw)
   } catch {
-    return { kind: 'probe-failure', error: 'malformed JSON' }
+    return { kind: 'probe-failure', error: 'malformed JSON', failureKind: 'malformed_output' }
   }
 
   if (!parsed || typeof parsed !== 'object' || parsed.ok !== true) {
-    return { kind: 'probe-failure', error: 'missing or invalid ok field' }
+    return { kind: 'probe-failure', error: 'missing or invalid ok field', failureKind: 'malformed_output' }
   }
 
   if (typeof parsed.blocked !== 'boolean') {
-    return { kind: 'probe-failure', error: 'blocked must be a boolean' }
+    return { kind: 'probe-failure', error: 'blocked must be a boolean', failureKind: 'malformed_output' }
   }
 
   if (!Array.isArray(parsed.processes)) {
-    return { kind: 'probe-failure', error: 'processes must be an array' }
+    return { kind: 'probe-failure', error: 'processes must be an array', failureKind: 'malformed_output' }
   }
 
   const processes: VenvBlockerProcess[] = []
 
   for (const entry of parsed.processes) {
     if (!entry || typeof entry !== 'object') {
-      return { kind: 'probe-failure', error: 'process entry must be an object' }
+      return { kind: 'probe-failure', error: 'process entry must be an object', failureKind: 'malformed_output' }
     }
 
     const { pid, name, cmdline } = entry
 
     if (!Number.isInteger(pid) || pid <= 0) {
-      return { kind: 'probe-failure', error: 'process pid must be a positive integer' }
+      return { kind: 'probe-failure', error: 'process pid must be a positive integer', failureKind: 'malformed_output' }
     }
 
     if (typeof name !== 'string' || name.length === 0) {
-      return { kind: 'probe-failure', error: 'process name must be a non-empty string' }
+      return { kind: 'probe-failure', error: 'process name must be a non-empty string', failureKind: 'malformed_output' }
     }
 
     if (typeof cmdline !== 'string') {
-      return { kind: 'probe-failure', error: 'process cmdline must be a string' }
+      return { kind: 'probe-failure', error: 'process cmdline must be a string', failureKind: 'malformed_output' }
     }
 
     processes.push(classifyVenvBlocker({ pid, name, cmdline }, entry))
@@ -190,11 +228,11 @@ export function parseVenvBlockerScanOutput(raw: string): ScanOutcome {
 
   // Reject inconsistent combinations
   if (parsed.blocked && processes.length === 0) {
-    return { kind: 'probe-failure', error: 'blocked is true but process list is empty' }
+    return { kind: 'probe-failure', error: 'blocked is true but process list is empty', failureKind: 'malformed_output' }
   }
 
   if (!parsed.blocked && processes.length > 0) {
-    return { kind: 'probe-failure', error: 'blocked is false but process list is non-empty' }
+    return { kind: 'probe-failure', error: 'blocked is false but process list is non-empty', failureKind: 'malformed_output' }
   }
 
   return parsed.blocked
@@ -218,7 +256,7 @@ export async function scanVenvBlockers(
   const venvPython = resolveFn(updateRoot)
 
   if (!venvPython) {
-    return { kind: 'probe-failure', error: 'venv python not found' }
+    return { kind: 'probe-failure', error: 'venv python not found', failureKind: 'venv_missing' }
   }
 
   let stdout: string
@@ -233,13 +271,14 @@ export async function scanVenvBlockers(
 
     stdout = String((proc as any).stdout ?? '')
   } catch (err: any) {
-    const diag = [`exit code ${err.status ?? err.code ?? -1}`]
+    const classified = classifyProbeError(err)
+    const diag = [classified.detail]
 
     if (err.stderr) {
       diag.push(String(err.stderr).slice(0, 200))
     }
 
-    return { kind: 'probe-failure', error: diag.join('; ') }
+    return { kind: 'probe-failure', error: diag.join('; '), failureKind: classified.kind }
   }
 
   return parseVenvBlockerScanOutput(stdout)

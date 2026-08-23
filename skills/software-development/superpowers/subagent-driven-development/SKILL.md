@@ -1,6 +1,13 @@
 ---
 name: subagent-driven-development
-description: Use when executing implementation plans with independent tasks in the current session
+description: Delegates implementation to subagents.
+version: "vendored-b36e082"
+author: "obra/superpowers"
+license: "MIT"
+platforms: [linux, macos, windows]
+metadata:
+  hermes:
+    tags: [delegation, agents, workflow]
 ---
 
 # Subagent-Driven Development
@@ -31,6 +38,8 @@ publish); and a plan so broken that every path forward is a guess. For those,
 stop and ask.
 
 ## When to Use
+
+Use when executing implementation plans with independent tasks in the current session
 
 ```dot
 digraph when_to_use {

@@ -1,6 +1,13 @@
 ---
 name: writing-skills
-description: Use when creating new skills, editing existing skills, or verifying skills work before deployment
+description: Writes and edits skills that agents load.
+version: "vendored-b36e082"
+author: "obra/superpowers"
+license: "MIT"
+platforms: [linux, macos, windows]
+metadata:
+  hermes:
+    tags: [meta, skills, authoring]
 ---
 
 # Writing Skills
@@ -114,6 +121,8 @@ description: Use when [specific triggering conditions and symptoms]
 What is this? Core principle in 1-2 sentences.
 
 ## When to Use
+
+Use when creating new skills, editing existing skills, or verifying skills work before deployment
 [Small inline flowchart IF decision non-obvious]
 
 Bullet list with SYMPTOMS and use cases

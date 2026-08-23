@@ -347,6 +347,28 @@ export const en: Translations = {
   },
 
   settings: {
+    uninstall: {
+      dangerZone: 'Danger zone',
+      heading: 'Uninstall Hermes',
+      intro: 'Choose how much to remove. The app closes to finish the job; reopen the installer any time to come back.',
+      checking: "Checking what's installed…",
+      confirmTitle: 'Confirm uninstall',
+      confirmBody: (consequence: string) => `This removes ${consequence}. This can't be undone.`,
+      appPath: (path: string) => `App: ${path}`,
+      confirm: 'Yes, uninstall',
+      running: 'Uninstalling…',
+      guiTitle: 'Uninstall Chat GUI only',
+      guiDescription: 'Remove this desktop app. The Hermes agent, your config, and chats all stay.',
+      guiConsequence: 'the desktop Chat GUI (this app and its data)',
+      liteTitle: 'Uninstall GUI + agent, keep my data',
+      liteDescription:
+        'Remove the app and the Hermes agent, but keep config, chats, and secrets for a future reinstall.',
+      liteConsequence: 'the Chat GUI and the Hermes agent (config, chats, and secrets are kept)',
+      fullTitle: 'Uninstall everything',
+      fullDescription: 'Remove the app, the agent, and all user data — config, chats, scheduled jobs, secrets, logs.',
+      fullConsequence:
+        'EVERYTHING — the Chat GUI, the Hermes agent, and all of your config, chats, secrets, and logs'
+    },
     closeSettings: 'Close settings',
     exportConfig: 'Export config',
     importConfig: 'Import config',
@@ -2116,10 +2138,12 @@ export const en: Translations = {
   sidebar: {
     nav: {
       'new-session': 'New session',
+      agents: 'Agents',
       skills: 'Capabilities',
       messaging: 'Messaging',
       artifacts: 'Artifacts',
-      cron: 'Scheduled jobs'
+      cron: 'Scheduled jobs',
+      starmap: 'Memory'
     },
     searchAria: 'Search sessions',
     searchPlaceholder: 'Search sessions…',
@@ -2932,6 +2956,29 @@ export const en: Translations = {
     }
   },
 
+  missionControl: {
+    aria: 'Mission Control',
+    title: 'Mission Control',
+    empty: 'Nothing running',
+    emptyBody: 'Background processes, subagents and goals from every session show up here.',
+    summary: (running: number, sessions: number) =>
+      `${running} running across ${sessions} ${sessions === 1 ? 'session' : 'sessions'}`,
+    summaryFailed: (failed: number) => `${failed} failed`,
+    refresh: 'Refresh',
+    stop: 'Stop this process',
+    dismiss: 'Dismiss this row',
+    openSession: 'Open this session',
+    untitledSession: 'Untitled session',
+    stateRunning: 'Running',
+    stateDone: 'Finished',
+    stateFailed: 'Failed',
+    exit: (code: number) => `exit ${code}`,
+    untitledSessionWithId: (id: string) => `Session ${id}`,
+    toggleCommand: 'Toggle Mission Control',
+    stopFailed: 'Could not stop the process.',
+    groupRunning: (n: number) => `${n} running`,
+    groupFailed: (n: number) => `${n} failed`
+  },
   rightSidebar: {
     aria: 'Right sidebar',
     panelsAria: 'Right sidebar panels',

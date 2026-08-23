@@ -1,6 +1,13 @@
 ---
 name: dispatching-parallel-agents
-description: Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies
+description: Runs independent subagents in parallel.
+version: "vendored-b36e082"
+author: "obra/superpowers"
+license: "MIT"
+platforms: [linux, macos, windows]
+metadata:
+  hermes:
+    tags: [delegation, agents, parallel]
 ---
 
 # Dispatching Parallel Agents
@@ -14,6 +21,8 @@ When you have multiple unrelated failures (different test files, different subsy
 **Core principle:** Dispatch one agent per independent problem domain. Let them work concurrently.
 
 ## When to Use
+
+Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies
 
 ```dot
 digraph when_to_use {

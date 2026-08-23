@@ -1,6 +1,13 @@
 ---
 name: ui-designer
-description: Extract design systems from reference UI images and generate implementation-ready UI design prompts. Use when users provide UI screenshots/mockups and want to create consistent designs, generate design systems, or build MVP UIs matching reference aesthetics.
+description: Extracts a design system from UI screenshots.
+version: "vendored-d0e673c"
+author: "daymade/claude-code-skills"
+license: "MIT; see LICENSE.daymade"
+platforms: [linux, macos, windows]
+metadata:
+  hermes:
+    tags: [design, design-system, ui]
 ---
 
 # UI Designer
@@ -14,6 +21,8 @@ Map the upstream `Task` tool to Hermes delegation when it is enabled and allowed
 This skill enables systematic extraction of design systems from reference UI images through a multi-step workflow: analyze visual patterns → generate design system documentation → create PRD → produce implementation-ready UI prompts.
 
 ## When to Use
+
+Extract design systems from reference UI images and generate implementation-ready UI design prompts. Use when users provide UI screenshots/mockups and want to create consistent designs, generate design systems, or build MVP UIs matching reference aesthetics.
 
 - User provides UI screenshots, mockups, or design references
 - Need to extract color palettes, typography, spacing from existing designs

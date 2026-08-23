@@ -1,0 +1,308 @@
+{
+  "version": "2.1.0",
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Semgrep OSS",
+          "rules": [
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "JWT is decoded without signature verification. jwt.decode() never verifies the signature \u2014 use jwt.verify() with a trusted secret. An empty string secret is effectively no verification."
+              },
+              "help": {
+                "markdown": "JWT is decoded without signature verification. jwt.decode() never verifies the signature \u2014 use jwt.verify() with a trusted secret. An empty string secret is effectively no verification.",
+                "text": "JWT is decoded without signature verification. jwt.decode() never verifies the signature \u2014 use jwt.verify() with a trusted secret. An empty string secret is effectively no verification."
+              },
+              "id": "engine.semgrep.rules.auth.raptor.auth.jwt-no-verify.javascript",
+              "name": "engine.semgrep.rules.auth.raptor.auth.jwt-no-verify.javascript",
+              "properties": {
+                "precision": "very-high",
+                "tags": [
+                  "CWE-345",
+                  "auth",
+                  "jwt",
+                  "misconfiguration",
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "Semgrep Finding: engine.semgrep.rules.auth.raptor.auth.jwt-no-verify.javascript"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "JWT is decoded without signature verification. An attacker can forge arbitrary tokens. Always verify the signature with a trusted key and explicit algorithm."
+              },
+              "help": {
+                "markdown": "JWT is decoded without signature verification. An attacker can forge arbitrary tokens. Always verify the signature with a trusted key and explicit algorithm.",
+                "text": "JWT is decoded without signature verification. An attacker can forge arbitrary tokens. Always verify the signature with a trusted key and explicit algorithm."
+              },
+              "id": "engine.semgrep.rules.auth.raptor.auth.jwt-no-verify.python",
+              "name": "engine.semgrep.rules.auth.raptor.auth.jwt-no-verify.python",
+              "properties": {
+                "precision": "very-high",
+                "tags": [
+                  "CWE-345",
+                  "auth",
+                  "jwt",
+                  "misconfiguration",
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "Semgrep Finding: engine.semgrep.rules.auth.raptor.auth.jwt-no-verify.python"
+              }
+            },
+            {
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "fullDescription": {
+                "text": "Default TLS hostname verifier overridden globally. This typically disables hostname verification for all HTTPS connections in the JVM. Use the default verifier or configure per-connection verification."
+              },
+              "help": {
+                "markdown": "Default TLS hostname verifier overridden globally. This typically disables hostname verification for all HTTPS connections in the JVM. Use the default verifier or configure per-connection verification.",
+                "text": "Default TLS hostname verifier overridden globally. This typically disables hostname verification for all HTTPS connections in the JVM. Use the default verifier or configure per-connection verification."
+              },
+              "id": "engine.semgrep.rules.auth.raptor.tls.skip-verify.java",
+              "name": "engine.semgrep.rules.auth.raptor.tls.skip-verify.java",
+              "properties": {
+                "precision": "very-high",
+                "tags": [
+                  "CWE-295",
+                  "misconfiguration",
+                  "security",
+                  "tls"
+                ]
+              },
+              "shortDescription": {
+                "text": "Semgrep Finding: engine.semgrep.rules.auth.raptor.tls.skip-verify.java"
+              }
+            }
+          ],
+          "semanticVersion": "1.174.0"
+        }
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        },
+        {
+          "executionSuccessful": true,
+          "toolExecutionNotifications": []
+        }
+      ],
+      "results": [
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/tmp/vuln-target/app.py",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 52,
+                  "endLine": 6,
+                  "snippet": {
+                    "text": "    return subprocess.check_output(cmd, shell=True)  # command injection"
+                  },
+                  "startColumn": 12,
+                  "startLine": 6
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Detected user input entering a `subprocess` call unsafely. This could result in a command injection vulnerability. An attacker could use this vulnerability to execute arbitrary commands on the host, which allows them to download malware, scan sensitive data, or run any command they wish on the server. Do not let users choose the command to run. In general, prefer to use Python API versions of system commands. If you must use subprocess, use a dictionary to allowlist a set of commands."
+          },
+          "properties": {},
+          "ruleId": "python.flask.security.injection.subprocess-injection.subprocess-injection"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/tmp/vuln-target/app.py",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 39,
+                  "endLine": 6,
+                  "snippet": {
+                    "text": "    return subprocess.check_output(cmd, shell=True)  # command injection"
+                  },
+                  "startColumn": 36,
+                  "startLine": 6
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Detected subprocess function 'check_output' with user controlled data. A malicious actor could leverage this to perform command injection. You may consider using 'shlex.escape()'."
+          },
+          "properties": {},
+          "ruleId": "python.lang.security.dangerous-subprocess-use.dangerous-subprocess-use"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/tmp/vuln-target/app.py",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 51,
+                  "endLine": 6,
+                  "snippet": {
+                    "text": "    return subprocess.check_output(cmd, shell=True)  # command injection"
+                  },
+                  "startColumn": 47,
+                  "startLine": 6
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Found 'subprocess' function 'check_output' with 'shell=True'. This is dangerous because this call will spawn the command using a shell process. Doing so propagates current shell settings and variables, which makes it much easier for a malicious actor to execute commands. Use 'shell=False' instead."
+          },
+          "properties": {},
+          "ruleId": "python.lang.security.audit.subprocess-shell-true.subprocess-shell-true"
+        },
+        {
+          "fingerprints": {
+            "matchBasedId/v1": "requires login"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "/tmp/vuln-target/app.py",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "endColumn": 52,
+                  "endLine": 6,
+                  "snippet": {
+                    "text": "    return subprocess.check_output(cmd, shell=True)  # command injection"
+                  },
+                  "startColumn": 12,
+                  "startLine": 6
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Untrusted input is passed to command execution. Use safe APIs or sanitise arguments."
+          },
+          "properties": {},
+          "ruleId": "engine.semgrep.rules.injection.raptor.injection.command.taint.python"
+        }
+      ]
+    }
+  ]
+}

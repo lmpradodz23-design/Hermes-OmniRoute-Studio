@@ -15,6 +15,19 @@
         "skills/gsap-react",
         "skills/gsap-performance",
         "skills/gsap-frameworks"
+      ],
+      "localPaths": [
+        "skills/creative/gsap/gsap-core",
+        "skills/creative/gsap/gsap-timeline",
+        "skills/creative/gsap/gsap-scrolltrigger",
+        "skills/creative/gsap/gsap-plugins",
+        "skills/creative/gsap/gsap-utils",
+        "skills/creative/gsap/gsap-react",
+        "skills/creative/gsap/gsap-performance",
+        "skills/creative/gsap/gsap-frameworks"
+      ],
+      "modifiedFiles": [
+        "frontmatter completado localmente (description <=60 com o texto original preservado em 'When to Use', version/author/license/platforms e metadata.hermes.tags) para satisfazer tests/skills/test_authoring_standards.py"
       ]
     },
     {
@@ -22,14 +35,30 @@
       "repository": "https://github.com/img2threejs/img2threejs",
       "commit": "d6673386f89673a58736f8d398dd16ece67874f5",
       "license": "Apache-2.0",
-      "paths": ["."]
+      "paths": [
+        "."
+      ],
+      "localPaths": [
+        "skills/creative/img2threejs"
+      ],
+      "modifiedFiles": [
+        "frontmatter completado localmente (description <=60 com o texto original preservado em 'When to Use', version/author/license/platforms e metadata.hermes.tags) para satisfazer tests/skills/test_authoring_standards.py"
+      ]
     },
     {
       "id": "motion-design",
       "repository": "https://github.com/LottieFiles/motion-design-skill",
       "commit": "f9a8a041b85185ee4881b3471d3415e939aac772",
       "license": "MIT",
-      "paths": ["skills/motion-design"]
+      "paths": [
+        "skills/motion-design"
+      ],
+      "localPaths": [
+        "skills/creative/motion-design"
+      ],
+      "modifiedFiles": [
+        "frontmatter completado localmente (description <=60 com o texto original preservado em 'When to Use', version/author/license/platforms e metadata.hermes.tags) para satisfazer tests/skills/test_authoring_standards.py"
+      ]
     }
   ]
 }

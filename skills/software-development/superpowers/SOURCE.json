@@ -22,5 +22,21 @@
     "skills/software-development/systematic-debugging",
     "skills/software-development/test-driven-development"
   ],
-  "note": "The Studio bundles skills only. Upstream plugin hooks are not auto-enabled."
+  "note": "The Studio bundles skills only. Upstream plugin hooks are not auto-enabled.",
+  "localPaths": [
+    "skills/software-development/superpowers/brainstorming",
+    "skills/software-development/superpowers/dispatching-parallel-agents",
+    "skills/software-development/superpowers/executing-plans",
+    "skills/software-development/superpowers/finishing-a-development-branch",
+    "skills/software-development/superpowers/receiving-code-review",
+    "skills/software-development/superpowers/subagent-driven-development",
+    "skills/software-development/superpowers/using-git-worktrees",
+    "skills/software-development/superpowers/using-superpowers",
+    "skills/software-development/superpowers/verification-before-completion",
+    "skills/software-development/superpowers/writing-plans",
+    "skills/software-development/superpowers/writing-skills"
+  ],
+  "modifiedFiles": [
+    "frontmatter completado localmente (description <=60 com o texto original preservado em 'When to Use', version/author/license/platforms e metadata.hermes.tags) para satisfazer tests/skills/test_authoring_standards.py"
+  ]
 }

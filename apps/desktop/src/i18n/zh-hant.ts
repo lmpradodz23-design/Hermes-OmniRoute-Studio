@@ -2418,6 +2418,29 @@ export const zhHant = defineLocale({
     }
   },
 
+  missionControl: {
+    aria: '任務中心',
+    title: '任務中心',
+    empty: '沒有正在執行的工作',
+    emptyBody: '所有工作階段的背景程序、子代理與目標都會顯示在這裡。',
+    summary: (running: number, sessions: number) => `${sessions} 個工作階段中有 ${running} 個正在執行`,
+    summaryFailed: (failed: number) => `${failed} 個失敗`,
+    refresh: '重新整理',
+    stop: '停止此程序',
+    dismiss: '關閉此列',
+    openSession: '開啟此工作階段',
+    untitledSession: '未命名工作階段',
+    stopFailed: '無法停止該程序。',
+    groupRunning: (n: number) => `${n} 個正在執行`,
+    groupFailed: (n: number) => `${n} 個失敗`,
+    stateRunning: '執行中',
+    stateDone: '已完成',
+    stateFailed: '失敗',
+    exit: (code: number) => `結束碼 ${code}`,
+    untitledSessionWithId: (id: string) => `工作階段 ${id}`,
+    toggleCommand: '切換任務中心'
+  },
+
   rightSidebar: {
     aria: '右側邊欄',
     panelsAria: '右側邊欄面板',

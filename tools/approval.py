@@ -554,8 +554,20 @@ HARDLINE_PATTERNS = [
     # `run(){ tail -f log | grep err & }`, `x(){ y|z& }`) because those either
     # do not pipe the function into itself or use different names.
     (r':\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:', "fork bomb"),
+    #
+    # Anchored to _CMDPOS like the rm rules, and for the same reason: the
+    # generalized shape also appears as DATA. Measured false positives before
+    # the anchor — each an unconditional block with no recourse, since hardline
+    # ignores yolo:
+    #
+    #     grep -r 'x(){ x|x& }' .          <- procurando por um fork bomb
+    #     echo "log(){ log|log& }"         <- documentando um
+    #     cat README.md | grep 'f(){ f|f& }'
+    #
+    # A real bomb still has to BE a command, so requiring command position
+    # costs the rule nothing.
     (
-        r'(?P<forkfn>[:a-z_][\w:.-]*)\s*\(\s*\)\s*\{[^}]*?'
+        _CMDPOS + r'(?P<forkfn>[:a-z_][\w:.-]*)\s*\(\s*\)\s*\{[^}]*?'
         r'(?P=forkfn)\s*\|\s*(?P=forkfn)\s*&[^}]*\}',
         "fork bomb",
     ),
@@ -569,6 +581,34 @@ HARDLINE_PATTERNS = [
     (_CMDPOS + r'init\s+[06]\b', "init 0/6 (shutdown/reboot)"),
     (_CMDPOS + r'systemctl\s+(poweroff|reboot|halt|kexec)\b', "systemctl poweroff/reboot"),
     (_CMDPOS + r'telinit\s+[06]\b', "telinit 0/6 (shutdown/reboot)"),
+    # Wipes and shutdowns that are as irreversible as the rules above but were
+    # only "dangerous" — which means yolo waved them through. The floor exists
+    # precisely so that trusting the agent with your files is not the same as
+    # letting it erase the disk; these belong on the same side of that line.
+    #
+    # `find / -delete` / `find / -exec rm` — a recursive root wipe spelled with
+    # a different tool. The root path uses the same collapse-to-"/" alternation
+    # as the rm rules, so `find /tmp -delete` and `find . -delete` stay out.
+    (
+        _CMDPOS + r'find\s+(?:-[^\s]+\s+)*/(?:(?:\.\.?)?/)*(?:\.\.?)?\s'
+        r'[^\n]*?(?:-delete\b|-exec\s+rm\b|-execdir\s+rm\b|-ok\s+rm\b)',
+        "recursive delete of root filesystem",
+    ),
+    # Destroying a block device outright — same class as mkfs and dd-to-device.
+    (
+        _CMDPOS + r'(?:shred|wipefs|blkdiscard)\b[^\n]*\s/dev/'
+        r'(?:sd|nvme|hd|mmcblk|vd|xvd)[a-z0-9]*',
+        "destroy raw block device",
+    ),
+    # Magic SysRq: a single byte here reboots or kills the box immediately,
+    # with no unmount and no sync.
+    (r'>\s*/proc/sysrq-trigger\b', "kernel sysrq (immediate reboot/kill)"),
+    # systemd targets and bus calls that power the host down by another name.
+    (_CMDPOS + r'systemctl\s+(?:isolate\s+)?(?:poweroff|reboot|halt|shutdown)[\w.-]*\.target\b',
+     "systemctl poweroff/reboot target"),
+    (_CMDPOS + r'(?:dbus-send|busctl|gdbus)\b[^\n]*\b(?:PowerOff|Reboot|Halt)\b',
+     "power off via system bus"),
+    (_CMDPOS + r'loginctl\s+(?:poweroff|reboot|halt)\b', "loginctl poweroff/reboot"),
 ]
 
 # Pre-compiled variant used by the hot-path matcher. Building these at module
@@ -1222,6 +1262,70 @@ def _approval_key_aliases(pattern_key: str) -> set[str]:
 # Detection
 # =========================================================================
 
+_ANSI_C_ESCAPES = {
+    'a': '\a', 'b': '\b', 'e': '\x1b', 'E': '\x1b', 'f': '\f',
+    'n': '\n', 'r': '\r', 't': '\t', 'v': '\v',
+    '\\': '\\', "'": "'", '"': '"', '?': '?',
+}
+
+_ANSI_C_QUOTED = re.compile(r"\$'((?:[^'\\]|\\.)*)'")
+
+
+def _decode_ansi_c_body(body: str) -> str:
+    """Decode the inside of a bash ``$'...'`` string to literal characters."""
+    out = []
+    i = 0
+    while i < len(body):
+        ch = body[i]
+        if ch != '\\' or i + 1 >= len(body):
+            out.append(ch)
+            i += 1
+            continue
+
+        nxt = body[i + 1]
+        if nxt in _ANSI_C_ESCAPES:
+            out.append(_ANSI_C_ESCAPES[nxt])
+            i += 2
+        elif nxt == 'x':
+            hexdigits = re.match(r'[0-9a-fA-F]{1,2}', body[i + 2:])
+            if hexdigits:
+                out.append(chr(int(hexdigits.group(0), 16)))
+                i += 2 + len(hexdigits.group(0))
+            else:
+                out.append(nxt)
+                i += 2
+        elif nxt in 'uU':
+            width = 4 if nxt == 'u' else 8
+            hexdigits = re.match(r'[0-9a-fA-F]{1,%d}' % width, body[i + 2:])
+            if hexdigits:
+                try:
+                    out.append(chr(int(hexdigits.group(0), 16)))
+                except ValueError:
+                    pass
+                i += 2 + len(hexdigits.group(0))
+            else:
+                out.append(nxt)
+                i += 2
+        elif nxt.isdigit():
+            octdigits = re.match(r'[0-7]{1,3}', body[i + 1:])
+            if octdigits:
+                out.append(chr(int(octdigits.group(0), 8) & 0xFF))
+                i += 1 + len(octdigits.group(0))
+            else:
+                out.append(nxt)
+                i += 2
+        else:
+            out.append(nxt)
+            i += 2
+
+    return ''.join(out)
+
+
+def _expand_ansi_c_quotes(command: str) -> str:
+    """Replace every ``$'...'`` with the literal text bash would produce."""
+    return _ANSI_C_QUOTED.sub(lambda m: _decode_ansi_c_body(m.group(1)), command)
+
+
 def _normalize_command_for_detection(command: str) -> str:
     """Normalize a command string before dangerous-pattern matching.
 
@@ -1262,6 +1366,20 @@ def _normalize_command_for_detection(command: str) -> str:
     # Fold the (more specific) Hermes home first: on Windows it nests under the
     # user home (C:\Users\alice\AppData\...\hermes), so folding the user home
     # first would eat the prefix the Hermes-home fold needs.
+    # Expand ANSI-C quoting ($'...') FIRST, because bash reduces it to literal
+    # characters before the command ever runs: `rm -rf $'/'`, `rm -rf $'\\x2f'`
+    # and `rm -rf $'\\057'` all reach the shell as `rm -rf /`. They slid past the
+    # rm-root patterns because the leading `$` breaks the quoted branch (which
+    # expects ["']) and the token doesn't start with `/` so the bare branch
+    # missed too. This matters more than the other de-obfuscations below: the
+    # HARDLINE floor is the one guard that survives yolo, so a bypass here is a
+    # bypass of the last line of defense.
+    #
+    # Order is load-bearing TWICE over. It must run before the generic
+    # backslash-escape strip below (which would dissolve `\\x2f` into `x2f` and
+    # make the sequence undecodable), and before the home folds, so a home path
+    # spelled in hex still folds to ~/.
+    command = _expand_ansi_c_quotes(command)
     command = _rewrite_resolved_hermes_home(command)
     command = _rewrite_resolved_user_home(command)
     # Strip shell backslash-escapes: r\m → rm. Prevents \-injection bypass.
@@ -1310,11 +1428,19 @@ def _home_prefix_fold_regex(path: str):
     if not path:
         return None
     components = [c for c in re.split(r"[/\\]+", path) if c]
-    # Require at least two non-empty components below the root. For POSIX this
-    # mirrors the historical ``count("/") >= 2`` guard (``/home/alice`` folds,
-    # ``/home`` does not); for Windows it rejects a bare drive root (``C:\\``)
-    # while accepting a real home (``C:\\Users\\alice``).
-    if len(components) < 2:
+    # At least ONE non-empty component below the root. Two was the historical
+    # guard (``/home/alice`` folds, ``/home`` does not), but it made the fold
+    # inert for single-component homes — and ``/root`` is exactly that. Running
+    # as root is not exotic here: Docker, CI, and the container-supervision
+    # skill all do it, and there ``cat key >> /root/.ssh/authorized_keys``
+    # slipped past a guard that catches the identical ``~/.ssh`` write.
+    #
+    # One component is safe because the tail is REQUIRED (``+`` in _PATH_TAIL):
+    # a degenerate home of ``/`` or ``C:\\`` yields zero components and is still
+    # rejected here, so no stray HOME can rewrite unrelated prefixes. What a
+    # single component can over-fold is a sibling that literally starts with the
+    # home's own name — and that IS the home directory.
+    if len(components) < 1:
         return None
     body = r"[/\\]+".join(re.escape(c) for c in components)
     # Optional leading root separator (POSIX ``/`` or UNC ``\\``); a Windows
@@ -1476,6 +1602,9 @@ _READ_TOOL_SHORT_OPTIONS_WITH_ARG = {
 _SHELL_PUNCTUATION = {";", "&", "&&", "|", "||", "(", ")", "{", "}"}
 _MAX_DETECTION_COMMAND_CHARS = 128_000
 _MAX_SEPARATOR_FREE_COMMAND_CHARS = 4_096
+# Command substitution ceilings — see _command_parser_limit_exceeded.
+_MAX_COMMAND_SUBSTITUTIONS = 256
+_MAX_COMMAND_SUBSTITUTION_DEPTH = 16
 _MAX_DETECTION_SEGMENTS = 25_000
 _PARSER_LIMIT_DESCRIPTION = "command parser limit exceeded"
 _MALFORMED_EXEC_DESCRIPTION = "command parser limit or malformed executable payload"
@@ -1505,6 +1634,34 @@ def _command_parser_limit_exceeded(command: str) -> bool:
             separators += 1
             if separators >= _MAX_DETECTION_SEGMENTS:
                 return True
+    # Nested command substitution is the one shape none of the ceilings above
+    # bounds: `$(` repeated is separator-free, tiny, and makes the recursive
+    # scan explode. Measured on the guard itself, all well inside every other
+    # limit — 302 chars took 2.5s, 362 took 4.2s, 608 took ~15s, and ~3000
+    # chars raised RecursionError inside a check that is supposed to decide
+    # whether a command is safe:
+    #
+    #     "$(" * n + "id" + ")" * n
+    #
+    # A few bytes of attacker-influenced text (a prompt injection, a tool
+    # result, a plugin) could therefore stall or crash the guard on every
+    # command. Real compound commands nest a handful of levels; the ceiling
+    # below is far above any of them and fails CLOSED, like its siblings.
+    substitutions = command.count("$(") + command.count("`")
+    if substitutions > _MAX_COMMAND_SUBSTITUTIONS:
+        return True
+    depth = 0
+    index = 0
+    while index < len(command):
+        if command.startswith("$(", index):
+            depth += 1
+            if depth > _MAX_COMMAND_SUBSTITUTION_DEPTH:
+                return True
+            index += 2
+            continue
+        if command[index] == ")" and depth:
+            depth -= 1
+        index += 1
     return False
 
 
@@ -1938,6 +2095,53 @@ _PKG_VALUE_TAKING_FLAGS = {
     "--from", "--spec", "--pin", "--python-preference",
 }
 
+# Flags cujo VALOR é justamente o pacote a ser buscado. Para os runners, engolir
+# o valor destas apaga o operando e o achado some:
+#
+#     npx -p pacote-malicioso -c 'node -e "…"'   → operandos: []  → nada
+#
+# `tools/osv_check.py` já sabia disso para o npx; esta tabela não sabia. Aqui a
+# regra se inverte: o valor NÃO é descartado, é o que interessa.
+_PKG_PACKAGE_NAMING_FLAGS = {
+    "--package", "-p", "--from", "--spec", "--with",
+}
+
+# Só valem como "não vai à rede" enquanto forem opções do PRÓPRIO runner, isto
+# é, antes do primeiro operando. Depois dele são argumentos do pacote que já foi
+# baixado, e olhar a cauda inteira era o bypass:
+#
+#     npx pacote-malicioso --no        → o `--no` é do PACOTE, não do npx
+def _pkg_runner_is_local_only(tokens) -> bool:
+    for token in tokens:
+        low = token.lower()
+        if not token.startswith("-"):
+            return False
+        if low in _PKG_RUNNER_LOCAL_ONLY:
+            return True
+        if low.split("=", 1)[0] in _PKG_RUNNER_LOCAL_ONLY:
+            return True
+    return False
+
+
+def _pkg_named_package(tokens):
+    """Pacote nomeado por --package/-p/--from/--spec, se houver."""
+    skip_next = False
+    for index, token in enumerate(tokens):
+        if skip_next:
+            skip_next = False
+            continue
+        low = token.lower()
+        if "=" in low and low.split("=", 1)[0] in _PKG_PACKAGE_NAMING_FLAGS:
+            value = token.split("=", 1)[1]
+            if value:
+                return value
+            continue
+        if low in _PKG_PACKAGE_NAMING_FLAGS and index + 1 < len(tokens):
+            return tokens[index + 1]
+        if token.startswith("-") and low in _PKG_VALUE_TAKING_FLAGS:
+            skip_next = True
+    return None
+
 # Bare runners: the executable itself fetches and runs a package.
 _PKG_RUNNERS_BARE = {"npx", "bunx", "uvx", "pnpx"}
 
@@ -2030,13 +2234,15 @@ def _package_fetch_findings(command: str):
 
             # 1. Bare runners: npx / bunx / uvx.
             if name in _PKG_RUNNERS_BARE:
-                if any(flag in lowered for flag in _PKG_RUNNER_LOCAL_ONLY):
+                if _pkg_runner_is_local_only(rest):
                     continue
+                named = _pkg_named_package(rest)
                 operands = _pkg_operands(rest)
-                if operands:
+                package = named or (operands[0] if operands else None)
+                if package:
                     yield (
                         "remote package execution requires explicit approval",
-                        operands[0],
+                        package,
                     )
                 continue
 
@@ -2046,13 +2252,25 @@ def _package_fetch_findings(command: str):
 
             # 2. Two-word runners: pnpm dlx / yarn dlx / npm exec / pipx run.
             if (name, sub) in _PKG_RUNNERS_SUB:
-                if any(flag in lowered for flag in _PKG_RUNNER_LOCAL_ONLY):
+                if _pkg_runner_is_local_only(rest[1:]):
                     continue
+                named = _pkg_named_package(rest[1:])
                 operands = _pkg_operands(rest[1:])
-                if operands:
+                package = named or (operands[0] if operands else None)
+                # `deno run ./script.ts` não busca nada: o Deno só vai à rede
+                # quando o especificador é URL, `npm:` ou `jsr:`. Rotular um
+                # script local como "remote package execution" era um falso
+                # positivo repetido — e falso positivo repetido treina o usuário
+                # a aprovar sem ler, que é como um verdadeiro passa.
+                if (name, sub) == ("deno", "run") and package:
+                    spec = package.lower()
+                    remote = spec.startswith(("http://", "https://", "npm:", "jsr:"))
+                    if not remote:
+                        continue
+                if package:
                     yield (
                         "remote package execution requires explicit approval",
-                        operands[0],
+                        package,
                     )
                 continue
 
@@ -4059,7 +4277,16 @@ def check_dangerous_command(command: str, env_type: str,
     # unconditionally, BEFORE the yolo bypass.  Opting into yolo is
     # trusting the agent with your files and services, not trusting it
     # to wipe the disk or power the box off.
-    is_hardline, hardline_desc = detect_hardline_command(command)
+    try:
+        is_hardline, hardline_desc = detect_hardline_command(command)
+    except RecursionError:
+        # The floor deciding "is this catastrophic?" must never answer by
+        # crashing. A parser blowup on hostile input used to raise straight
+        # through this call site, and an exception here means the command was
+        # never inspected at all. Fail CLOSED — an unparseable command is
+        # exactly the one not to run on a guess.
+        logger.warning("Hardline parser overflow; failing closed (command: %s)", command[:200])
+        is_hardline, hardline_desc = True, _PARSER_LIMIT_DESCRIPTION
     if is_hardline:
         logger.warning("Hardline block: %s (command: %s)", hardline_desc, command[:200])
         return _hardline_block_result(hardline_desc, command)

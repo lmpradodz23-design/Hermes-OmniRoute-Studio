@@ -1,9 +1,20 @@
 ---
 name: writing-plans
-description: Use when you have a spec or requirements for a multi-step task, before touching code
+description: Writes an implementation plan from a spec.
+version: "vendored-b36e082"
+author: "obra/superpowers"
+license: "MIT"
+platforms: [linux, macos, windows]
+metadata:
+  hermes:
+    tags: [planning, spec, workflow]
 ---
 
 # Writing Plans
+
+## When to Use
+
+Use when you have a spec or requirements for a multi-step task, before touching code
 
 ## Overview
 

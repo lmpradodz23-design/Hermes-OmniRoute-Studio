@@ -12,6 +12,8 @@ import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 import { atom } from 'nanostores'
 
+import { MissionControlPane } from '@/app/mission-control'
+import { openSession } from '@/app/open-session'
 import { RightSidebarPane } from '@/app/right-sidebar'
 import { ReviewPane } from '@/app/right-sidebar/review'
 import type { GroupSetter } from '@/app/shell/group-setter'
@@ -84,6 +86,17 @@ function previewFile(path: string) {
 // GLOBALLY by the tree's seam invariant (see LayoutTreeRoot) — only sizing
 // and titlebar clearance are per-wrapper concerns.
 const ZONE_CONTENT = 'h-full [&>aside]:h-full [&>aside]:w-full [&>aside]:pt-0'
+
+export function MissionPane() {
+  return (
+    <div className={cn(ZONE_CONTENT, 'flex min-h-0 flex-col')}>
+      {/* 'tab' e não 'in-place': o painel existe para vigiar trabalho de VÁRIAS
+          sessões — trocar a sessão aberta por baixo dele derrubaria o contexto
+          de quem clicou. */}
+      <MissionControlPane onOpenSession={storedId => openSession(storedId, () => undefined, 'tab')} />
+    </div>
+  )
+}
 
 export function FilesPane() {
   return (

@@ -336,6 +336,26 @@ export const zh: Translations = {
   },
 
   settings: {
+    uninstall: {
+      dangerZone: '危险区域',
+      heading: '卸载 Hermes',
+      intro: '选择卸载范围。应用会关闭以完成卸载；随时重新运行安装程序即可回来。',
+      checking: '正在检查已安装的内容…',
+      confirmTitle: '确认卸载',
+      confirmBody: (consequence: string) => `这将移除${consequence}。此操作无法撤销。`,
+      appPath: (path: string) => `应用：${path}`,
+      confirm: '是，卸载',
+      running: '正在卸载…',
+      guiTitle: '仅卸载聊天界面',
+      guiDescription: '移除此桌面应用。Hermes 代理、配置和对话都会保留。',
+      guiConsequence: '桌面聊天界面（本应用及其数据）',
+      liteTitle: '卸载界面和代理，保留数据',
+      liteDescription: '移除应用和 Hermes 代理，但保留配置、对话和密钥以便日后重装。',
+      liteConsequence: '聊天界面和 Hermes 代理（配置、对话和密钥会保留）',
+      fullTitle: '全部卸载',
+      fullDescription: '移除应用、代理以及全部用户数据 — 配置、对话、定时任务、密钥和日志。',
+      fullConsequence: '全部内容 — 聊天界面、Hermes 代理，以及你的所有配置、对话、密钥和日志'
+    },
     closeSettings: '关闭设置',
     exportConfig: '导出配置',
     importConfig: '导入配置',
@@ -3089,6 +3109,29 @@ export const zh: Translations = {
       modelTitle: (provider, model) => `模型 · ${provider}: ${model}`,
       providerModelTitle: (provider, model) => `${provider} · ${model}`
     }
+  },
+
+  missionControl: {
+    aria: '任务中心',
+    title: '任务中心',
+    empty: '没有正在运行的任务',
+    emptyBody: '所有会话的后台进程、子代理和目标都会显示在这里。',
+    summary: (running: number, sessions: number) => `${sessions} 个会话中有 ${running} 个正在运行`,
+    summaryFailed: (failed: number) => `${failed} 个失败`,
+    refresh: '刷新',
+    stop: '停止此进程',
+    dismiss: '忽略此行',
+    openSession: '打开此会话',
+    untitledSession: '未命名会话',
+    stateRunning: '运行中',
+    stateDone: '已完成',
+    stateFailed: '失败',
+    exit: (code: number) => `退出码 ${code}`,
+    untitledSessionWithId: (id: string) => `会话 ${id}`,
+    toggleCommand: '切换任务中心',
+    stopFailed: '无法停止该进程。',
+    groupRunning: (n: number) => `${n} 个正在运行`,
+    groupFailed: (n: number) => `${n} 个失败`
   },
 
   rightSidebar: {

@@ -14,10 +14,12 @@
          de mexer, porque este index.html recebe um token de sessao de uso
          unico injetado pelo servidor Python e por isso NUNCA pode ser
          precacheado. -->
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- Relativos: sob um prefixo de proxy (/hermes/) os absolutos dão 404,
+         o Chrome não oferece "Instalar app" e o atalho do iOS fica genérico. -->
+    <link rel="manifest" href="manifest.webmanifest" />
     <meta name="theme-color" content="#0b0b0d" />
     <meta name="color-scheme" content="dark light" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Hermes" />

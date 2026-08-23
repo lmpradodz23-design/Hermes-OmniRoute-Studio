@@ -488,6 +488,19 @@ function revealNarrowPane(id: string, mode: 'close' | 'open' | 'toggle'): boolea
   return true
 }
 
+/** Alterna um pane arbitrário respeitando o regime de viewport estreita.
+ *
+ * Abaixo de `SIDEBAR_COLLAPSE_BREAKPOINT_PX` um pane `collapsible` sai da grid
+ * e só volta pelo evento de revelação. Um toggle que ignora isso lê a árvore
+ * (que diz "visível"), o usuário não vê nada, e o segundo aperto fecha algo que
+ * ele nunca viu. A sidebar, o file browser e o review já passam por aqui.
+ */
+export function toggleNarrowAwarePane(id: string, fallback: () => void) {
+  if (!revealNarrowPane(id, 'toggle')) {
+    fallback()
+  }
+}
+
 export function setSidebarOpen(open: boolean) {
   setPaneOpen(CHAT_SIDEBAR_PANE_ID, open)
   revealNarrowPane(CHAT_SIDEBAR_PANE_ID, open ? 'open' : 'close')

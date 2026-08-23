@@ -295,6 +295,26 @@ export interface Translations {
   }
 
   settings: {
+    uninstall: {
+      dangerZone: string
+      heading: string
+      intro: string
+      checking: string
+      confirmTitle: string
+      confirmBody: (consequence: string) => string
+      appPath: (path: string) => string
+      confirm: string
+      running: string
+      guiTitle: string
+      guiDescription: string
+      guiConsequence: string
+      liteTitle: string
+      liteDescription: string
+      liteConsequence: string
+      fullTitle: string
+      fullDescription: string
+      fullConsequence: string
+    }
     closeSettings: string
     exportConfig: string
     importConfig: string
@@ -2496,6 +2516,29 @@ export interface Translations {
       modelTitle: (provider: string, model: string) => string
       providerModelTitle: (provider: string, model: string) => string
     }
+  }
+
+  missionControl: {
+    aria: string
+    title: string
+    empty: string
+    emptyBody: string
+    summary: (running: number, sessions: number) => string
+    summaryFailed: (failed: number) => string
+    refresh: string
+    stop: string
+    dismiss: string
+    openSession: string
+    untitledSession: string
+    stateRunning: string
+    stateDone: string
+    stateFailed: string
+    exit: (code: number) => string
+    untitledSessionWithId: (id: string) => string
+    toggleCommand: string
+    stopFailed: string
+    groupRunning: (n: number) => string
+    groupFailed: (n: number) => string
   }
 
   rightSidebar: {

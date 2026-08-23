@@ -14,6 +14,7 @@ import { ko } from "./ko";
 import { it } from "./it";
 import { ga } from "./ga";
 import { pt } from "./pt";
+import { ptBr } from "./pt-br";
 import { ru } from "./ru";
 import { hu } from "./hu";
 import { ar } from "./ar";
@@ -33,6 +34,7 @@ const TRANSLATIONS: Record<Locale, Translations> = {
   it,
   ga,
   pt,
+  "pt-br": ptBr,
   ru,
   hu,
   ar,
@@ -65,7 +67,8 @@ export const LOCALE_META: Record<Locale, { name: string }> = {
   ko: { name: "한국어" },
   it: { name: "Italiano" },
   ga: { name: "Gaeilge" },
-  pt: { name: "Português" },
+  pt: { name: "Português (Portugal)" },
+  "pt-br": { name: "Português (Brasil)" },
   ru: { name: "Русский" },
   hu: { name: "Magyar" },
   ar: { name: "العربية" },
@@ -78,6 +81,41 @@ function isLocale(value: string): value is Locale {
   return (SUPPORTED_LOCALES as string[]).includes(value);
 }
 
+/** Idiomas do navegador → nossos códigos, quando não batem exatamente. */
+const LOCALE_ALIASES: Record<string, string> = {
+  pt: "pt-br",
+  "pt-pt": "pt",
+  "zh-hant": "zh-hant",
+  "zh-tw": "zh-hant",
+  "zh-hk": "zh-hant",
+  "zh-hans": "zh",
+  "zh-cn": "zh",
+};
+
+function matchBrowserLocale(): Locale | null {
+  const candidates =
+    typeof navigator === "undefined"
+      ? []
+      : [...(navigator.languages ?? []), navigator.language].filter(Boolean);
+
+  for (const raw of candidates) {
+    const tag = raw.toLowerCase();
+    const aliased = LOCALE_ALIASES[tag];
+
+    if (aliased && isLocale(aliased)) return aliased;
+    if (isLocale(tag)) return tag;
+
+    // pt-BR → pt-br já casou acima; aqui cai en-GB → en, de-AT → de.
+    const base = tag.split("-")[0];
+    const aliasedBase = LOCALE_ALIASES[base];
+
+    if (aliasedBase && isLocale(aliasedBase)) return aliasedBase;
+    if (base && isLocale(base)) return base;
+  }
+
+  return null;
+}
+
 function getInitialLocale(): Locale {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -85,7 +123,11 @@ function getInitialLocale(): Locale {
   } catch {
     // SSR or privacy mode
   }
-  return "en";
+
+  // Sem escolha salva, seguir o navegador. Antes disto o app caía direto em
+  // inglês: um usuário brasileiro via a interface em inglês apesar de existirem
+  // catálogos pt-BR e pt completos, até descobrir sozinho o seletor de idioma.
+  return matchBrowserLocale() ?? "en";
 }
 
 interface I18nContextValue {

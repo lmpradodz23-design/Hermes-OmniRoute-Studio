@@ -79,11 +79,21 @@ export const $backgroundRunningSessionIds = computed(
 // while, so without this every refresh would resurrect a dismissed row.
 const dismissedBySession = new Map<string, Set<string>>()
 
-// Finished tasks self-clear so the stack only ever holds running work. Success
-// goes quick; failure lingers longer so its exit code stays readable (the output
-// also lives in the transcript). A manual X still drops either at once.
+// Tarefas bem-sucedidas se limpam sozinhas, para que a pilha só carregue
+// trabalho vivo. FALHAS não se limpam.
+//
+// Elas se limpavam, em 12 segundos, e isso era defensável enquanto a única
+// superfície era a pilha acima do composer — efêmera, sempre à vista de quem
+// está na sessão. Deixou de ser quando a Central de missões passou a existir
+// justamente para responder "o que quebrou enquanto eu não estava olhando":
+// uma falha que some sozinha depois de doze segundos é, para quem estava em
+// outra sessão, uma falha que nunca aconteceu.
+//
+// A linha continua saindo por dois caminhos honestos: o X do usuário, e o
+// próprio registro esquecendo o processo (aí ela some do snapshot e é
+// reconciliada para fora). O que não existe mais é o desaparecimento por
+// decurso de prazo.
 const SUCCESS_LINGER_MS = 4_000
-const FAILURE_LINGER_MS = 12_000
 const autoClearTimers = new Map<string, Map<string, ReturnType<typeof setTimeout>>>()
 
 function scheduleAutoDismiss(sid: string, id: string, delayMs: number) {
@@ -276,6 +286,8 @@ interface GatewayProcessEntry {
   command?: string
   exit_code?: number
   output_tail?: string
+  /** Dono do processo — só vem de `process.list_all`. */
+  session_key?: string
   session_id?: string
   status?: string
 }
@@ -352,12 +364,11 @@ export function reconcileBackgroundProcesses(sid: string, procs: GatewayProcessE
     }
   }
 
-  // Arm the self-clear on every finished task (failures linger longer); cancel
-  // it for anything running again or gone from the snapshot.
+  // Arma a limpeza automática só no que terminou BEM; cancela para o que
+  // voltou a rodar ou sumiu do snapshot. Falha não entra no mapa: ela fica até
+  // alguém olhar (ver SUCCESS_LINGER_MS acima).
   const finishedDelay = new Map(
-    next
-      .filter(item => item.state !== 'running')
-      .map(item => [item.id, item.state === 'failed' ? FAILURE_LINGER_MS : SUCCESS_LINGER_MS])
+    next.filter(item => item.state === 'done').map(item => [item.id, SUCCESS_LINGER_MS])
   )
 
   for (const [id, delay] of finishedDelay) {
@@ -378,6 +389,57 @@ export function reconcileBackgroundProcesses(sid: string, procs: GatewayProcessE
 }
 
 /** Pull the session's live process snapshot from the gateway. */
+/**
+ * Hidrata o trabalho de fundo de TODAS as sessões, inclusive as que esta janela
+ * nunca abriu.
+ *
+ * `refreshBackgroundProcesses` é por sessão, e é o certo para a status stack do
+ * composer. Para uma visão cruzada isso não basta: um painel que só aprende
+ * sobre sessões que o usuário por acaso abriu não consegue mostrar o processo
+ * que morreu numa sessão fechada — que é justamente o caso para o qual esse
+ * painel existe.
+ *
+ * O `session_key` de cada processo vem do gateway; os itens são agrupados por
+ * ele, com o mesmo `reconcileBackgroundProcesses` de sempre, para que a
+ * estabilidade de layout e as regras de dispensa continuem valendo.
+ */
+export async function refreshAllBackgroundProcesses(): Promise<void> {
+  const gateway = $gateway.get()
+
+  if (!gateway) {
+    return
+  }
+
+  try {
+    const result = await gateway.request<{ processes?: GatewayProcessEntry[] }>('process.list_all', {})
+    const bySession = new Map<string, GatewayProcessEntry[]>()
+
+    for (const proc of result?.processes ?? []) {
+      const owner = proc.session_key?.trim()
+
+      if (!owner) {
+        continue
+      }
+
+      const list = bySession.get(owner)
+
+      if (list) {
+        list.push(proc)
+      } else {
+        bySession.set(owner, [proc])
+      }
+    }
+
+    for (const [owner, procs] of bySession) {
+      reconcileBackgroundProcesses(owner, procs)
+    }
+  } catch {
+    // Gateway antigo (sem `process.list_all`) ou socket caído: o painel
+    // continua mostrando o que os eventos por sessão já trouxeram, em vez de
+    // esvaziar a tela.
+  }
+}
+
 export async function refreshBackgroundProcesses(sid: string): Promise<void> {
   const gateway = $gateway.get()
 
