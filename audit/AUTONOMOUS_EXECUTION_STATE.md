@@ -27,7 +27,7 @@ commits       20
 versão        0.17.0-omniroute.1
 worktree      14 arquivos modificados + apps/mobile inteiro não rastreado
 remote        origin -> NousResearch/hermes-agent  (ERRADO: é o upstream)
-identidade    lmprado.dz23 <lmprado.dz23@gmail.com> (dos commits existentes;
+identidade    lmprado.dz23 <redacted-email> (dos commits existentes;
               o gitconfig do Windows não é visível da VM Linux)
 instalado     do commit 9d80176, dirty:true, 20 commits atrás
 ```

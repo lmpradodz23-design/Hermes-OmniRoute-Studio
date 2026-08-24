@@ -4,7 +4,7 @@
 current_wave=TODAS as waves de lógica pura concluídas (MCP, cron, guardrails, agent bridge, memória, cliente Easy API); só restam waves device+phone
 completed=WAVE 0 (audit), 1 (license+v4/v5), 2 (arquitetura/contrato), 4 (sessão/QR states), 5 (send/receive/events domain), 8 (security domain), MCP (9023888), agent bridge (630fb4e), memória (e994edd), cliente Easy API (8f5f891)
 files_changed=whatsapp_provider/{__init__,session,events,sending,validation,easyapi,provider,process_manager,capabilities,mcp_tools,outbound_policy,cron_policy,agent_bridge,memory,client}.py + tests/whatsapp_provider/* + docs + .gitignore
-tests_run=whatsapp_provider + security_research 219/219 passed; canários (capability gate, no-false-success, privileged confirmation, outbound gate, dedup, redação de memória, fail-closed, key-só-no-header, endpoint allowlist) todos mordem; smokes rodados no PC real (desktop-prado)
+tests_run=whatsapp_provider + security_research 219/219 passed; canários (capability gate, no-false-success, privileged confirmation, outbound gate, dedup, redação de memória, fail-closed, key-só-no-header, endpoint allowlist) todos mordem; smokes rodados no PC real (local-pc)
 remaining=SÓ device+phone: WhatsApp Studio UI, auth HTTP real, runtime real+QR+send/receive (gate do telefone), build Windows/NSIS/installed E2E, contagem matriz MCP no gateway — ver audit/OPENWA_DEVICE_EXECUTOR_PROMPTS.md
 blockers=OPENWA-LIC-1 (bundling), WAITING_FOR_HUMAN_QR_SCAN (device+phone), device-required (UI/packaging)
 next_exact_action=no PC: rodar o runbook abaixo (npx @open-wa/wa-automate@4.76.0), escanear QR, e então validar send/receive contra número controlado
@@ -77,7 +77,7 @@ contagem da matriz MCP no gateway, e o envio/recebimento real (gate do QR).
 ## Waves de lógica pura concluídas após MCP (bridge, memória, cliente)
 
 Todas testadas no cloud, canariadas (teste falha quando a defesa é removida) e
-com smoke rodado no PC real (desktop-prado):
+com smoke rodado no PC real (local-pc):
 
 | wave | commit | módulo | garantia central provada |
 |---|---|---|---|
