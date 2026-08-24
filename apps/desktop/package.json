@@ -7,8 +7,12 @@
   "author": "DZ23 and Nous Research",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/NousResearch/hermes-agent.git"
+    "url": "git+https://github.com/lmpradodz23-design/Hermes-OmniRoute-Studio.git"
   },
+  "bugs": {
+    "url": "https://github.com/lmpradodz23-design/Hermes-OmniRoute-Studio/issues"
+  },
+  "homepage": "https://github.com/lmpradodz23-design/Hermes-OmniRoute-Studio#readme",
   "type": "module",
   "main": "dist/electron-main.mjs",
   "engines": {
