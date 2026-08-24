@@ -1,5 +1,34 @@
 > **Hermes OmniRoute Studio fork:** this branch builds a side-by-side Windows desktop edition with native OmniRoute routing, 107 MCP tools, Product Studio, pt-BR, project preview, goal/spec workflow, cross-chat memory, guardrails, SSH and an optional Caveman compression switch. See [the Studio guide](docs/hermes-omniroute-studio.md) and [derivative-work notice](NOTICE-OMNIROUTE-STUDIO.md). The original Hermes Agent installation is kept separate.
 
+<!-- OMNIROUTE-PUBLIC-PREVIEW:START -->
+## ⬇️ Hermes OmniRoute Studio — Windows Public Preview
+
+> **Status: Public Preview (`v0.17.0-omniroute.1`).** An early, community **fork** build for **Windows 10/11**, provided for evaluation. Expect rough edges. This is **not** an official Nous Research release.
+
+**Download:** get the latest installer from the **[Releases page](../../releases/latest)** — either the NSIS installer (`HermesOmniRoute-Studio-Setup-*.exe`) or the MSI (`*.msi`). Found a bug? Use the **[issue tracker](../../issues)**.
+
+### ⚠️ Unsigned build — a Windows SmartScreen warning is expected
+
+This preview is **not code-signed**. On first run, Windows SmartScreen will likely show *“Windows protected your PC.”* That is expected for an unsigned open-source preview and does not by itself mean the file is unsafe. To proceed:
+
+1. Click **More info**
+2. Click **Run anyway**
+
+Verify integrity first: each release publishes the **SHA-256** of every installer asset. Before running, compare it with PowerShell:
+
+```powershell
+Get-FileHash .\HermesOmniRoute-Studio-Setup-0.17.0-omniroute.1.exe -Algorithm SHA256
+```
+
+### 🔒 Local-first by design (LOCAL_ONLY)
+
+The Studio ships a **fail-closed** `LOCAL_ONLY` mode: when enabled, memory and tools are restricted to the local machine and loopback only — **zero cloud egress**. If its configuration is missing or unreadable, it fails **closed** (stays private), never open. See the [Studio guide](docs/hermes-omniroute-studio.md) for what runs locally versus what an end user can explicitly opt into.
+
+### What this preview is
+
+A side-by-side Windows desktop edition of Hermes Agent with native OmniRoute routing, MCP tooling, Product Studio, a pt-BR UI, project preview, guardrails, SSH, and an optional compression switch. It is a **derivative work** of [Hermes Agent](https://github.com/NousResearch/hermes-agent) (MIT, © Nous Research) — see the [derivative-work notice](NOTICE-OMNIROUTE-STUDIO.md) and [third-party notices](THIRD_PARTY_NOTICES.md). The upstream **“Quick Install”** one-liners further down install the **original** Hermes Agent (cross-platform CLI/gateway), **not** this Windows Studio edition.
+<!-- OMNIROUTE-PUBLIC-PREVIEW:END -->
+
 <p align="center">
   <img src="assets/banner.png" alt="Hermes Agent" width="100%">
 </p>
@@ -35,6 +64,8 @@ Use any model you want — [Nous Portal](https://portal.nousresearch.com), OpenR
 ---
 
 ## Quick Install
+
+> **Note:** the one-liners in this section install the **original, upstream Hermes Agent** (cross-platform CLI/gateway). For the **Windows OmniRoute Studio desktop preview**, use the [Releases download](../../releases/latest) described above instead.
 
 ### Linux, macOS, WSL2, Termux
 

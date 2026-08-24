@@ -104,3 +104,15 @@ docker/entrypoint.sh text eol=lf
 # Scripts de shell do Windows esperam CRLF, como o *.ps1 acima.
 *.bat text eol=crlf
 *.cmd text eol=crlf
+
+# ---------------------------------------------------------------------------
+# Release hygiene (export-ignore): estes caminhos permanecem no repositorio
+# (util para o historico/auditoria do dono), mas sao EXCLUIDOS dos arquivos
+# de codigo-fonte que o GitHub gera automaticamente em cada Release
+# (`git archive`). Assim o tarball/zip do Public Preview nao carrega material
+# interno de trabalho. Nao afeta a navegacao do repositorio.
+# ---------------------------------------------------------------------------
+audit/              export-ignore
+_to_delete/         export-ignore
+log.txt             export-ignore
+sqlite_leak_fix.png export-ignore

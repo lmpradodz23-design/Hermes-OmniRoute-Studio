@@ -12,6 +12,27 @@ Este arquivo começa no fork. O histórico anterior ao fork é o do
 
 ## [Não lançado]
 
+_Sem mudanças ainda desde a Public Preview._
+
+## [0.17.0-omniroute.1] - 2026-08-24
+
+Primeira **Public Preview** (Windows) do Hermes OmniRoute Studio — um fork
+derivado do [Hermes Agent](https://github.com/NousResearch/hermes-agent)
+(MIT, © Nous Research). Instalador **não assinado** (NSIS + MSI); o Windows
+SmartScreen exibirá um aviso esperado — veja o README para instruções e para o
+SHA-256 de cada artefato.
+
+### Destaques
+
+- Edição desktop Windows lado a lado com roteamento **OmniRoute** nativo,
+  ferramentas MCP, Product Studio, UI pt-BR, preview de projeto, guardrails e SSH.
+- Modo **`LOCAL_ONLY`** fail-closed: memória e ferramentas restritas à máquina
+  local e loopback (zero egress para nuvem); config ausente/ilegível falha
+  **fechado**.
+- Dependências de WhatsApp (OpenWA / Baileys) **não são empacotadas** no
+  instalador — são obtidas em runtime na máquina do usuário. Atribuição upstream
+  MIT preservada (`LICENSE`, `NOTICE-OMNIROUTE-STUDIO.md`, `THIRD_PARTY_NOTICES.md`).
+
 ### Segurança
 
 - **`rm -rf $'/'` deixou de furar o piso hardline.** O bash reduz `$'...'` a
