@@ -47,8 +47,8 @@ git stash drop
 
 **Produto:** Hermes OmniRoute Studio — edição desktop Windows do Hermes Agent (Nous Research), com roteamento local via OmniRoute, 106 ferramentas MCP, Product Studio, memória entre chats, Goal spec-first, preview de projeto, SSH, guardrails, cron e pt-BR.
 
-**Caminho do projeto:** `C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute`
-**Aplicativo instalado:** `C:\Users\zodyp\AppData\Local\Programs\HermesOmniRoute`
+**Caminho do projeto:** `C:\Users\you\Documents\Codex\Hermes-OmniRoute`
+**Aplicativo instalado:** `C:\Users\you\AppData\Local\Programs\HermesOmniRoute`
 **Pacote OmniRoute:** `%APPDATA%\npm\node_modules\omniroute` (versão 3.8.49)
 
 **Origem deste documento:** auditoria forense independente executada em 2026-08-21. Os artefatos completos estão em `audit/`:
@@ -87,7 +87,7 @@ As 3.192 linhas do trabalho OmniRoute existem **apenas no índice do Git**. Não
 
 Execute, nesta ordem:
 ```powershell
-cd C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute
+cd C:\Users\you\Documents\Codex\Hermes-OmniRoute
 git bundle create ..\hermes-omniroute-backup-$(Get-Date -Format yyyyMMdd-HHmmss).bundle --all
 git diff --cached > ..\hermes-omniroute-staged-$(Get-Date -Format yyyyMMdd-HHmmss).diff
 git status --porcelain=v1 > ..\hermes-omniroute-status.txt
@@ -157,8 +157,8 @@ m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
 os.environ['HERMES_GUARDRAIL_WORKSPACE_ROOTS'] = str(Path.cwd())
 
 # HERMES-005 — denylist não cobre Windows
-for c in ['del /s /q C:\\Users\\zodyp\\Documents','rd /s /q C:\\projeto',
-          'Remove-Item -Recurse -Force C:\\Users\\zodyp','rm -r -f /tmp/x',
+for c in ['del /s /q C:\\Users\\you\\Documents','rd /s /q C:\\projeto',
+          'Remove-Item -Recurse -Force C:\\Users\\you','rm -r -f /tmp/x',
           'find . -delete','git clean -fdx','DROP DATABASE prod','TRUNCATE TABLE users',
           'docker volume prune -f','rm -rf /tmp/x']:
     r = m.on_pre_tool_call('terminal', {'command': c})

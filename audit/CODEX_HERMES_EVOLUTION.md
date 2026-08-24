@@ -2,7 +2,7 @@
 ## 9 capacidades novas + workspace no padrão Qoder/Quest
 
 > Documento autossuficiente. Leia inteiro antes de tocar em qualquer arquivo.
-> Projeto: `C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute`
+> Projeto: `C:\Users\you\Documents\Codex\Hermes-OmniRoute`
 > Branch: `feature/hermes-omniroute-studio`
 
 ---

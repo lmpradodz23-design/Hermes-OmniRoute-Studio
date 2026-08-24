@@ -5,7 +5,7 @@
 > da fila. **Nunca reinicie a missão do zero.**
 
 **Última atualização:** 2026-08-22 · rodada R4-01
-**Repositório:** `C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute`
+**Repositório:** `C:\Users\you\Documents\Codex\Hermes-OmniRoute`
 **Branch:** `feature/hermes-omniroute-studio`
 
 ---

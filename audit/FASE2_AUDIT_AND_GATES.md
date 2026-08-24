@@ -17,8 +17,8 @@ suítes de teste que rodam no container.
 ## 0. Discrepância de ambiente registrada (BLOCKED_BY_EXTERNAL_DEPENDENCY)
 
 - O prompt aponta a árvore autoritativa Windows como
-  `C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute@GitHub`, mas essa pasta **não está
-  conectada** ao ambiente. Só `C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute` está.
+  `C:\Users\you\Documents\Codex\Hermes-OmniRoute@GitHub`, mas essa pasta **não está
+  conectada** ao ambiente. Só `C:\Users\you\Documents\Codex\Hermes-OmniRoute` está.
 - Ação: auditei o **clone do GitHub** (fonte de verdade) e entrego correções na pasta
   conectada `Hermes-OmniRoute` (cujo HEAD pós-publicação = `275dad4` = GitHub). Se você
   quiser que eu trabalhe na `@GitHub`, conecte-a no app.

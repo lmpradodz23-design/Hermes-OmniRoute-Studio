@@ -238,9 +238,9 @@ LOCATION: :16-25 (_DESTRUCTIVE_PATTERNS), :296-305 (on_pre_tool_call)
 ```
 **FACT — provado por execução.** Carreguei o módulo e chamei `on_pre_tool_call('terminal', {'command': ...})`:
 ```text
-PASSOU    | del /s /q C:\Users\zodyp\Documents
+PASSOU    | del /s /q C:\Users\you\Documents
 PASSOU    | rd /s /q C:\projeto
-PASSOU    | Remove-Item -Recurse -Force C:\Users\zodyp
+PASSOU    | Remove-Item -Recurse -Force C:\Users\you
 PASSOU    | rm -r -f /tmp/x
 PASSOU    | rm --recursive --force /tmp/x
 PASSOU    | find . -delete
@@ -781,7 +781,7 @@ LOCATION: approval.py:3841-3856, :3684-3687, :2949-2962 ; guardrail:322-328
 ```
 **FACT.** `rule_key` fornecido pelo plugin vira `pattern_key = f"plugin_rule:{rule_key}"`, e a escolha `[a]lways` grava esse pattern em `command_allowlist` no `config.yaml` — auto-aprovação permanente entre sessões. O guardrail usa `f"dz23-guardrail:outside-workspace:{outside.parent}"`, ou seja granularidade por **diretório-pai**.
 
-**IMPACT.** Um único `[a]lways` numa escrita legítima em, digamos, `C:\Users\zodyp\.ssh\known_hosts` autoriza permanentemente **todo** o diretório `.ssh`. Não há validação do `rule_key` vindo do plugin; um plugin mal escrito ou hostil pode escolher uma chave larga e converter um clique em autorização ampla.
+**IMPACT.** Um único `[a]lways` numa escrita legítima em, digamos, `C:\Users\you\.ssh\known_hosts` autoriza permanentemente **todo** o diretório `.ssh`. Não há validação do `rule_key` vindo do plugin; um plugin mal escrito ou hostil pode escolher uma chave larga e converter um clique em autorização ampla.
 
 **RECOMMENDED_FIX.** No core: prefixar obrigatoriamente `rule_key` com o id do plugin e recusar chaves que não sejam suficientemente específicas. No guardrail: usar o caminho completo do arquivo, não o diretório-pai. Na UI de aprovação: mostrar literalmente o escopo que `[a]lways` concede.
 
@@ -1023,7 +1023,7 @@ FILE: repositório
 
 **RECOMMENDED_FIX — fazer isto antes de qualquer outra coisa, e é o único ponto em que recomendo escrita no repositório:**
 ```powershell
-cd C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute
+cd C:\Users\you\Documents\Codex\Hermes-OmniRoute
 git stash create                      # NÃO — não usar
 # Correto, não destrutivo, preserva o índice:
 git bundle create ..\hermes-omniroute-index-backup.bundle --all

@@ -96,7 +96,7 @@ O F4 tornou `windows-primary` a lane obrigatória. Para o open source:
 ## 6. O QUE NÃO PODE IR PARA O PÚBLICO
 
 - Nenhuma credencial, cookie, token ou chave — em código, histórico, fixture, screenshot ou log.
-- Nenhum caminho absoluto de usuário real em teste, snapshot ou documentação (`C:\Users\zodyp\...` deve virar placeholder).
+- Nenhum caminho absoluto de usuário real em teste, snapshot ou documentação (`C:\Users\you\...` deve virar placeholder).
 - Nenhum relatório de tarefa, gravação de sessão ou `install-stamp` de máquina real.
 - Nenhum artefato de `audit/_raw/` — tarballs e diffs de trabalho. **Confirme que `audit/_raw/` está no `.gitignore`.**
 - Nenhum backup (`hermes-r2-backup-*`) dentro do repositório.
@@ -153,7 +153,7 @@ gitleaks detect --source . --log-opts="--all" --report-path secrets-history.json
 git ls-files | Select-String -Pattern "audit/_raw|\.bundle$|task-reports|session-recordings"
 
 # caminhos de usuário real versionados
-git grep -n "C:\\\\Users\\\\zodyp" -- . | Select-Object -First 40
+git grep -n "C:\\\\Users\\\\you" -- . | Select-Object -First 40
 ```
 
 Esses três comandos definem se o projeto está a dias ou a semanas do lançamento público.

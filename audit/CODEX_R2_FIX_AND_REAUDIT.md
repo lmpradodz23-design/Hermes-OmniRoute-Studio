@@ -1,7 +1,7 @@
 # CODEX — CORREÇÃO R2 + AUDITORIA INDEPENDENTE PÓS-CORREÇÃO
 
 > Documento autossuficiente. Leia inteiro antes de tocar em qualquer arquivo.
-> Projeto: `C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute`
+> Projeto: `C:\Users\you\Documents\Codex\Hermes-OmniRoute`
 > Branch: `feature/hermes-omniroute-studio` · HEAD esperado: `9d80176ad6761949775b354d37be8678dea843b5`
 
 ---
@@ -88,7 +88,7 @@ Além deles há 12 arquivos rastreados modificados e não commitados (`main.ts` 
 **Faça, nesta ordem:**
 1. Backup primeiro:
    ```powershell
-   cd C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute
+   cd C:\Users\you\Documents\Codex\Hermes-OmniRoute
    git bundle create ..\hermes-r2-backup-$(Get-Date -Format yyyyMMdd-HHmmss).bundle --all
    git diff > ..\hermes-r2-worktree.diff
    git status --porcelain=v1 > ..\hermes-r2-status.txt
@@ -251,8 +251,8 @@ os.makedirs('/tmp/ws', exist_ok=True) if os.name != 'nt' else os.makedirs(os.pat
 WS = '/tmp/ws' if os.name != 'nt' else os.path.expandvars(r'%TEMP%\ws')
 os.environ['HERMES_GUARDRAIL_WORKSPACE_ROOTS'] = WS
 
-DESTRUTIVOS = ['del /s /q C:\\Users\\zodyp\\Documents','rd /s /q C:\\projeto',
- 'Remove-Item -Recurse -Force C:\\Users\\zodyp','rm -r -f /tmp/x','rm --recursive --force /tmp/x',
+DESTRUTIVOS = ['del /s /q C:\\Users\\you\\Documents','rd /s /q C:\\projeto',
+ 'Remove-Item -Recurse -Force C:\\Users\\you','rm -r -f /tmp/x','rm --recursive --force /tmp/x',
  'find . -delete','git clean -fdx','git reset --hard','git push --force origin main',
  'DROP DATABASE producao','TRUNCATE TABLE users','docker volume prune -f','docker image prune -a',
  'vssadmin delete shadows /all','reg delete HKLM\\Software\\X /f','takeown /f C:\\ /r',

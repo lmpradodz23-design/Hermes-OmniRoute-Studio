@@ -1,7 +1,7 @@
 # U1 — Executor Final no Windows (validação real)
 
 Prompt ÚNICO para o executor local (Claude Code/Codex) no PC Windows, dentro de
-`C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute`. Fecha o que este ambiente
+`C:\Users\you\Documents\Codex\Hermes-OmniRoute`. Fecha o que este ambiente
 remoto não pôde VALIDAR (não implementar): IPC real ao gateway, runtime OpenWA,
 QR, build/NSIS, app instalado e inspeção visual.
 
@@ -17,7 +17,7 @@ WAITING_FOR_HUMAN_QR_SCAN (só para auth/send/receive), não bloqueia o resto.
 ## 0. Gates base (rodar primeiro; parar se vermelho)
 
 ```powershell
-cd C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute
+cd C:\Users\you\Documents\Codex\Hermes-OmniRoute
 npm install                     # raiz (workspaces)
 python -m pytest tests/security_research tests/whatsapp_provider tests/agent/test_local_only.py -q  # esperado: 227 passed
 pnpm -C apps/desktop typecheck
@@ -70,7 +70,7 @@ CONNECTED sem estado real.
 ```powershell
 pnpm -C apps/desktop build
 pnpm -C apps/desktop test:desktop:nsis      # ou o gate NSIS do projeto
-# instalar e abrir:  C:\Users\zodyp\AppData\Local\Programs\HermesOmniRoute
+# instalar e abrir:  C:\Users\you\AppData\Local\Programs\HermesOmniRoute
 ```
 NÃO incluir OpenWA/RAPTOR/CodeQL no instalador.
 

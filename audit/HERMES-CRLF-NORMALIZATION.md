@@ -2,7 +2,7 @@
 
 **Status:** RESOLVIDO no working tree. Aguarda commit.
 **Executado por:** Claude (desenvolvedor master do projeto)
-**Escopo:** `.gitattributes` + working tree de `C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute` (branch `feature/hermes-omniroute-studio`)
+**Escopo:** `.gitattributes` + working tree de `C:\Users\you\Documents\Codex\Hermes-OmniRoute` (branch `feature/hermes-omniroute-studio`)
 
 ---
 

@@ -197,7 +197,7 @@ a sidebar, o file browser e o review já usavam.
 
 ### C-4 · O script de build só funcionava na máquina do autor — **CORRIGIDO**
 
-`$repo = 'C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute'` fazia
+`$repo = 'C:\Users\you\Documents\Codex\Hermes-OmniRoute'` fazia
 `BUILD-E-INSTALAR.bat` abortar para qualquer pessoa que clonasse o projeto — e
 vazava o nome de usuário num repositório que vai a público.
 

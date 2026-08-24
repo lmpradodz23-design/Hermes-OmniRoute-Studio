@@ -1,6 +1,6 @@
 # HERMES OMNIROUTE — AUDITORIA R2 (verificação de remediação)
 
-Auditor independente · 2026-08-21 · escopo: `C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute`
+Auditor independente · 2026-08-21 · escopo: `C:\Users\you\Documents\Codex\Hermes-OmniRoute`
 
 > **Esta rodada não repete a anterior.** O projeto mudou de forma substancial entre as duas auditorias. O trabalho aqui foi: reancorar o estado, **re-executar** os bypasses que eu havia provado, e separar com evidência o que foi corrigido do que continua aberto.
 
@@ -107,9 +107,9 @@ Carreguei o `plugins/dz23-guardrail/__init__.py` **atual** (19.603 bytes) e repe
 
 ```text
 === denylist destrutivo ===
-  BLOQUEADO | del /s /q C:\Users\zodyp\Documents
+  BLOQUEADO | del /s /q C:\Users\you\Documents
   BLOQUEADO | rd /s /q C:\projeto
-  BLOQUEADO | Remove-Item -Recurse -Force C:\Users\zodyp
+  BLOQUEADO | Remove-Item -Recurse -Force C:\Users\you
   BLOQUEADO | rm -r -f /tmp/x
   BLOQUEADO | rm --recursive --force /tmp/x
   BLOQUEADO | find . -delete

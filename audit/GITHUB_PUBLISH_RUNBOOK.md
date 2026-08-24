@@ -1,7 +1,7 @@
 # Runbook — Publicar Hermes OmniRoute Studio como repo open source
 
 Para você rodar **no PC (PowerShell)**, dentro de
-`C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute`. Eu não executo isto (não
+`C:\Users\you\Documents\Codex\Hermes-OmniRoute`. Eu não executo isto (não
 manuseio suas credenciais GitHub e o WSL não tem rede). Requer `git` e `gh`
 autenticados (`gh auth status`).
 

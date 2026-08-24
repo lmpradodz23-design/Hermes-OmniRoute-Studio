@@ -1,6 +1,6 @@
 # HERMES OMNIROUTE — AUDITORIA FINAL
 
-Auditor: Claude (independente) · Data: 2026-08-21 · Projeto: `C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute`
+Auditor: Claude (independente) · Data: 2026-08-21 · Projeto: `C:\Users\you\Documents\Codex\Hermes-OmniRoute`
 
 ```text
 HERMES OMNIROUTE — AUDITORIA FINAL

@@ -8,12 +8,12 @@ Gerado por auditoria independente em 2026-08-22, a partir de inspeção real do 
 ## 1. IDENTIDADE VERIFICADA
 
 ```text
-checkout   C:\Users\zodyp\Documents\Codex\Hermes-OmniRoute
+checkout   C:\Users\you\Documents\Codex\Hermes-OmniRoute
 toplevel   idêntico ao checkout                              ✔
 branch     feature/hermes-omniroute-studio                   ✔
 HEAD       c573d4791a77928f8772e8e3d3d3cbb24799d3bf          ← ÂNCORA NOVA
 remote     origin → https://github.com/NousResearch/hermes-agent.git
-backup     C:\Users\zodyp\Documents\Codex\hermes-r2-backup-20260821-185318
+backup     C:\Users\you\Documents\Codex\hermes-r2-backup-20260821-185318
 ```
 
 **Se o HEAD divergir de `c573d47`, pare e diagnostique antes de editar.**

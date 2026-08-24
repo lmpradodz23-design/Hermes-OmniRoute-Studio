@@ -171,7 +171,7 @@ fato (ver gaps abaixo) — a regra "nenhum botão falso" foi respeitada.
 
 BLOQUEADO por dispositivo — exigem o app buildado e rodando no Windows, DevTools,
 screenshots e o app instalado em
-`C:\Users\zodyp\AppData\Local\Programs\HermesOmniRoute`. Entregues como prompts
+`C:\Users\you\AppData\Local\Programs\HermesOmniRoute`. Entregues como prompts
 prontos abaixo. Não declaro PASS sem tê-los rodado.
 
 ## KNOWN LIMITATIONS / próximos passos (prompts para o executor)

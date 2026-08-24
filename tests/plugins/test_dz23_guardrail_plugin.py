@@ -254,9 +254,9 @@ def test_guardrail_uses_raw_conservative_variant_when_core_parser_import_fails(
 @pytest.mark.parametrize(
     "command",
     [
-        r"del /s /q C:\Users\zodyp\Documents",
+        r"del /s /q C:\Users\you\Documents",
         r"rd /s /q C:\projeto",
-        r"Remove-Item -Recurse -Force C:\Users\zodyp",
+        r"Remove-Item -Recurse -Force C:\Users\you",
         "rm -r -f /tmp/x",
         "find . -delete",
         "git clean -fdx",
