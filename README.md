@@ -5,7 +5,7 @@
 
 > **Status: Public Preview (`v0.17.0-omniroute.1`).** An early, community **fork** build for **Windows 10/11**, provided for evaluation. Expect rough edges. This is **not** an official Nous Research release.
 
-**Download:** get the latest installer from the **[Releases page](../../releases/latest)** — either the NSIS installer (`HermesOmniRoute-Studio-Setup-*.exe`) or the MSI (`*.msi`). Found a bug? Use the **[issue tracker](../../issues)**.
+**Download:** get the latest installer from the **[Releases page](../../releases/latest)** — either the NSIS installer (`Hermes-OmniRoute-Studio-*-win-x64.exe`) or the MSI (`Hermes-OmniRoute-Studio-*-win-x64.msi`). Found a bug? Use the **[issue tracker](../../issues)**.
 
 ### ⚠️ Unsigned build — a Windows SmartScreen warning is expected
 
@@ -17,7 +17,7 @@ This preview is **not code-signed**. On first run, Windows SmartScreen will like
 Verify integrity first: each release publishes the **SHA-256** of every installer asset. Before running, compare it with PowerShell:
 
 ```powershell
-Get-FileHash .\HermesOmniRoute-Studio-Setup-0.17.0-omniroute.1.exe -Algorithm SHA256
+Get-FileHash .\Hermes-OmniRoute-Studio-0.17.0-omniroute.1-win-x64.exe -Algorithm SHA256
 ```
 
 ### 🔒 Local-first by design (LOCAL_ONLY)

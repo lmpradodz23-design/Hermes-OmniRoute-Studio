@@ -30,7 +30,7 @@ Every release publishes the **SHA-256** of each installer asset (in the release
 notes and/or a `SHA256SUMS.txt` asset). Users should compare before running:
 
 ```powershell
-Get-FileHash .\HermesOmniRoute-Studio-Setup-0.17.0-omniroute.1.exe -Algorithm SHA256
+Get-FileHash .\Hermes-OmniRoute-Studio-0.17.0-omniroute.1-win-x64.exe -Algorithm SHA256
 # compare the output with the value published in the GitHub Release
 ```
 
