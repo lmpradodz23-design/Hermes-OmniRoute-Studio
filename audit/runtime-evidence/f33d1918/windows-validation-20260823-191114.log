@@ -1,0 +1,20 @@
+[19:11:14] === Hermes OmniRoute Windows validation - phase: Preflight ===
+[19:11:14] === PREFLIGHT ===
+[19:11:15] Windows: Microsoft Windows 11 Pro 10.0.26200.0
+[19:11:15] Arch: AMD64
+[19:11:15] node: v24.16.0
+[19:11:16] npm: 11.13.0
+[19:11:16] python: Python 3.14.5
+[19:11:16] git: git version 2.55.0.windows.1
+[19:11:17] Free disk C: 365.5 GB
+[19:11:17] HEAD: f33d1918aeebedbb6b69cbb65eadd6a27851d123
+[19:11:17] Branch: feature/hermes-omniroute-studio
+[19:11:17] HEAD matches the frozen baseline.
+[19:11:17] Backup (copy, no delete): C:\Users\zodyp\AppData\Roaming\Hermes OmniRoute Studio -> C:\Users\zodyp\Hermes-RC-backup-20260823-191114\Hermes OmniRoute Studio
+[19:11:18] Backup (copy, no delete): C:\Users\zodyp\AppData\Roaming\hermes -> C:\Users\zodyp\Hermes-RC-backup-20260823-191114\hermes
+[19:11:19] Backup (copy, no delete): C:\Users\zodyp\.hermes -> C:\Users\zodyp\Hermes-RC-backup-20260823-191114\.hermes
+[19:11:19] Backup (copy, no delete): C:\Users\zodyp\AppData\Local\hermes -> C:\Users\zodyp\Hermes-RC-backup-20260823-191114\hermes
+[19:20:56] Backup at: C:\Users\zodyp\Hermes-RC-backup-20260823-191114
+[19:21:16] state.db C:\Users\zodyp\AppData\Local\hermes\state.db: quick_check=ok integrity_check=ok
+[19:21:16] WINDOWS_EXECUTOR_PREFLIGHT=PASS
+[19:21:16] === phase complete ===

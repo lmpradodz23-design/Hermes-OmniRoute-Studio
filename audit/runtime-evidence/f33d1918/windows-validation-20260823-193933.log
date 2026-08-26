@@ -1,0 +1,264 @@
+[19:39:33] === Hermes OmniRoute Windows validation - phase: SourceTests ===
+[19:39:33] === SOURCE TESTS (Windows) ===
+[19:39:33] ELECTRON typecheck (tsc)...
+npm warn Unknown project config "min-release-age-exclude". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+[19:39:45] ELECTRON_TYPECHECK=PASS
+[19:39:45] ELECTRON tests (full electron/ vitest suite)...
+npm warn Unknown project config "min-release-age-exclude". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vite.config.ts:22:20). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90mC:/Users/zodyp/Documents/Codex/Hermes-OmniRoute/apps/desktop[39m
+
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/bundled-product-studio.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 843[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/backend-probes.test.ts [2m([22m[2m12 tests[22m[2m)[22m[33m 1360[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m canImportHermesCli returns false when interpreter cannot run -c [33m 649[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m verifyHermesCli returns true when --version exits 0 [33m 618[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/remote-lifecycle.test.ts [2m([22m[2m71 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 1039[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m scrapeReadyPort times out and reports a dead spawn [33m 767[2mms[22m[39m
+[90mstderr[2m | electron/git-review-ops.test.ts[2m > [22m[2mgitFor accepts an internally resolved git binary path containing spaces
+[22m[39mInvalid value supplied for custom binary, restricted characters must be removed or supply the unsafe.allowUnsafeCustomBinary option
+
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/ssh-connection.test.ts [2m([22m[2m67 tests[22m[2m | [22m[33m2 skipped[39m[2m)[22m[33m 2403[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m no-mux: forward fails fast when the tunnel child dies (bad spec/auth) [33m 2013[2mms[22m[39m
+ [31mÔØ»[39m [30m[43m electron [49m[39m electron/omniroute-security.test.ts [2m([22m[2m10 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 2301[2mms[22m[39m
+   [32mÔ£ô[39m OmniRoute bridge requires a dedicated local token and rejects generic API-key fallback[32m 6[2mms[22m[39m
+   [32mÔ£ô[39m OmniRoute endpoint identity must match the trusted installed package version[32m 2[2mms[22m[39m
+   [32mÔ£ô[39m default OmniRoute MCP scopes are minimal and never auto-grant privileged writes[32m 2[2mms[22m[39m
+   [32mÔ£ô[39m external file policy rejects executables and sensitive files[32m 5[2mms[22m[39m
+   [32mÔ£ô[39m filesystem IPC writes are confined to explicitly allowed roots[32m 8[2mms[22m[39m
+   [32mÔ£ô[39m native file grants are exact and never grant the selected parent directory[32m 10[2mms[22m[39m
+   [32mÔ£ô[39m drive roots and the user home are rejected as broad grants[32m 1[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m OmniRoute bridge rejects an environment-controlled package root outside its allowlist [33m 417[2mms[22m[39m
+   [32mÔ£ô[39m OmniRoute server.js byte drift is blocked by the capability lock[32m 151[2mms[22m[39m
+[31m   [31m+ù[31m real MCP bridge exposes privileged tools but denies their missing write scopes (needs a local OmniRoute install)[39m[33m 1692[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/fs-read-dir.test.ts [2m([22m[2m12 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 2394[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m readDirForIpc hides noisy directories and files from the project tree [33m 1649[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/connection-registry.test.ts [2m([22m[2m63 tests[22m[2m)[22m[33m 704[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m backendScopeKey: electron and shared implementations agree everywhere [33m 644[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/hardening.test.ts [2m([22m[2m45 tests[22m[2m | [22m[33m7 skipped[39m[2m)[22m[33m 3497[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m attachment data URL helper reads bytes above the preview default without changing that limit [33m 452[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m tightenSecretFileMode hardens a real Windows file with icacls [33m 1995[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/primary-backend-startup.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 562[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/omniroute-local-auth.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 572[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m replaces a malformed database hash instead of crashing the desktop [33m 448[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/backend-ready.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 624[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/bootstrap-runner.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 267[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/handoff-result.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 71[2mms[22m[39m
+warning: in the working copy of 'tracked.txt', LF will be replaced by CRLF the next time Git touches it
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/media-protocol.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 291[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/native-oauth-login.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 104[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/translucency.test.ts [2m([22m[2m72 tests[22m[2m)[22m[32m 188[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/desktop-plugin-install.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 114[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/gitlock.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 53[2mms[22m[39m
+[90mstderr[2m | electron/git-review-ops.test.ts[2m > [22m[2mgitFor runs git through a spaced binary path
+[22m[39mInvalid value supplied for custom binary, restricted characters must be removed or supply the unsafe.allowUnsafeCustomBinary option
+
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/first-run-setup-main-process.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 149[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/update-marker.test.ts [2m([22m[2m28 tests[22m[2m)[22m[33m 889[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/connection-config.test.ts [2m([22m[2m107 tests[22m[2m)[22m[32m 98[2mms[22m[39m
+Preparing worktree (new branch 'wt')
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/desktop-installation.test.ts [2m([22m[2m9 tests[22m[2m | [22m[33m3 skipped[39m[2m)[22m[32m 67[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/git-repo-scan.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 99[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/gateway-ws-probe.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 67[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/windows-sandbox-fallback.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 36[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/plugin-profile-routes.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/desktop-remote-route.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 93[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/remote-liveness.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 83[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/guardrail-taint-status.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 144[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/connection-apply.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/favicon.test.ts [2m([22m[2m38 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/zoom.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/preview-reach.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/power-save.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/venv-blocker-scan.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/quick-entry.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/window-renderer-lifecycle.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/profile-session-routing.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+warning: in the working copy of 'tracked.txt', LF will be replaced by CRLF the next time Git touches it
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/update-decision.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/shell-path.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/update-policy.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 29[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/profile-delete-routing.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/renderer-log.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/windows-remote-lifecycle.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/updater-process.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/wsl-path-bridge.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 445[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m wslPosixToWindowsAccessible maps an in-distro POSIX path to a UNC share [33m 412[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/update-backoff.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 76[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/first-run-setup-gate.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/hud-cursor.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/renderer-bundle.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/desktop-electron-pin.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 173[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/gateway-file-download-transport.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 39[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/windows-child-options.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/ssh-config.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/backend-ownership.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 46[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/wake-indicator.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 33[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/find-in-page.test.ts [2m([22m[2m31 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/window-state.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 104[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/hyprland.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/link-title-window.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/windows-hermes-path.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/dashboard-token.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/backend-start-failure.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/pool-eviction.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/stream-throttle.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/active-runtime-state.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/update-handoff-marker.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m1 skipped[39m[2m)[22m[33m 22331[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m PowerShell hand-off preserves the Desktop marker acquisition time [33m 22326[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/event-dedupe.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/native-token-store.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 35[2mms[22m[39m
+warning: in the working copy of 'tracked.txt', LF will be replaced by CRLF the next time Git touches it
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/desktop-uninstall.test.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/backend-health.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/git-root.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 124[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/wsl-clipboard-image.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/native-auth-decisions.test.ts [2m([22m[2m16 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/parent-process-identity.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/backend-command.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/bootstrap-platform.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/external-terminal.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/crash-forensics.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/vscode-marketplace.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/quit-guard.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/spawn-helper-perms.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/ssh-bootstrap-coordinator.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 27[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/main-window-lifecycle.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/workspace-cwd.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/native-oauth.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 166[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/dev-cdp.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/pool-touch-scope.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/content-security.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/omniroute-compression.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/titlebar-overlay-width.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/windows-user-env.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/backend-env.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/hud-snap-shortcut.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/session-windows.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/update-count.test.ts [2m([22m[2m19 tests[22m[2m)[22m[33m 32058[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m shallow Git graph proves the remote tip is an ancestor of a local commit [33m 11744[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m shallow checkout with a merge-base does not trust an inflated rev-list count [33m 20294[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/update-gate.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/bundle-skew.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 37[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/desktop-log-line.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+warning: in the working copy of 'tracked.txt', LF will be replaced by CRLF the next time Git touches it
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/windows-system-ca.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/window-below.test.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/update-remote.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 59[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/oauth-net-request.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/gateway-file-download.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 23[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/backend-connection-state.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/bootstrap-repair-guard.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 19[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/profile-rename-routing.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/window-reveal.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/find-git-bash.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/hud-snap.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/hud-url.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/pool-stop.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [2m[90mÔåô[39m[22m [30m[43m electron [49m[39m electron/windows-remote-live.test.ts [2m([22m[2m1 test[22m[2m | [22m[33m1 skipped[39m[2m)[22m
+ [2m[90mÔåô[39m[22m [30m[43m electron [49m[39m electron/ssh-connection-live.test.ts [2m([22m[2m2 tests[22m[2m | [22m[33m2 skipped[39m[2m)[22m
+Switched to a new branch 'rawr'
+ [31mÔØ»[39m [30m[43m electron [49m[39m electron/update-marker.concurrency.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 30155[2mms[22m[39m
+[31m   [31m+ù[31m REAL multi-process: claimUpdateMarker yields exactly one winner over a seeded stale marker[39m[33m 2097[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m CANARY: the buggy existsÔåÆunlinkÔåÆwrite claim produces >1 winner under the same harness [33m 22450[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m node executable is available for the race harness [33m 345[2mms[22m[39m
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/git-review-ops.test.ts [2m([22m[2m9 tests[22m[2m)[22m[33m 46038[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m gitFor runs git through a spaced binary path [33m 6677[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m repoStatus reports an untracked directory without recursively listing its contents [33m 9850[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m reviewList reports an untracked directory without recursively listing its contents [33m 9667[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m reviewList caps the file payload returned to the renderer [33m 19762[2mms[22m[39m
+Switched to a new branch 'rawr'
+Cloning into 'C:\Users\zodyp\AppData\Local\Temp\hermes-clone-Yu13pf'...
+done.
+fatal: no upstream configured for branch 'feature-branch'
+Cloning into 'C:\Users\zodyp\AppData\Local\Temp\hermes-branches-remote-clone-7pHkHO'...
+done.
+Cloning into 'C:\Users\zodyp\AppData\Local\Temp\hermes-convert-remote-clone-mh8iKR'...
+done.
+Cloning into 'C:\Users\zodyp\AppData\Local\Temp\hermes-convert-remote-default-clone-c5vMYw'...
+done.
+Switched to a new branch 'rawr'
+ [32mÔ£ô[39m [30m[43m electron [49m[39m electron/git-worktree-ops.test.ts [2m([22m[2m22 tests[22m[2m)[22m[33m 86822[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m ensureGitRepo: inits a plain dir with a root commit so worktrees branch [33m 10958[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m switchBranch: switches a normal checkout branch [33m 7755[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m listBranches: lists locals and flags the checked-out branch [33m 13990[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m listBranches: flags a free default branch as default, not checked out [33m 10617[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m listBranches: a branch claimed by a worktree is flagged checked out [33m 6966[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m listBranches: empty on a non-repo path [33m 303[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m addWorktree: existingBranch checks the branch out without a new branch [33m 6315[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m addWorktree: existing default branch switches the main checkout, not .worktrees/main [33m 3817[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m listBaseBranches: lists local branches and flags the default [33m 3411[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m addWorktree: base param branches off a specified local branch [33m 3268[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m addWorktree: a base starting with "-" is rejected (no git-flag injection) [33m 2247[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m addWorktree: base origin/main does not set up upstream tracking [33m 3580[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m listBranches: offers remote branches that have no local counterpart [33m 2186[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m addWorktree: a remote branch becomes a local branch tracking it [33m 4218[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m addWorktree: a remote default branch gets its own worktree, not a home switch [33m 4464[2mms[22m[39m
+   [33m[2mÔ£ô[22m[39m switchBranch: repo dir still validates the branch name and switches [33m 2222[2mms[22m[39m
+
+[31mÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[39m[1m[41m Failed Tests 2 [49m[22m[31mÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[39m
+
+[41m[1m FAIL [22m[49m [30m[43m electron [49m[39m electron/omniroute-security.test.ts[2m > [22mreal MCP bridge exposes privileged tools but denies their missing write scopes (needs a local OmniRoute install)
+[31m[1mError[22m: MCP bridge exited 1: node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+[TypeError: fetch failed] {
+  [cause]: Error: connect ECONNREFUSED 127.0.0.1:20128
+      at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16) {
+    errno: -4078,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 20128
+  }
+}
+
+Node.js v24.16.0
+[39m
+[36m [2mÔØ»[22m Timeout.poll [as _onTimeout] electron/omniroute-security.test.ts:[2m286:25[22m[39m
+    [90m284|[39m
+    [90m285|[39m         [35mif[39m (child[33m.[39mexitCode [33m!==[39m [35mnull[39m) {
+    [90m286|[39m           return reject(new Error(`MCP bridge exited ${child.exitCode}ÔÇª
+    [90m   |[39m                         [31m^[39m
+    [90m287|[39m         }
+    [90m288|[39m
+
+[31m[2mÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[1/2]ÔÄ»[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[43m electron [49m[39m electron/update-marker.concurrency.test.ts[2m > [22mREAL multi-process: claimUpdateMarker yields exactly one winner over a seeded stale marker
+[31m[1mAssertionError[22m: iteration 0 must have exactly one acquirer: expected 2 to be 1 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 1[39m
+[31m+ 2[39m
+
+[36m [2mÔØ»[22m electron/update-marker.concurrency.test.ts:[2m127:70[22m[39m
+    [90m125|[39m     [34mseedStaleMarker[39m(home)
+    [90m126|[39m     const winners = await (raceAcquire(realBundle, home, CHILDREN) as ÔÇª
+    [90m127|[39m     expect(winners, `iteration ${i} must have exactly one acquirer`).tÔÇª
+    [90m   |[39m                                                                      [31m^[39m
+    [90m128|[39m   }
+    [90m129|[39m }[33m,[39m [34m60_000[39m)
+
+[31m[2mÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»ÔÄ»[2/2]ÔÄ»[22m[39m
+
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m113 passed[39m[22m[2m | [22m[33m2 skipped[39m[90m (117)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m1581 passed[39m[22m[2m | [22m[33m18 skipped[39m[90m (1601)[39m
+[2m   Start at [22m 19:39:58
+[2m   Duration [22m 90.79s[2m (transform 23.44s, setup 0ms, import 37.09s, tests 239.40s, environment 83ms)[22m
+
+[19:41:31] ELECTRON_TESTS=FAIL (exit 1)
+[19:41:31] NOTE: the concurrency test forks OS processes; on Windows this exercises NTFS O_EXCL/link semantics - the target platform.
+[19:41:31] PYTHON LOCAL_ONLY + memory tests...
+........................................................................ [ 50%]
+.......................................................................  [100%]
+143 passed in 29.62s
+[19:42:04] PYTHON_TESTS=PASS
+[19:42:04] WINDOWS_SOURCE_TESTS=FAIL
+[19:42:04] === phase complete ===
