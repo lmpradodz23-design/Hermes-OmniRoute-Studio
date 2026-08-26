@@ -1,0 +1,16 @@
+[22:35:12] === Hermes OmniRoute Windows validation - phase: Preflight ===
+[22:35:12] === PREFLIGHT ===
+[22:35:12] Windows: unknown 6.18.44.21
+[22:35:12] Arch: 
+[22:35:12] node: v22.22.2
+[22:35:12] npm: 10.9.7
+[22:35:12] python: Python 3.11.15
+[22:35:12] git: git version 2.43.0
+[22:35:12] Free disk C: N/A (no C drive on this host)
+[22:35:12] HEAD: f33d1918aeebedbb6b69cbb65eadd6a27851d123
+[22:35:12] Branch: 
+[22:35:12] HEAD matches the frozen baseline.
+[22:35:12] No existing userData/HERMES_HOME found (fresh-install scenario) - nothing to back up.
+[22:35:12] STATE_DB=NOT_APPLICABLE_FRESH_PROFILE (no state.db found in known locations)
+[22:35:12] WINDOWS_EXECUTOR_PREFLIGHT=PASS
+[22:35:12] === phase complete ===

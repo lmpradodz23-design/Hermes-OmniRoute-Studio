@@ -1,0 +1,41 @@
+[22:35:25] === Hermes OmniRoute Windows validation - phase: SourceTests ===
+[22:35:25] === SOURCE TESTS (Windows) ===
+[22:35:25] ELECTRON typecheck (tsc)...
+[22:35:35] ELECTRON_TYPECHECK=PASS
+[22:35:35] ELECTRON tests (full electron/ vitest suite)...
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vite.config.ts:22:20). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.10 /root/hos-frozen/apps/desktop
+
+Preparing worktree (new branch 'wt')
+Switched to a new branch 'rawr'
+Switched to a new branch 'rawr'
+Cloning into '/tmp/hermes-clone-3s7XCi'...
+done.
+fatal: no upstream configured for branch 'feature-branch'
+Cloning into '/tmp/hermes-branches-remote-clone-OC65k7'...
+done.
+Cloning into '/tmp/hermes-convert-remote-clone-y9vfiU'...
+done.
+Cloning into '/tmp/hermes-convert-remote-default-clone-y3PMon'...
+done.
+Switched to a new branch 'rawr'
+(node:6487) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  115 passed | 2 skipped (117)
+      Tests  1593 passed | 8 skipped (1601)
+   Start at  22:35:36
+   Duration  47.53s (transform 2.69s, setup 0ms, import 4.37s, tests 25.85s, environment 13ms)
+
+[22:36:24] ELECTRON_TESTS=PASS
+[22:36:24] NOTE: the concurrency test forks OS processes; on Windows this exercises NTFS O_EXCL/link semantics - the target platform.
+[22:36:24] PYTHON LOCAL_ONLY + memory tests...
+........................................................................ [ 50%]
+.......................................................................  [100%]
+143 passed in 3.04s
+[22:36:28] PYTHON_TESTS=PASS
+[22:36:28] WINDOWS_SOURCE_TESTS=PASS
+[22:36:28] === phase complete ===
