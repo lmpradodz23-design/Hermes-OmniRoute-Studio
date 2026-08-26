@@ -23,10 +23,11 @@ IMPLEMENTED (this session, Linux, source+unit only; branch feature/autonomy-kern
   - agent/mission_store.py — durable Mission persistence (§4): SQLite store for mission/nodes/deps/status/attempts/checkpoint/events. No secrets persisted.
   - agent/mission_runtime.py — orchestration (§3/§5): MissionRuntime scheduler over the DAG frontier + pluggable NodeExecutor (delegates to Goals/kanban/subagents in real runtime), bounded RecoveryPolicy (NO infinite retry), MissionWatchdog (HEALTHY/SLOW/STUCK/FAILED/RECOVERABLE/BLOCKED + action), create/tick/run/resume with checkpoint-after-every-step.
   - tests/canary/test_real_guards.py — REAL guards registered through the canary framework: LOCAL_ONLY egress (_ALWAYS_REMOTE_TOOL_MARKERS) + DZ23 destructive guardrail (_DESTRUCTIVE_PATTERNS), break in-memory only (never the working tree).
+  - agent/mission_evidence.py — per-node required-evidence contract (§12/§79): EvidenceKind/Verification; a node is UNVERIFIED (never PASS) if required evidence is missing, FAILED if present-but-failing, VERIFIED only when all required kinds are present + ok. Default profiles per role (CODING/FRONTEND/SECURITY/RELEASE...).
   - Still NOT wired into the live gateway/goals/kanban (that's a Windows-runtime-validatable edit). The orchestration + persistence LOGIC is proven with real SQLite restart/resume tests here; no runtime PASS claimed for the shipped Windows app.
 
 VALIDATED =
-  - Full kernel/factory/canary suite = 68 passed (Linux venv): budget_state, mission_dag, progress_signal, mission, product_spec, kernel_pipeline, route_history, mission_runtime (persistence + restart/resume + bounded recovery + watchdog), canary framework + real-guard canaries.
+  - Full kernel/factory/canary suite = 74 passed (Linux venv): budget_state, mission_dag, progress_signal, mission, product_spec, kernel_pipeline, route_history, mission_runtime (persistence + restart/resume + bounded recovery + watchdog), canary framework + real-guard canaries.
   - NO runtime validation of the Windows app. NO PASS claimed for any Windows runtime gate.
 
 EXTERNAL_BLOCKERS =
@@ -45,7 +46,7 @@ OPEN_INTERNAL_FIXABLE (from audit; none block the Public Preview) =
   - Skill factory: ACTIVE/STALE/ARCHIVED only (no DRAFT/QUARANTINED authoring states, no ImprovementProposal); agent-created security scan off by default.
   - Doctor: vocabulary OK/WARN/FAIL/INFO (no BLOCKED); transactional safe-repair envelope exists only for state.db.
 
-LAST_TEST = full kernel/factory/canary suite -> 68 passed (Linux).
+LAST_TEST = full kernel/factory/canary suite -> 74 passed (Linux).
 LAST_COMMIT = feature/autonomy-kernel: orchestration (MissionStore/Runtime/Watchdog) + learned routing + real-guard canaries.
 
 INTEGRATION_STATUS (§15) =
