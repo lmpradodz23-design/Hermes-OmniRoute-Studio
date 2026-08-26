@@ -11,7 +11,7 @@ REMOTE_HEAD  = oss/develop = 6c46770 (cloud proxy blocks push; integrate via the
 INTEGRATED = NO (bundle = transport; becomes YES when the .bat reports PUSH=PASS)
 RUNTIME_VALIDATED = NO (Windows app not runnable here)
 SOURCE_IMPLEMENTED = YES (see modules below), all pure + additive, NO existing product file modified
-LAST_TEST = 126 passed (Linux venv), all new kernel/factory/canary suites
+LAST_TEST = 130 passed (Linux venv), incl. mission_trace observability + redacted JSON logs
 LAST_TEST_RESULT = PASS
 LAST_COMMIT = feat(waves 3/5/6): adaptive pipeline + safe repair + skill lifecycle + benchmark arena
 LAST_EVIDENCE = tests/agent + tests/canary (per-module), secret scan clean per commit
@@ -63,7 +63,7 @@ INSTALLED_APP_E2E     = WAITING_FOR_HUMAN (Windows)
 
 ## QUEUES
 READY_QUEUE (Linux-testable, additive — loop continues here next) =
-  1. observability/mission-trace correlation-id + JSON structured logs w/ redaction (§58/§59)
+  1. [DONE] observability/mission-trace correlation-id + JSON structured logs w/ redaction (§58/§59) -> agent/mission_trace.py
   2. self-healing propose-only loop composing doctor findings + worktree + safe_repair (§56/§57)
   3. DesignSpec contract + creative provider-abstraction contract w/ image LOCAL_ONLY (§35/§36/§37)
   4. project_model repo-intelligence extension (§40) ; debug_session engine (§45)
@@ -73,9 +73,9 @@ HUMAN_ACTION_QUEUE = run INTEGRAR-HERMES-WAVES.bat (push develop); OpenWA QR; co
 PLATFORM_QUEUE = iOS (needs macOS/Xcode) ; RAPTOR runtime binary
 EXTERNAL_QUEUE = none currently
 
-EXECUTABLE_INTERNAL_WORK = >0 (READY_QUEUE above)
+EXECUTABLE_INTERNAL_WORK = >0 (READY_QUEUE items 2-5)
 OPEN_INTERNAL_FIXABLE = 0 known P0/P1 in the landed source layer (all tested)
-NEXT_READY_TASK = observability correlation-id + structured JSON logging (§58/§59)
+NEXT_READY_TASK = self-healing propose-only loop (doctor findings + worktree + safe_repair), then DesignSpec + creative contract
 
 ## RESUME INSTRUCTIONS (§5/§76)
 1. git checkout feature/autonomy-kernel ; confirm clean tree.
