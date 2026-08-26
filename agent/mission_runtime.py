@@ -18,9 +18,15 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable
 
+from agent.autonomy_levels import Decision
 from agent.mission import Checkpoint, Mission, MissionState, derive_state
 from agent.mission_store import MissionStore
 from agent.progress_signal import ProgressSignal
+
+# A scheduler gate: node_id -> Decision (ALLOW/PROPOSE/HUMAN_GATE/DENY).
+DispatchPolicy = "object"   # documented type; runtime accepts any callable
+_GATE_DENY = Decision.DENY
+_GATE_HUMAN = (Decision.HUMAN_GATE, Decision.PROPOSE)
 
 
 # node status vocabulary (persisted as text)
@@ -94,11 +100,15 @@ class MissionRuntime:
         *,
         now_fn: Callable[[], float],
         recovery: RecoveryPolicy | None = None,
+        policy: "DispatchPolicy | None" = None,
     ):
         self.store = store
         self.executor = executor
         self.now = now_fn
         self.recovery = recovery or RecoveryPolicy()
+        # Optional scheduler-gate: budget / autonomy enforcement (§8/§9/§60).
+        # A callable node_id -> Decision (ALLOW/HUMAN_GATE/DENY). Default: allow all.
+        self.policy = policy
 
     # ---- lifecycle ------------------------------------------------------ #
 
@@ -135,6 +145,22 @@ class MissionRuntime:
             return state
 
         node_id = ready[0]
+
+        # Scheduler gate: resource-governor / autonomy enforcement before dispatch.
+        if self.policy is not None:
+            decision = self.policy(node_id)
+            if decision == _GATE_DENY:
+                self.store.set_node_status(mission_id, node_id, BLOCKED)
+                self.store.append_event(mission_id, "node_denied", {"node": node_id}, at=self.now())
+                state = MissionState.BLOCKED
+                self._commit_state(mission, state)
+                return state
+            if decision in _GATE_HUMAN:
+                self.store.append_event(mission_id, "node_human_gate", {"node": node_id}, at=self.now())
+                state = self._derive(dag, statuses, awaiting_human=True)
+                self._commit_state(mission, state)
+                return state
+
         self.store.set_node_status(mission_id, node_id, RUNNING)
         self.store.append_event(mission_id, "node_start", {"node": node_id}, at=self.now())
         outcome = self.executor(mission_id, node_id)
