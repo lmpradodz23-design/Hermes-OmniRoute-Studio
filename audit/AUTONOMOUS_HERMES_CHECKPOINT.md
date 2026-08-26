@@ -130,3 +130,23 @@ NEXT_READY_TASK = (runtime, next Windows turn) run the .bat to integrate develop
 3. Pure additive source items: write module+test -> pytest (venv /tmp/hos-venv) -> secret scan -> commit -> update checkpoint.
 4. Runtime-wiring items require the Windows host to validate (mark WAITING_FOR_HUMAN; do not fake PASS).
 STABLE_RELEASE = NOT_AUTHORIZED. Upstream push = NEVER. Force push = NEVER.
+
+## CONTINUITY CONTROLLER — 2026-08-26 (final source pass)
+CURRENT_TASK=prepare final publish (PUBLICAR-HERMES-FINAL.bat) + completion report
+NEXT_TASK=(host) run PUBLICAR-HERMES-FINAL.bat for the final push; then WINDOWS_NATIVE_EXECUTOR_HANDOFF Fase A-K
+READY_QUEUE=(empty for Linux-validatable source; exhausted)
+COMPLETED=autonomy kernel + factory + OmniRoute provider + wiring layer + real injections + real HTTP integration test + kernel<->OmniRoute mission composition + OSS docs
+FAILED=none
+WAITING_HUMAN=final push (credentials); Electron/NSIS build; install; installed-app E2E; live provider health; OS keychain secret writer; React Settings UI render
+BLOCKED_EXTERNAL=none open
+BLOCKED_PLATFORM=iOS (macOS/Xcode); RAPTOR runtime binary if absent
+OPEN_INTERNAL_FIXABLE=0
+SOURCE_HEAD=d1007fc (develop-integrated; +PUBLICAR/report commit follows)
+PACKAGE_VERSION=UNKNOWN (no build here)
+INSTALLED_VERSION=UNKNOWN (no install here)
+LAST_TEST=provider+kernel+integration suite green (100+ tests)
+LAST_BUILD=WAITING_FOR_HUMAN (Windows)
+LAST_INSTALL=WAITING_FOR_HUMAN (Windows)
+LAST_E2E=WAITING_FOR_HUMAN (Windows)
+EXECUTABLE_INTERNAL_WORK=0 for Linux-validatable source; remainder exclusively WAITING_FOR_HUMAN / BLOCKED_PLATFORM (proof: audit/HERMES_FINAL_COMPLETION_REPORT.md)
+PUSH_POLICY=session does NOT push; user runs PUBLICAR-HERMES-FINAL.bat
