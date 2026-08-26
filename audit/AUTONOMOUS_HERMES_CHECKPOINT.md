@@ -17,10 +17,11 @@ IMPLEMENTED (this session, Linux, source+unit only; branch feature/autonomy-kern
   - agent/mission_dag.py — Mission DAG (§7): topo order, ready/blocked frontier, critical path (longest weighted), ancestors/descendants, cycle+unknown-parent guards. Feedable by kanban parent edges OR goal sub-nodes.
   - agent/progress_signal.py — unified Watchdog stuck signal (§8): PROGRESSING/HEARTBEAT_ONLY/STRATEGY_CHANGE_REQUIRED/ESCALATE_TO_DIAGNOSTIC_AGENT/STALLED_NO_HEARTBEAT, thresholds mirror goals.classify_progress.
   - agent/mission.py — thin Mission entity (§6): MissionState DRAFT..CANCELLED, Mission references goal_key + kanban_board_id, Checkpoint reference tuple (§9), derive_state() composes DAG+budget+progress. Persist via to_dict/from_dict on the existing state_meta path.
-  - NOT yet wired into runtime (gateway status RPC / goals.py / kanban_db.py). Wiring is the Windows-validatable next step; no runtime PASS claimed.
+  - agent/product_spec.py — structured ProductSpec (§11/§16, WAVE 3): validated dataclass (name/audience/roles/features/journeys/design/backend/db/auth/integrations/platforms/acceptance_criteria/assumptions/risks), to_dict/from_mapping, and to_mission_dag() that lowers a spec into a schedulable build graph (features -> QA -> release). This is the machine-readable spec the factory was missing.
+  - NOT yet wired into runtime (gateway status RPC / goals.py / kanban_db.py / product-studio skill). Wiring is the Windows-validatable next step; no runtime PASS claimed.
 
 VALIDATED =
-  - tests/agent/{test_budget_state,test_mission_dag,test_progress_signal,test_mission}.py = 39 passed (Linux venv). Adapters exercised against the REAL enforcer types.
+  - tests/agent/{test_budget_state,test_mission_dag,test_progress_signal,test_mission,test_product_spec,test_kernel_pipeline}.py = 49 passed (Linux venv). Adapters exercised against the REAL enforcer types; kernel coherence proven end-to-end (INTENT->SPEC->DAG->STATE) in test_kernel_pipeline.py.
   - NO runtime validation (Windows app not runnable here). NO PASS claimed for any runtime gate.
 
 EXTERNAL_BLOCKERS =
