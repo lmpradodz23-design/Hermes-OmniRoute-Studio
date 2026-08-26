@@ -7,7 +7,13 @@ CURRENT_WAVE = Waves 1-6 SOURCE LAYER exhausted (kernel + factory logic, tested)
 ## §4 STATE
 FEATURE_HEAD = feature/autonomy-kernel tip (delivered as hos-waves-<sha>.bundle, base 6c46770)
 DEVELOP_HEAD = <pending: user runs INTEGRAR-HERMES-WAVES.bat>
-REMOTE_HEAD  = oss/develop = 6c46770 (cloud proxy blocks push; integrate via the .bat)
+REMOTE_HEAD  = oss/develop = 649bf5c (CORRECTED; 6c46770 is its ancestor). My feature branch sits DIRECTLY on
+  top of 649bf5c, so oss/develop is a direct ancestor of FEATURE_HEAD -> merge into develop is CONFLICT-FREE /
+  fast-forwardable (verified on device: merge-base(HEAD,649bf5c)=649bf5c; 0 file collisions with develop's 3
+  newer release/docs commits). Bundle base 6c46770 is verified present on the Windows repo. Cloud proxy blocks
+  push; integrate via the .bat.
+  NOTE: 6c46770 = "fix(desktop): NTFS-robust update-lock CS + honest MCP test precondition" -> the atomic-lock/
+  MCP fixes from audit/runtime-evidence are ALREADY in oss/develop history (landed upstream on the fork).
 INTEGRATED = NO (HERMES-INTEGRATION-RESULT.txt not present yet) -> YES when the .bat reports PUSH=PASS
 RUNTIME_VALIDATED = NO (Windows app not runnable here)
 SOURCE_IMPLEMENTED = YES (all pure + additive; only mission_runtime got an additive policy hook, regression green)
