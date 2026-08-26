@@ -11,10 +11,21 @@ REMOTE_HEAD  = oss/develop = 6c46770 (cloud proxy blocks push; integrate via the
 INTEGRATED = NO (HERMES-INTEGRATION-RESULT.txt not present yet) -> YES when the .bat reports PUSH=PASS
 RUNTIME_VALIDATED = NO (Windows app not runnable here)
 SOURCE_IMPLEMENTED = YES (all pure + additive; only mission_runtime got an additive policy hook, regression green)
-LAST_TEST = 169 passed (Linux venv), full kernel/factory/canary suite + integration
-LAST_TEST_RESULT = PASS
-LAST_COMMIT = feat(test-intel): flaky-test history ledger (§44)
-LAST_EVIDENCE = per-module tests in tests/agent + tests/canary; secret scan clean per commit
+LAST_TEST = 196 passed (Linux venv), mission kernel/factory/canary + provider complement (20 new)
+LAST_TEST_RESULT = PASS (1 unrelated product test skipped: test_verification_evidence needs `requests` dep; not a mission module)
+LAST_COMMIT = docs(omniroute): supported-providers table generated from catalog (§35)
+LAST_EVIDENCE = per-module tests in tests/agent + tests/canary; secret scan clean per commit; Windows run-1 evidence preserved under audit/runtime-evidence/f33d1918
+
+## PROVIDER COMPLEMENT (§1-43) — DONE (source layer), OmniRoute EXTENSION not parallel router
+provider_catalog       = IMPLEMENTED+TESTED (curation metadata; quotas NEVER invented; last_verified_at=None)
+provider_routing       = IMPLEMENTED+TESTED (free-first; LOCAL_ONLY absolute; cost guard; §37 canaries green)
+provider_adapter       = IMPLEMENTED+TESTED (ConnectionStatus + key-format + local auto-detect; NO api_key field; sanitize_for_renderer)
+provider_catalog_link  = IMPLEMENTED+TESTED (reconcile to existing providers/ registry; registry wins runtime facts; drift FLAGGED = anti-parallel guard)
+provider_settings_view = IMPLEMENTED+TESTED (Settings->AI&Models lay-user surface; guided flow §38; secret-safe by construction; UNKNOWN never faked CONNECTED)
+docs/provider-catalog.md = generated from source (honest, no invented price/quota)
+PROVIDER_RUNTIME_WIRING = WAITING_FOR_HUMAN: bind provider_routing into gateway selection; OS secure-storage for key_ref;
+  live health probes/quota_status; benchmark_arena feed of quality_score; capability_acquisition of missing local provider;
+  renderer screen consuming build_settings_view. (Runtime = validatable only on the app host.)
 
 ## MODULES IMPLEMENTED (branch feature/autonomy-kernel; agent/*.py unless noted)
 Kernel: budget_state, mission_dag, progress_signal, mission, mission_store, mission_runtime(+policy hook),
@@ -23,8 +34,11 @@ Kernel: budget_state, mission_dag, progress_signal, mission, mission_store, miss
 Factory: product_spec, mission_class, code_graph, impact_selection, project_model, debug_session,
          security_gate, safe_repair, release_pipeline, mcp_control_plane, creative_contract,
          eyes_hands_contracts, skill_lifecycle, self_heal, doctor_model, flaky_ledger
+Provider(§1-43): provider_catalog, provider_routing, provider_adapter, provider_catalog_link, provider_settings_view
+         + docs/provider-catalog.md (generated from source)
 Canary: tests/canary/framework + tests/canary/test_real_guards (LOCAL_ONLY + dz23)
 Ops: INTEGRAR-HERMES-WAVES.bat (one-click integration to develop)
+Evidence: audit/runtime-evidence/f33d1918 (preserved Windows SourceTests run-1 + atomic-lock/MCP fix rationale)
 
 ## §121 FINAL MATRIX (evidence-backed; IMPLEMENTED/TESTED = source+unit on Linux)
 AUTONOMY_KERNEL        = IMPLEMENTED+TESTED ; INTEGRATED=NO ; RUNTIME_VALIDATED=WAITING_FOR_HUMAN
@@ -60,6 +74,7 @@ DOCTOR                = EXISTS broad(audit) + doctor_model (BLOCKED status + sel
 SAFE_REPAIR           = IMPLEMENTED+TESTED
 SELF_HEALING          = IMPLEMENTED+TESTED (isolated propose-only loop) ; live wiring=WAITING_FOR_HUMAN
 MCP_CONTROL_PLANE     = IMPLEMENTED+TESTED (registry + per-mission selection) ; bind to capabilities.lock=WAITING(runtime)
+PROVIDER_CATALOG_UX   = IMPLEMENTED+TESTED (catalog+routing+adapter+link+settings-view; free-first/LOCAL_ONLY/secret-safe; §37 canaries) ; runtime bind/UI=WAITING_FOR_HUMAN
 GENERAL_AGENT_E2E     = WAITING_FOR_HUMAN (runtime)
 SOFTWARE_FACTORY_E2E  = SOURCE-INTEGRATION TESTED (test_full_kernel_integration, failure injection) ; full runtime E2E=WAITING_FOR_HUMAN
 INSTALLED_APP_E2E     = WAITING_FOR_HUMAN (Windows)
@@ -76,12 +91,17 @@ RUNTIME_WIRING_QUEUE (edits to mature engines; PASS is Windows-runtime -> WAITIN
   - wire doctor_model + safe_repair into hermes_cli/doctor.py; BLOCKED status
   - browser_network tool into tools/browser_tool.py ; populate code_graph from agent/lsp
   - bind mcp_control_plane to capabilities.lock ; creative_contract to plugins/image_gen
+  - PROVIDER: bind provider_routing.select_provider into the gateway provider-selection path (extend, not replace);
+    reconcile() against providers.list_providers() at startup; store key_ref in OS secure storage (keyring/DPAPI);
+    live health_check/quota_status probes; feed benchmark_arena quality_score; renderer Settings->AI&Models consumes
+    build_settings_view(); LOCAL_ONLY runtime gate on the real dispatch path.
 WINDOWS_VALIDATION_QUEUE = P0 updater runtime, Electron/NSIS build, Computer Use/Browser/Visual QA real, installed E2E, cold start/backend READY/restart, LOCAL_ONLY runtime
 HUMAN_ACTION_QUEUE = run INTEGRAR-HERMES-WAVES.bat (push develop); OpenWA QR; code-signing cert
 PLATFORM_QUEUE = iOS (macOS/Xcode) ; RAPTOR runtime binary
 
-EXECUTABLE_INTERNAL_WORK = ~0 for pure/Linux-validatable source (exhausted). Remainder is exclusively
-  runtime-wiring (WAITING_FOR_HUMAN to validate), BLOCKED_PLATFORM, or the human integration action.
+EXECUTABLE_INTERNAL_WORK = ~0 again for pure/Linux-validatable source. The §1-43 provider complement
+  (catalog+routing+adapter+link+settings-view+docs) is now landed and tested; its remainder is provider
+  RUNTIME_WIRING (WAITING_FOR_HUMAN). No other pure-testable high-value item is currently open.
 OPEN_INTERNAL_FIXABLE = 0 known P0/P1 in the landed source layer (all tested)
 NEXT_READY_TASK = (runtime, next Windows turn) run the .bat to integrate develop, then execute the
   RUNTIME_WIRING_QUEUE + WINDOWS_VALIDATION_QUEUE on the authoritative host.
