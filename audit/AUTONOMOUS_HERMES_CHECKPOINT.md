@@ -55,17 +55,14 @@ INTEGRATION_STATUS (§15) =
   REMOTE_HEAD  = oss/develop still at 6c46770 until the one-click integrator pushes (cloud proxy blocks push here)
   INTEGRATED   = NO (bundle is transport, not merged/pushed) -> becomes YES after INTEGRAR-HERMES-WAVES.bat reports PUSH=PASS
   RUNTIME_VALIDATED = NO (Windows app gates = WAITING_FOR_HUMAN)
-NEXT_ACTION = Continue WAVE 1 -> WAVE 2 with additive, Linux-testable increments (reuse-and-extend):
-  - wire the primitives into runtime seams (gateway session-status read for BudgetState; a Mission reference row alongside GoalState) — small edits, Windows-validatable.
-  - WAVE 2: browser_network tool (alongside browser_console); compose a visual-QA loop from preview-act + screenshot + browser_vision.
-  External/human (do not block cloud work): user pushes bundles + runs P0/runtime gates on Windows per PUBLIC_PREVIEW_RUNBOOK.md.
+DONE_THIS_SESSION (superset of COMPLETED above) = kernel primitives (budget/dag/progress/mission) + coherence pipeline; ProductSpec + spec->DAG; canary framework + REAL-guard canaries (LOCAL_ONLY, dz23); learned routing; Mission orchestration (store/runtime/watchdog + persistence + restart/resume + bounded recovery); per-node evidence contract. + one-click INTEGRAR-HERMES-WAVES.bat.
 
-REMAINING_INTERNAL_EXECUTABLE_WORK (Linux-testable, additive; the loop continues on these) =
-  - Wave 4/6: route-history ledger + learned selection policy (§30/§31) — pure, reuses moa_trace concept.
-  - Wave 5: security_research/engine.py composing the existing primitives (§27) — pure orchestration, unit-testable with fakes; RAPTOR binary itself = BLOCKED_BY_PLATFORM.
-  - Wave 6: register the real guards (LOCAL_ONLY / dz23-guardrail) through tests/canary/framework.py.
-  - Wave 3: ProductSpec schema block into product-studio contracts.yaml (doc reuse).
-  - Runtime wiring of all kernel primitives (small edits to gateway/goals/kanban) — authored here, but their PASS is WINDOWS-runtime and therefore WAITING_FOR_HUMAN to validate.
+NEXT_ACTION (loop continues on these — Linux-testable, additive) =
+  - Wave 5: security_research/engine.py composing the existing primitives into a SECURITY_REVIEW mission node (finding -> remediation node -> blocks release node -> rescan -> resolve) — unit-testable with fakes; RAPTOR binary = BLOCKED_BY_PLATFORM.
+  - Wave 3: register the ProductSpec schema into product-studio contracts.yaml; adaptive MICRO-vs-PRODUCT pipeline in to_mission_dag.
+  - Wave 2: pure data contracts (ComputerAction/Observation/BrowserObservation/NetworkEvent/VisualQaFinding...) so IMPLEMENTATION=PASS while REAL_WINDOWS_RUNTIME=WAITING_FOR_HUMAN.
+  - Wire kernel primitives into gateway/goals/kanban seams (authored logic ready; PASS is Windows-runtime -> WAITING_FOR_HUMAN to validate).
+  External/human (do not block cloud work): run INTEGRAR-HERMES-WAVES.bat to merge+push develop; run P0/runtime gates on Windows per PUBLIC_PREVIEW_RUNBOOK.md.
 
 BLOCKED (not internal-executable here) =
   - Wave 2 browser_network / visual-QA loop runtime (external agent-browser + Windows app) = WAITING_FOR_HUMAN.
