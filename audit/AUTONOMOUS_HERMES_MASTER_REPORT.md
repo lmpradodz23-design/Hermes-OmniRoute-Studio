@@ -47,12 +47,12 @@ Hermes OmniRoute Studio is **not** "a fork with many features." It already conta
 
 ## Reuse-and-extend roadmap (smallest verifiable increment per wave)
 
-- **WAVE 1 — Autonomy Kernel:** [DONE] `budget_state.py` roll-up. [NEXT] thin `Mission` reference over GoalState+kanban; lift `classify_progress()` to a shared stuck-signal; `critical_path()` read over kanban parent edges (no schema change).
-- **WAVE 2 — Eyes & Hands:** compose `preview-act` + Electron/CDP screenshot + `browser_vision` into one visual-QA loop; add `browser_network` alongside `browser_console`.
-- **WAVE 3 — Product Creation:** add a machine-readable ProductSpec schema to `contracts.yaml`; have intake emit it; hand a DESIGN.md (design-md) to the design step.
-- **WAVE 4 — Elite Coding:** code graph on `agent/lsp` -> impact analysis -> deterministic integration/merge lane (promote `merge-reconciler` skill to orchestration); fine-grained diff->test selection over `run_tests_parallel.py`.
-- **WAVE 5 — Factory:** `security_research/engine.py` composing the existing primitives + a `hermes doctor` "Security Research" section; SBOM job + tag-triggered release orchestrator; Android build/emulator CI (iOS BLOCKED_BY_PLATFORM).
-- **WAVE 6 — Self Evolution:** learned router reading a promoted `moa_trace` ledger; DRAFT/QUARANTINED skill states + ImprovementProposal; generalize the `update-marker` canary into a fail-closed canary framework; `SafeRepair` helper + `BLOCKED` state in doctor; doctor FAIL findings -> worktree-isolated, propose-only self-heal missions.
+- **WAVE 1 — Autonomy Kernel:** [DONE, tested] `budget_state.py` roll-up; `mission_dag.py` (topo/frontier/critical-path); `progress_signal.py` (unified stuck signal); `mission.py` (Mission entity + Checkpoint + `derive_state`). Coherence proven end-to-end in `test_kernel_pipeline.py`. [NEXT] wire into runtime seams (gateway status; a Mission row beside GoalState) — Windows-validatable.
+- **WAVE 2 — Eyes & Hands:** [WAITING_FOR_HUMAN — external agent-browser + Windows app] compose `preview-act` + Electron/CDP screenshot + `browser_vision` into one visual-QA loop; add `browser_network` alongside `browser_console`.
+- **WAVE 3 — Product Creation:** [DONE, tested] `product_spec.py` — structured, validated ProductSpec + `to_mission_dag()` bridge. [NEXT] mirror the schema into `contracts.yaml`; hand a DESIGN.md (design-md) to the design step.
+- **WAVE 4 — Elite Coding:** [QUEUED — large] code graph on `agent/lsp` -> impact analysis -> deterministic integration/merge lane; fine-grained diff->test selection over `run_tests_parallel.py`.
+- **WAVE 5 — Factory:** [PARTIAL-INTERNAL / rest WAITING_FOR_HUMAN] `security_research/engine.py` composing the existing primitives (unit-testable) + a `hermes doctor` "Security Research" section; SBOM job + tag-triggered release orchestrator; Android build/emulator CI (iOS BLOCKED_BY_PLATFORM; RAPTOR binary BLOCKED_BY_PLATFORM).
+- **WAVE 6 — Self Evolution:** [DONE, tested] fail-closed canary framework (`tests/canary/framework.py`). [NEXT-INTERNAL] learned router over a promoted `moa_trace` ledger; DRAFT/QUARANTINED skill states + ImprovementProposal; register real guards through the canary framework; `SafeRepair` helper + `BLOCKED` doctor state; doctor FAIL -> worktree-isolated, propose-only self-heal.
 
 ## Changes made this session
 
