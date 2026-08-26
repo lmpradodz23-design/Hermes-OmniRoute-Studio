@@ -12,7 +12,47 @@ Este arquivo começa no fork. O histórico anterior ao fork é o do
 
 ## [Não lançado]
 
-_Sem mudanças ainda desde a Public Preview._
+### Adicionado — Autonomy Kernel (source layer)
+Núcleo compartilhado para um agente geral autônomo e uma fábrica de software
+autônoma, construído como camada pura/aditiva (stdlib, sem novo runtime paralelo),
+com testes de unidade/contrato/integração de fonte:
+
+- **Mission/DAG/Store/Runtime/Scheduler/Watchdog** com checkpoint/resume e recuperação
+  limitada; **Evidence Engine** por nó (UNVERIFIED ≠ PASS) correlacionado via
+  **mission_trace** (logs redigidos).
+- **Learned routing** (`route_history` + `benchmark_arena`) com **LOCAL_ONLY** como
+  regra de elegibilidade absoluta; **Resource Governor** (budget) e **Autonomy Levels**
+  aplicados no dispatch.
+- **Capability Acquisition Engine** (detectar → classificar risco → hard-stop de
+  segurança → adquirir transacional → registrar → retomar).
+- **Software Factory**: `ProductSpec → MissionDag`, pipeline adaptativo, `code_graph` +
+  seleção de testes por impacto (fail-open), **security gate**, **safe repair**
+  transacional, **self-heal** isolado (propose-only), **doctor** com status BLOCKED.
+- **Canary framework** fail-closed com guardas reais (LOCAL_ONLY e padrões destrutivos).
+
+### Adicionado — OmniRoute Provider Catalog + Free-First UX (§1–43)
+Extensão do OmniRoute existente (não um roteador paralelo) para configuração de IA
+simples para leigos, priorizando grátis/local e privacidade:
+
+- **Provider Catalog** com metadados curados (cloud/local/agregador/OpenAI-compat);
+  **cotas e preços nunca inventados** (UNKNOWN até verificação real).
+- **Free-first routing** com ordem de prioridade obrigatória (privacidade→capability→
+  disponibilidade→grátis/local→qualidade→latência), **cost-guard** (ASK_BEFORE_PAID) e
+  **LOCAL_ONLY absoluto**.
+- **Secret-safe**: `ProviderConfig` sem campo de chave; segredos via `agent/secret_sources`
+  (OS-backed); o renderer recebe só `{configured, status, metadata}`.
+- **Camada de wiring** (consome os módulos puros nos *seams* reais, sem novo transport):
+  `provider_omniroute_bridge`, `provider_secret_bridge`, `provider_probe`,
+  `provider_settings_service` e `provider_runtime_hooks`.
+- **Injeções reais** (`provider_runtime`): `UrllibHttpClient` (stdlib), `SecretSourcesResolver`
+  e `default_service()`, com **teste de integração real** contra servidor HTTP local.
+- Docs: `docs/provider-catalog.md` (gerado da fonte) e
+  `docs/AUTONOMY_KERNEL_AND_OMNIROUTE.md`.
+
+> Nota: a validação de **runtime** (build Electron/NSIS, app instalado, GUI, E2E) roda
+> apenas no host Windows nativo — ver `audit/WINDOWS_NATIVE_EXECUTOR_HANDOFF.md`. Esta
+> camada é fonte + testes de unidade/contrato/integração de fonte; nenhum PASS de runtime
+> é declarado sem o host real.
 
 ## [0.17.0-omniroute.1] - 2026-08-24
 

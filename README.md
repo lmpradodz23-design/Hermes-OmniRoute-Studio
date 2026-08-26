@@ -215,6 +215,14 @@ All documentation lives at **[hermes-agent.nousresearch.com/docs](https://hermes
 | [CLI Reference](https://hermes-agent.nousresearch.com/docs/reference/cli-commands)                  | All commands and flags                                     |
 | [Environment Variables](https://hermes-agent.nousresearch.com/docs/reference/environment-variables) | Complete env var reference                                 |
 
+### OmniRoute Studio additions (this fork)
+
+| Doc | What's covered |
+| --- | --- |
+| [Autonomy Kernel & OmniRoute Provider System](docs/AUTONOMY_KERNEL_AND_OMNIROUTE.md) | The shared autonomy kernel + free-first, secret-safe, LOCAL_ONLY provider configuration; modules, selection flow, tests, host activation |
+| [Provider Catalog](docs/provider-catalog.md) | Supported providers table (generated from source; no invented quotas/prices) |
+| [Windows Native Executor Handoff](audit/WINDOWS_NATIVE_EXECUTOR_HANDOFF.md) | The remaining runtime-only work (build/install/E2E) mapped to real seams |
+
 ---
 
 ## Migrating from OpenClaw
