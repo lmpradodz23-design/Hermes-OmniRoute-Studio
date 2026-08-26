@@ -105,9 +105,21 @@ WINDOWS_VALIDATION_QUEUE = P0 updater runtime, Electron/NSIS build, Computer Use
 HUMAN_ACTION_QUEUE = run INTEGRAR-HERMES-WAVES.bat (push develop); OpenWA QR; code-signing cert
 PLATFORM_QUEUE = iOS (macOS/Xcode) ; RAPTOR runtime binary
 
-EXECUTABLE_INTERNAL_WORK = ~0 again for pure/Linux-validatable source. The §1-43 provider complement
-  (catalog+routing+adapter+link+settings-view+docs) is now landed and tested; its remainder is provider
-  RUNTIME_WIRING (WAITING_FOR_HUMAN). No other pure-testable high-value item is currently open.
+## INTEGRATION READINESS (verified on device this turn — de-risked, ready to run)
+DELIVERED_BUNDLE = hos-waves-<final>.bundle in the Hermes-OmniRoute repo root (base 649bf5c = real oss/develop tip).
+VERIFIED: (a) `git bundle verify` PASS on device; (b) base 649bf5c present on the Windows repo; (c) DRY-RUN fetch of
+  the feature branch on device succeeded and merge-base(develop 649bf5c, feature tip)=649bf5c => CONFLICT-FREE /
+  fast-forwardable merge; (d) 0 file collisions with develop's 3 newer release/docs commits.
+STALE bundles moved to <repo>/_to_delete/ on the device (device_bash cannot delete — user removes that folder).
+REMAINING ACTION = run INTEGRAR-HERMES-WAVES.bat on Windows. Push itself is WAITING_FOR_HUMAN: the cloud/device
+  shells have NO network egress to GitHub, and a push is a gated publish action — must be the user's authenticated run.
+
+EXECUTABLE_INTERNAL_WORK = 0 for pure/Linux-validatable source. CONVERGED: the §1-43 provider complement
+  (catalog+routing+adapter+link+settings-view+docs, pyflakes-clean, 20 new tests green) is the last pure layer;
+  its remainder is provider RUNTIME_WIRING (WAITING_FOR_HUMAN). Every other open item is WAITING_FOR_HUMAN
+  (runtime wiring, integration .bat, Windows validation/E2E) or BLOCKED_PLATFORM (iOS, RAPTOR). Proof: this
+  turn ran the mission suite (196 pass; the one fail is an unrelated product test missing the `requests` dep),
+  secret scans clean, and an on-device dry-run proving the develop merge is conflict-free.
 OPEN_INTERNAL_FIXABLE = 0 known P0/P1 in the landed source layer (all tested)
 NEXT_READY_TASK = (runtime, next Windows turn) run the .bat to integrate develop, then execute the
   RUNTIME_WIRING_QUEUE + WINDOWS_VALIDATION_QUEUE on the authoritative host.

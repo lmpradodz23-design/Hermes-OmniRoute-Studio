@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, Sequence
 
-from agent.provider_catalog import Capability, ProviderCatalog, ProviderEntry, Tri
+from agent.provider_catalog import Capability, ProviderCatalog, ProviderEntry
 
 
 class _Profile(Protocol):

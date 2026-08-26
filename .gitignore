@@ -251,3 +251,6 @@ HERMES-PUBLISH-RESULT.txt
 HERMES-SECRET-FINDINGS.txt
 HERMES-PUBLISH-LOG.txt
 HERMES-REMOTE-TREE.txt
+
+# transport bundles — never tracked
+hos-waves-*.bundle

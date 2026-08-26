@@ -11,7 +11,7 @@ renderer/logs/repo. Pure/contract module; real network probes are injected
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Mapping, Protocol
 

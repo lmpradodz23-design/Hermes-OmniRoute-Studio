@@ -20,7 +20,7 @@ Pure module.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Mapping
 
 from agent.provider_adapter import (
@@ -29,8 +29,6 @@ from agent.provider_adapter import (
     user_message,
 )
 from agent.provider_catalog import (
-    Capability,
-    Category,
     Curation,
     ProviderCatalog,
     ProviderEntry,

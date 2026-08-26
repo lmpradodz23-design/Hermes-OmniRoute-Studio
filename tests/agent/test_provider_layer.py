@@ -14,7 +14,6 @@ from agent.provider_catalog import (
     Capability,
     Curation,
     ProviderCatalog,
-    Tri,
 )
 from agent.provider_routing import (
     ProviderCandidate,
