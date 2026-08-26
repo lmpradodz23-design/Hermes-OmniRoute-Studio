@@ -2,7 +2,7 @@
 
 MISSION = Hermes OmniRoute Studio -> autonomous general agent + autonomous software factory on ONE shared Autonomy Kernel (reuse-and-extend, never duplicate; no invented PASS).
 
-CURRENT_WAVE = WAVE_ZERO complete -> WAVE_1 (Autonomy Kernel) started.
+CURRENT_WAVE = WAVE_1 (Autonomy Kernel) in progress — 4 pure kernel primitives landed + tested.
 
 COMPLETED =
   - WAVE ZERO: evidence-based source audit of all 27 capabilities (§4), 8 independent read-only auditors, every claim file-cited. See AUTONOMOUS_HERMES_MASTER_REPORT.md.
@@ -12,11 +12,15 @@ COMPLETED =
 IN_PROGRESS =
   - WAVE 1: unify Goal loop + Kanban DAG under a thin Mission reference (no new engine); thread one correlation id (run_id/mission_id) through the 4 evidence sinks.
 
-IMPLEMENTED (this session, Linux, source+unit only) =
-  - agent/budget_state.py — worst-state-wins roll-up (WITHIN_BUDGET/NEAR_LIMIT/LIMIT_REACHED/OVERRIDE_REQUIRED); adapters reuse IterationBudget + SpendCeilingConfig/SpendStatus. NOT yet wired into the gateway status RPC (next step).
+IMPLEMENTED (this session, Linux, source+unit only; branch feature/autonomy-kernel; all pure + additive, NO existing file modified) =
+  - agent/budget_state.py — Resource Governor (§39) worst-state-wins roll-up; adapters reuse IterationBudget + SpendCeilingConfig/SpendStatus.
+  - agent/mission_dag.py — Mission DAG (§7): topo order, ready/blocked frontier, critical path (longest weighted), ancestors/descendants, cycle+unknown-parent guards. Feedable by kanban parent edges OR goal sub-nodes.
+  - agent/progress_signal.py — unified Watchdog stuck signal (§8): PROGRESSING/HEARTBEAT_ONLY/STRATEGY_CHANGE_REQUIRED/ESCALATE_TO_DIAGNOSTIC_AGENT/STALLED_NO_HEARTBEAT, thresholds mirror goals.classify_progress.
+  - agent/mission.py — thin Mission entity (§6): MissionState DRAFT..CANCELLED, Mission references goal_key + kanban_board_id, Checkpoint reference tuple (§9), derive_state() composes DAG+budget+progress. Persist via to_dict/from_dict on the existing state_meta path.
+  - NOT yet wired into runtime (gateway status RPC / goals.py / kanban_db.py). Wiring is the Windows-validatable next step; no runtime PASS claimed.
 
 VALIDATED =
-  - tests/agent/test_budget_state.py = 17 passed (Linux venv). Adapters exercised against the REAL enforcer types.
+  - tests/agent/{test_budget_state,test_mission_dag,test_progress_signal,test_mission}.py = 39 passed (Linux venv). Adapters exercised against the REAL enforcer types.
   - NO runtime validation (Windows app not runnable here). NO PASS claimed for any runtime gate.
 
 EXTERNAL_BLOCKERS =
@@ -35,6 +39,9 @@ OPEN_INTERNAL_FIXABLE (from audit; none block the Public Preview) =
   - Skill factory: ACTIVE/STALE/ARCHIVED only (no DRAFT/QUARANTINED authoring states, no ImprovementProposal); agent-created security scan off by default.
   - Doctor: vocabulary OK/WARN/FAIL/INFO (no BLOCKED); transactional safe-repair envelope exists only for state.db.
 
-LAST_TEST = tests/agent/test_budget_state.py -> 17 passed (Linux).
-LAST_COMMIT = feature/autonomy-kernel: "feat(autonomy): Resource Governor budget-state roll-up (§39)".
-NEXT_ACTION = (1) user runs the delivered bundle push + P0/runtime gates on Windows; (2) next cloud increment: wire BudgetState into the gateway session-status read path and add the thin Mission reference linking GoalState <-> kanban board id (both additive, Linux-unit-testable). Continue reuse-and-extend per wave; declare PASS only with evidence.
+LAST_TEST = tests/agent/{budget_state,mission_dag,progress_signal,mission} -> 39 passed (Linux).
+LAST_COMMIT = feature/autonomy-kernel: kernel primitives (mission_dag + progress_signal + mission).
+NEXT_ACTION = Continue WAVE 1 -> WAVE 2 with additive, Linux-testable increments (reuse-and-extend):
+  - wire the primitives into runtime seams (gateway session-status read for BudgetState; a Mission reference row alongside GoalState) — small edits, Windows-validatable.
+  - WAVE 2: browser_network tool (alongside browser_console); compose a visual-QA loop from preview-act + screenshot + browser_vision.
+  External/human (do not block cloud work): user pushes bundles + runs P0/runtime gates on Windows per PUBLIC_PREVIEW_RUNBOOK.md.
